@@ -17,3 +17,7 @@ The included `Dockerfile` uses Bun and Next.js standalone output. A `docker-comp
 ## Background sets
 - Christmas (12): Winter Lights, Candy Cane Stripes, Snow Globe, Pine Lanterns, Gingerbread Hall, Crimson Ornaments, Midnight Snowfall, Holly Bokeh, Cozy Fireplace, North Star, Frosted Mint, Gold Ribbon.
 - Alaska (4): Aurora Ridge (AK), Glacier Bay (AK), Spruce Sunset (AK), Icefield Dawn (AK).
+
+## Background library
+- Front desk can upload custom backgrounds (name + optional description + image) and delete uploads; built-ins are protected.
+- API: `/api/backgrounds` (list/add/delete), `/api/backgrounds/files/:id` (serve custom assets).

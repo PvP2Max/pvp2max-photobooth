@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
-import { BACKGROUND_OPTIONS } from "@/lib/backgrounds";
+import { useEffect, useMemo, useState } from "react";
+import type { BackgroundOption } from "@/lib/backgrounds";
 
 type Photo = {
   id: string;
@@ -17,6 +17,8 @@ type Selection = {
   backgroundId: string;
   preview?: string;
 };
+
+type BackgroundState = BackgroundOption & { isCustom?: boolean };
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en", {
@@ -75,6 +77,8 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [sending, setSending] = useState(false);
+  const [backgroundUploading, setBackgroundUploading] = useState(false);
+  const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
   const [selectionMap, setSelectionMap] = useState<Record<string, Selection>>(
@@ -96,6 +100,28 @@ export default function Home() {
     () => searchEmail || uploadEmail,
     [searchEmail, uploadEmail],
   );
+
+  async function loadBackgrounds() {
+    try {
+      const response = await fetch("/api/backgrounds");
+      const payload = (await response.json()) as {
+        backgrounds?: BackgroundState[];
+        error?: string;
+      };
+      if (!response.ok || !payload.backgrounds) {
+        throw new Error(payload.error || "Could not load backgrounds.");
+      }
+      setBackgrounds(payload.backgrounds);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to load backgrounds.";
+      setError(msg);
+    }
+  }
+
+  useEffect(() => {
+    loadBackgrounds();
+  }, []);
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -202,7 +228,7 @@ export default function Home() {
   }
 
   async function pickBackground(photo: Photo, backgroundId: string) {
-    const background = BACKGROUND_OPTIONS.find((bg) => bg.id === backgroundId);
+    const background = backgrounds.find((bg) => bg.id === backgroundId);
     if (!background) return;
     ensurePhotoSelected(photo.id);
     setError(null);
@@ -230,6 +256,90 @@ export default function Home() {
         err instanceof Error
           ? err.message
           : "Could not generate preview for that background.";
+      setError(msg);
+    }
+  }
+
+  async function uploadBackground(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    const form = event.currentTarget;
+    const fileInput = form.elements.namedItem("bgfile") as HTMLInputElement;
+    const nameInput = form.elements.namedItem("bgname") as HTMLInputElement;
+    const descInput = form.elements.namedItem("bgdesc") as HTMLInputElement;
+    const file = fileInput.files?.[0];
+    if (!file) {
+      setError("Choose a background file to upload.");
+      return;
+    }
+    if (!nameInput.value.trim()) {
+      setError("Give the background a name.");
+      return;
+    }
+
+    setBackgroundUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("name", nameInput.value);
+      formData.append("description", descInput.value);
+      formData.append("file", file);
+
+      const response = await fetch("/api/backgrounds", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json()) as {
+        background?: BackgroundState;
+        error?: string;
+      };
+      if (!response.ok || !payload.background) {
+        throw new Error(payload.error || "Failed to add background.");
+      }
+      setBackgrounds((prev) => [...prev, payload.background!]);
+      form.reset();
+      setMessage("Background added.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not upload background.";
+      setError(msg);
+    } finally {
+      setBackgroundUploading(false);
+    }
+  }
+
+  async function deleteBackground(id: string) {
+    setError(null);
+    setMessage(null);
+    const bg = backgrounds.find((b) => b.id === id);
+    if (!bg?.isCustom) {
+      setError("Only uploaded backgrounds can be removed.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/backgrounds", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to delete background.");
+      }
+      setBackgrounds((prev) => prev.filter((b) => b.id !== id));
+      setSelectionMap((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(next)) {
+          if (next[key]?.backgroundId === id) {
+            delete next[key];
+          }
+        }
+        return next;
+      });
+      setMessage("Background removed.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not delete background.";
       setError(msg);
     }
   }
@@ -428,6 +538,86 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="space-y-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm text-amber-200/80">Background library</p>
+              <h2 className="text-xl font-semibold text-white">
+                Upload or remove backdrops
+              </h2>
+            </div>
+          </div>
+          <form
+            onSubmit={uploadBackground}
+            className="grid gap-3 rounded-2xl bg-black/20 p-4 ring-1 ring-white/5"
+          >
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm text-slate-200/80">
+                Name
+                <input
+                  name="bgname"
+                  required
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-amber-300 focus:outline-none"
+                  placeholder="Cozy Hearth"
+                />
+              </label>
+              <label className="text-sm text-slate-200/80">
+                Description (optional)
+                <input
+                  name="bgdesc"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-amber-300 focus:outline-none"
+                  placeholder="Warm fireplace glow"
+                />
+              </label>
+            </div>
+            <label className="text-sm text-slate-200/80">
+              Upload image
+              <input
+                name="bgfile"
+                type="file"
+                accept="image/*"
+                required
+                className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={backgroundUploading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-amber-500 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:from-amber-200 hover:to-amber-400 disabled:opacity-50"
+            >
+              {backgroundUploading ? "Saving..." : "Add background"}
+            </button>
+          </form>
+          <div className="grid gap-3 md:grid-cols-2">
+            {backgrounds.map((bg) => (
+              <div
+                key={bg.id}
+                className="flex items-center justify-between rounded-xl bg-black/15 px-4 py-3 ring-1 ring-white/5"
+              >
+                <div>
+                  <p className="font-semibold text-white">{bg.name}</p>
+                  <p className="text-xs text-slate-300/70">
+                    {bg.description || "—"} {bg.isCustom ? "(custom)" : ""}
+                  </p>
+                </div>
+                {bg.isCustom && (
+                  <button
+                    onClick={() => deleteBackground(bg.id)}
+                    className="text-xs font-semibold text-red-200 hover:text-red-100"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            ))}
+            {backgrounds.length === 0 && (
+              <div className="rounded-xl border border-dashed border-white/10 bg-black/10 p-4 text-sm text-slate-300">
+                No backgrounds yet. Upload to get started.
+              </div>
+            )}
+          </div>
+        </section>
+
         {(message || error) && (
           <div
             className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
@@ -506,7 +696,7 @@ export default function Home() {
                       Background
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {BACKGROUND_OPTIONS.map((background) => (
+                      {backgrounds.map((background) => (
                         <button
                           key={background.id}
                           onClick={() => {

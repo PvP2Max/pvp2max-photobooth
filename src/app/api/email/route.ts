@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { NextRequest, NextResponse } from "next/server";
-import { BACKGROUND_OPTIONS } from "@/lib/backgrounds";
+import { getBackgroundName } from "@/lib/backgrounds";
 import { sendMail } from "@/lib/mailer";
 import { findPhotoById, removePhotos } from "@/lib/storage";
 
@@ -74,9 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     processedPhotoIds.add(selection.photoId);
-    const backgroundName =
-      BACKGROUND_OPTIONS.find((bg) => bg.id === selection.backgroundId)?.name ??
-      selection.backgroundId;
+    const backgroundName = await getBackgroundName(selection.backgroundId);
 
     attachments.push({
       filename: `${record.originalName.replace(/\.[^.]+$/, "")}-${backgroundName}.png`,
