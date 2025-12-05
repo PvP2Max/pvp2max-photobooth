@@ -146,9 +146,6 @@ export async function POST(request: NextRequest) {
       <div style="padding:28px 28px 12px;">
         <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BOSS Holiday Photobooth</p>
         <h1 style="color:#fff;font-size:26px;margin:0 0 12px;">Your photos are ready!</h1>
-        <p style="margin:0 0 16px;color:#cbd5e1;font-size:14px;line-height:1.5;">
-          Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.
-        </p>
         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;margin:12px 0;">
           <p style="margin:0;color:#cbd5e1;font-size:13px;">Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.</p>
         </div>
@@ -162,8 +159,8 @@ export async function POST(request: NextRequest) {
         </p>
       </div>
       <div style="background:#0f172a;padding:0 28px 24px;">
-        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px 16px;text-align:center;">
-          <span style="color:#cbd5e1;font-size:12px;">Need a photobooth for your next event? </span>
+        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;text-align:center;">
+          <span style="color:#e2e8f0;font-size:12px;">Need a photobooth for your next event? </span>
           <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:700;">Contact Arctic Aura Designs to book.</a>
         </div>
       </div>
