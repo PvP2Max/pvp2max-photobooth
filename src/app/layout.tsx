@@ -46,6 +46,12 @@ export default function RootLayout({
                 Home
               </Link>
               <Link
+                href="/checkin"
+                className="rounded-full px-3 py-2 hover:bg-white/10 transition"
+              >
+                Check-in
+              </Link>
+              <Link
                 href="/photographer"
                 className="rounded-full px-3 py-2 hover:bg-white/10 transition"
               >

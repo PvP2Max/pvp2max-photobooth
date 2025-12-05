@@ -1,12 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type Checkin = { id: string; name: string; email: string; createdAt: string };
 
 export default function PhotographerPage() {
-  const [uploadEmail, setUploadEmail] = useState("");
+  const [checkins, setCheckins] = useState<Checkin[]>([]);
+  const [selectedCheckinId, setSelectedCheckinId] = useState("");
+  const [loadingCheckins, setLoadingCheckins] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedCheckin = useMemo(
+    () => checkins.find((c) => c.id === selectedCheckinId),
+    [checkins, selectedCheckinId],
+  );
+
+  async function loadCheckins() {
+    setLoadingCheckins(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/checkins");
+      const payload = (await response.json()) as {
+        checkins?: Checkin[];
+        error?: string;
+      };
+      if (!response.ok || !payload.checkins) {
+        throw new Error(payload.error || "Could not load check-ins.");
+      }
+      setCheckins(payload.checkins);
+      if (payload.checkins.length > 0) {
+        const stillValid = payload.checkins.find(
+          (checkin) => checkin.id === selectedCheckinId,
+        );
+        setSelectedCheckinId(
+          stillValid ? stillValid.id : payload.checkins[0].id,
+        );
+      } else {
+        setSelectedCheckinId("");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to load check-ins.";
+      setError(msg);
+    } finally {
+      setLoadingCheckins(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCheckins();
+  }, []);
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -20,15 +65,15 @@ export default function PhotographerPage() {
       setError("Choose at least one photo to upload first.");
       return;
     }
-    if (!uploadEmail) {
-      setError("Add the client email so we can keep photos grouped.");
+    if (!selectedCheckin?.email) {
+      setError("Pick a checked-in guest first.");
       return;
     }
 
     setUploading(true);
     try {
       const formData = new FormData();
-      formData.append("email", uploadEmail);
+      formData.append("email", selectedCheckin.email);
       for (const file of files) {
         formData.append("file", file);
       }
@@ -55,7 +100,7 @@ export default function PhotographerPage() {
       setMessage(
         failureCount > 0
           ? `${successCount} photo(s) processed. ${failureCount} failed.`
-          : `${successCount} photo(s) processed and ready.`,
+          : `${successCount} photo(s) processed and ready for ${selectedCheckin.name}.`,
       );
       form.reset();
     } catch (err) {
@@ -79,10 +124,24 @@ export default function PhotographerPage() {
             Upload & auto-remove backgrounds
           </h1>
           <p className="text-sm text-slate-300/80">
-            Drop one or more shots per family; files are forwarded to bgremover and
-            saved as cut-outs for the front desk. Keep this page mirrored cleanly for
-            clients.
+            Check guests in first, then pick their email from the dropdown so uploads stay grouped for the
+            front desk.
           </p>
+          <div className="flex flex-wrap gap-3 text-xs text-slate-300/80">
+            <Link
+              href="/checkin"
+              className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10 transition hover:bg-white/15"
+            >
+              Open check-in
+            </Link>
+            <button
+              type="button"
+              onClick={loadCheckins}
+              className="rounded-full bg-white/5 px-3 py-1 text-left ring-1 ring-white/10 transition hover:bg-white/10"
+            >
+              Refresh dropdown
+            </button>
+          </div>
         </div>
 
         {(message || error) && (
@@ -102,15 +161,26 @@ export default function PhotographerPage() {
           className="grid gap-4 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10"
         >
           <label className="text-sm text-slate-200/80">
-            Client email to attach uploads
-            <input
-              type="email"
+            Choose checked-in guest
+            <select
               required
-              value={uploadEmail}
-              onChange={(e) => setUploadEmail(e.target.value)}
-              placeholder="family@example.com"
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-cyan-300 focus:outline-none"
-            />
+              value={selectedCheckinId}
+              onChange={(e) => setSelectedCheckinId(e.target.value)}
+              disabled={checkins.length === 0}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white focus:border-cyan-300 focus:outline-none"
+            >
+              <option value="" disabled>
+                {loadingCheckins ? "Loading..." : "Select a check-in"}
+              </option>
+              {checkins.map((checkin) => (
+                <option key={checkin.id} value={checkin.id} className="bg-slate-900 text-white">
+                  {checkin.name} — {checkin.email}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-300/70">
+              Add new guests on the check-in page; refresh to pull the latest list.
+            </p>
           </label>
           <label className="text-sm text-slate-200/80">
             Select one or more photos
@@ -120,20 +190,30 @@ export default function PhotographerPage() {
               accept="image/*"
               required
               multiple
-              className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+              disabled={!selectedCheckin}
+              className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
             />
           </label>
           <button
             type="submit"
-            disabled={uploading}
+            disabled={uploading || !selectedCheckin}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-emerald-300 disabled:opacity-50"
           >
             {uploading ? "Processing..." : "Upload & remove background"}
           </button>
           <p className="text-xs text-slate-300/70">
-            We forward files to bgremover with the configured service token and keep
-            the cut-outs locally until delivery.
+            Files route to bgremover with the service token, then cut-outs stay local for the front desk until
+            delivery.
           </p>
+          {checkins.length === 0 && (
+            <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
+              No check-ins yet. Add guests on the{" "}
+              <Link href="/checkin" className="underline text-cyan-200">
+                check-in page
+              </Link>{" "}
+              before uploading.
+            </div>
+          )}
         </form>
       </main>
     </div>

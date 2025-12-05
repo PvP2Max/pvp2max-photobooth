@@ -37,7 +37,7 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
   "image/avif": ".avif",
 };
 
-function normalizeEmail(email: string) {
+export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 

@@ -13,13 +13,20 @@ type Photo = {
   cutoutUrl: string;
 };
 
+type Transform = { scale: number; offsetX: number; offsetY: number };
+
 type Selection = {
   backgroundId: string;
   preview?: string;
-  transform?: { scale: number; offsetX: number; offsetY: number };
+  transform?: Transform;
 };
 
 type BackgroundState = BackgroundOption & { isCustom?: boolean };
+
+const PREVIEW_MAX_WIDTH = 1280;
+const PREVIEW_MAX_HEIGHT = 720;
+const PREVIEW_ASSET_WIDTH = 1400;
+const imageCache = new Map<string, Promise<HTMLImageElement>>();
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en", {
@@ -31,34 +38,50 @@ function formatDate(date: string) {
 }
 
 function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
+  if (imageCache.has(src)) {
+    return imageCache.get(src)!;
+  }
+  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
     if (typeof document === "undefined") {
       reject(new Error("Image constructor is not available in this environment"));
       return;
     }
     const img = document.createElement("img");
     img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.loading = "eager";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Failed to load image"));
     img.src = src;
   });
+  imageCache.set(src, promise);
+  return promise;
+}
+
+function withPreview(url: string, width = PREVIEW_ASSET_WIDTH) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}preview=1&w=${width}`;
 }
 
 async function composePreview(
   cutoutUrl: string,
   backgroundUrl: string,
-  transform?: { scale: number; offsetX: number; offsetY: number },
+  transform?: Transform,
 ) {
   const [cutout, background] = await Promise.all([
     loadImage(cutoutUrl),
     loadImage(backgroundUrl),
   ]);
 
-  const realBgWidth = background.width || cutout.width || 1600;
-  const realBgHeight = background.height || Math.round(realBgWidth * 0.72);
-  const previewScale = Math.min(1, 1600 / realBgWidth, 1600 / realBgHeight);
-  const width = Math.round(realBgWidth * previewScale);
-  const height = Math.round(realBgHeight * previewScale);
+  const realBgWidth = background.width || PREVIEW_MAX_WIDTH;
+  const realBgHeight = background.height || PREVIEW_MAX_HEIGHT;
+  const scaleDown = Math.min(
+    1,
+    PREVIEW_MAX_WIDTH / Math.max(realBgWidth, 1),
+    PREVIEW_MAX_HEIGHT / Math.max(realBgHeight, 1),
+  );
+  const width = Math.max(1, Math.round(realBgWidth * scaleDown));
+  const height = Math.max(1, Math.round(realBgHeight * scaleDown));
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -68,15 +91,13 @@ async function composePreview(
 
   ctx.drawImage(background, 0, 0, width, height);
 
-  const maxWidth = realBgWidth * 0.55;
-  const maxHeight = realBgHeight * 0.75;
   const baseScale = Math.min(
-    maxWidth / cutout.width,
-    maxHeight / cutout.height,
+    (width * 0.55) / cutout.width,
+    (height * 0.75) / cutout.height,
     1.1,
   );
   const appliedScale = transform?.scale ?? baseScale;
-  const usedTransform = {
+  const usedTransform: Transform = {
     scale: appliedScale,
     offsetX: transform?.offsetX ?? 0,
     offsetY: transform?.offsetY ?? 0,
@@ -84,17 +105,17 @@ async function composePreview(
 
   const targetWidth = cutout.width * usedTransform.scale;
   const targetHeight = cutout.height * usedTransform.scale;
-  const x = realBgWidth / 2 - targetWidth / 2 + usedTransform.offsetX;
-  const y = realBgHeight * 0.18 + usedTransform.offsetY;
-  const drawX = Math.min(Math.max(x, 0), Math.max(realBgWidth - targetWidth, 0));
-  const drawY = Math.min(Math.max(y, 0), Math.max(realBgHeight - targetHeight, 0));
+  const x = width / 2 - targetWidth / 2 + usedTransform.offsetX;
+  const y = height * 0.18 + usedTransform.offsetY;
+  const drawX = Math.min(Math.max(x, 0), Math.max(width - targetWidth, 0));
+  const drawY = Math.min(Math.max(y, 0), Math.max(height - targetHeight, 0));
 
   ctx.drawImage(
     cutout,
-    drawX * previewScale,
-    drawY * previewScale,
-    targetWidth * previewScale,
-    targetHeight * previewScale,
+    drawX,
+    drawY,
+    targetWidth,
+    targetHeight,
   );
   return { dataUrl: canvas.toDataURL("image/png"), transform: usedTransform };
 }
@@ -116,9 +137,7 @@ export default function FrontdeskPage() {
   );
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
   const [toasts, setToasts] = useState<string[]>([]);
-  const [transforms, setTransforms] = useState<
-    Record<string, { scale: number; offsetX: number; offsetY: number }>
-  >({});
+  const [transforms, setTransforms] = useState<Record<string, Transform>>({});
 
   const latestEmail = useMemo(() => searchEmail, [searchEmail]);
   const selectedList = useMemo(
@@ -267,9 +286,11 @@ export default function FrontdeskPage() {
           offsetX: 0,
           offsetY: 0,
         };
+      const cutoutSrc = withPreview(photo.cutoutUrl, PREVIEW_ASSET_WIDTH);
+      const backgroundSrc = withPreview(background.asset, PREVIEW_ASSET_WIDTH);
       const result = await composePreview(
-        photo.cutoutUrl,
-        background.asset,
+        cutoutSrc,
+        backgroundSrc,
         transform,
       );
       const usedTransform = result.transform;
@@ -289,6 +310,25 @@ export default function FrontdeskPage() {
           : "Could not generate preview for that background.";
       setError(msg);
     }
+  }
+
+  async function refreshPreview(photo: Photo, nextTransform: Transform) {
+    const backgroundId = selectionMap[photo.id]?.backgroundId;
+    if (!backgroundId) return;
+    const background = backgrounds.find((b) => b.id === backgroundId);
+    if (!background) return;
+    const cutoutSrc = withPreview(photo.cutoutUrl, PREVIEW_ASSET_WIDTH);
+    const backgroundSrc = withPreview(background.asset, PREVIEW_ASSET_WIDTH);
+    const result = await composePreview(cutoutSrc, backgroundSrc, nextTransform);
+    setTransforms((prev) => ({ ...prev, [photo.id]: result.transform }));
+    setSelectionMap((prev) => ({
+      ...prev,
+      [photo.id]: {
+        backgroundId,
+        preview: result.dataUrl,
+        transform: result.transform,
+      },
+    }));
   }
 
   async function advanceBackgroundStep() {
@@ -479,11 +519,12 @@ export default function FrontdeskPage() {
                     </div>
                     <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
                       <Image
-                        src={photo.cutoutUrl}
+                        src={withPreview(photo.cutoutUrl, 900)}
                         alt={`Cutout for ${photo.originalName}`}
                         width={1200}
                         height={800}
                         unoptimized
+                        loading="lazy"
                         className="h-48 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
                       />
                     </div>
@@ -579,25 +620,7 @@ export default function FrontdeskPage() {
                             scale: parseFloat(e.target.value),
                           };
                           setTransforms((prev) => ({ ...prev, [currentPhoto.id]: next }));
-                          const bg = backgrounds.find(
-                            (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
-                          );
-                          if (bg) {
-                            const result = await composePreview(
-                              currentPhoto.cutoutUrl,
-                              bg.asset,
-                              next,
-                            );
-                            setTransforms((prev) => ({ ...prev, [currentPhoto.id]: result.transform }));
-                            setSelectionMap((prev) => ({
-                              ...prev,
-                              [currentPhoto.id]: {
-                                backgroundId: prev[currentPhoto.id].backgroundId,
-                                preview: result.dataUrl,
-                                transform: result.transform,
-                              },
-                            }));
-                          }
+                          await refreshPreview(currentPhoto, next);
                         }}
                         className="mt-1 w-full"
                       />
@@ -620,25 +643,7 @@ export default function FrontdeskPage() {
                             offsetX: parseFloat(e.target.value),
                           };
                           setTransforms((prev) => ({ ...prev, [currentPhoto.id]: next }));
-                          const bg = backgrounds.find(
-                            (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
-                          );
-                          if (bg) {
-                            const result = await composePreview(
-                              currentPhoto.cutoutUrl,
-                              bg.asset,
-                              next,
-                            );
-                            setTransforms((prev) => ({ ...prev, [currentPhoto.id]: result.transform }));
-                            setSelectionMap((prev) => ({
-                              ...prev,
-                              [currentPhoto.id]: {
-                                backgroundId: prev[currentPhoto.id].backgroundId,
-                                preview: result.dataUrl,
-                                transform: result.transform,
-                              },
-                            }));
-                          }
+                          await refreshPreview(currentPhoto, next);
                         }}
                         className="mt-1 w-full"
                       />
@@ -661,25 +666,7 @@ export default function FrontdeskPage() {
                             offsetY: parseFloat(e.target.value),
                           };
                           setTransforms((prev) => ({ ...prev, [currentPhoto.id]: next }));
-                          const bg = backgrounds.find(
-                            (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
-                          );
-                          if (bg) {
-                            const result = await composePreview(
-                              currentPhoto.cutoutUrl,
-                              bg.asset,
-                              next,
-                            );
-                            setTransforms((prev) => ({ ...prev, [currentPhoto.id]: result.transform }));
-                            setSelectionMap((prev) => ({
-                              ...prev,
-                              [currentPhoto.id]: {
-                                backgroundId: prev[currentPhoto.id].backgroundId,
-                                preview: result.dataUrl,
-                                transform: result.transform,
-                              },
-                            }));
-                          }
+                          await refreshPreview(currentPhoto, next);
                         }}
                         className="mt-1 w-full"
                       />
