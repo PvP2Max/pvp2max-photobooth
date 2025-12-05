@@ -155,13 +155,16 @@ export default function Home() {
         body: formData,
       });
 
-      const payload = (await response.json()) as { photo?: Photo; error?: string };
-      if (!response.ok || !payload.photo) {
+      const payload = (await response.json()) as {
+        photo?: Photo;
+        error?: string;
+      };
+      const photo = payload.photo;
+      if (!response.ok || !photo) {
         throw new Error(payload.error || "Upload failed");
       }
 
-      const data = payload;
-      setPhotos((prev) => [data.photo, ...prev]);
+      setPhotos((prev) => [photo, ...prev]);
       setMessage("Photo processed and ready.");
       setSearchEmail(uploadEmail);
       form.reset();
