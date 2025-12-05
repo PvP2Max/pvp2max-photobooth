@@ -84,8 +84,8 @@ export async function POST(request: NextRequest) {
   }
 
   const html = `
-  <div style="background:#0b1324;padding:32px;font-family:Arial,Helvetica,sans-serif;color:#e2e8f0;">
-    <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.35);">
+  <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#f8fafc;">
+    <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.25);">
       <div style="padding:28px 28px 12px;">
         <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BOSS Holiday Photobooth</p>
         <h1 style="color:#fff;font-size:26px;margin:0 0 12px;">Your photos are ready!</h1>
