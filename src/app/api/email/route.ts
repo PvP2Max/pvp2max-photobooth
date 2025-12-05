@@ -83,10 +83,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const bgNames = [
-    ...new Set(body.selections?.map((s) => s.backgroundId.toString()) ?? []),
-  ];
-
   const html = `
   <div style="background:#0b1324;padding:32px;font-family:Arial,Helvetica,sans-serif;color:#e2e8f0;">
     <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.35);">
@@ -97,8 +93,7 @@ export async function POST(request: NextRequest) {
           Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.
         </p>
         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;margin:12px 0;">
-          <p style="margin:0;color:#e2e8f0;font-size:13px;"><strong>Backgrounds:</strong> ${bgNames.join(", ") || "Custom selection"}</p>
-          <p style="margin:6px 0 0;color:#cbd5e1;font-size:12px;">Your photos are attached to this email.</p>
+          <p style="margin:0;color:#cbd5e1;font-size:13px;">Your photos are attached to this email. Open and save them at your convenience.</p>
         </div>
       </div>
       <div style="padding:22px 28px;">
