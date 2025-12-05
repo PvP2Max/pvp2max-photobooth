@@ -279,6 +279,10 @@ export default function FrontdeskPage() {
       setSelectedPhotos(new Set());
       setSelectionMap({});
       setMessage("Email queued and local files cleaned up.");
+      // Soft reset after success.
+      setTimeout(() => {
+        window.location.href = "/frontdesk";
+      }, 5000);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Unexpected error sending email.";
@@ -588,7 +592,7 @@ export default function FrontdeskPage() {
                 disabled={sending}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
               >
-                {sending ? "Sending..." : "Send set & clean up"}
+                {sending ? "Sending..." : "Send now"}
               </button>
             </div>
             <div className="mt-3 grid gap-2 text-xs text-slate-300/80 md:grid-cols-3">
