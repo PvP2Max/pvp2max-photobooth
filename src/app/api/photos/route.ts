@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { removeBackground } from "@/lib/bgremover";
 import { savePhoto, listPhotosByEmail } from "@/lib/storage";
 import { addNotification } from "@/lib/notifications";
+import { removeCheckinByEmail } from "@/lib/checkins";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     await addNotification(email, photos.length);
+    await removeCheckinByEmail(email);
 
     return NextResponse.json({ photos, failures });
   } catch (error) {

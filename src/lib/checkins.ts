@@ -85,3 +85,11 @@ export async function addCheckin({
   await writeIndex(index);
   return checkin;
 }
+
+export async function removeCheckinByEmail(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  const index = await readIndex();
+  const remaining = index.checkins.filter((c) => c.email !== normalizedEmail);
+  await writeIndex({ checkins: remaining });
+  return remaining;
+}

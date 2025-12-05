@@ -102,6 +102,7 @@ export default function PhotographerPage() {
           ? `${successCount} photo(s) processed. ${failureCount} failed.`
           : `${successCount} photo(s) processed and ready for ${selectedCheckin.name}.`,
       );
+      await loadCheckins();
       form.reset();
     } catch (err) {
       const msg =
