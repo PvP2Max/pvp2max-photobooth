@@ -1,0 +1,25 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="candyRed" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b91c1c"/>
+      <stop offset="100%" stop-color="#7f1d1d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="900" fill="#fef2f2"/>
+  <g opacity="0.9">
+    <rect width="1400" height="900" fill="url(#candyRed)" opacity="0.12"/>
+    <g transform="skewX(-12)">
+      <rect x="-200" width="120" height="900" fill="url(#candyRed)"/>
+      <rect x="80" width="120" height="900" fill="url(#candyRed)"/>
+      <rect x="360" width="120" height="900" fill="url(#candyRed)"/>
+      <rect x="640" width="120" height="900" fill="url(#candyRed)"/>
+      <rect x="920" width="120" height="900" fill="url(#candyRed)"/>
+      <rect x="1200" width="120" height="900" fill="url(#candyRed)"/>
+      <rect x="1480" width="120" height="900" fill="url(#candyRed)"/>
+    </g>
+  </g>
+  <rect width="1400" height="900" fill="#fff" fill-opacity="0.2"/>
+  <rect width="1400" height="900" fill="url(#candyRed)" opacity="0.06"/>
+  <circle cx="1180" cy="180" r="140" fill="#dc2626" opacity="0.12"/>
+  <circle cx="260" cy="760" r="180" fill="#991b1b" opacity="0.12"/>
+</svg>

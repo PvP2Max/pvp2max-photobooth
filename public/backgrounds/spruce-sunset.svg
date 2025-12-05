@@ -1,0 +1,23 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sunset" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="900" fill="url(#sunset)"/>
+  <path d="M0 520 Q280 480 560 520 T1120 500 T1400 540 L1400 900 L0 900 Z" fill="#111827" opacity="0.8"/>
+  <path d="M0 620 Q320 600 620 620 T1100 600 T1400 660 L1400 900 L0 900 Z" fill="#111827" opacity="0.6"/>
+  <g fill="#0b1324" opacity="0.7">
+    <rect x="200" y="420" width="22" height="180" rx="6"/>
+    <rect x="540" y="420" width="22" height="180" rx="6"/>
+    <rect x="880" y="420" width="22" height="180" rx="6"/>
+    <rect x="1180" y="420" width="22" height="180" rx="6"/>
+  </g>
+  <g fill="#0b1324" opacity="0.7">
+    <path d="M210 430 L180 520 H240 Z"/>
+    <path d="M550 430 L520 520 H580 Z"/>
+    <path d="M890 430 L860 520 H920 Z"/>
+    <path d="M1190 430 L1160 520 H1220 Z"/>
+  </g>
+</svg>

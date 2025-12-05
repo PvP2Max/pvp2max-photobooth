@@ -1,0 +1,28 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="winterBase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0b1324"/>
+    </linearGradient>
+    <radialGradient id="winterGlow" cx="30%" cy="25%" r="50%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1400" height="900" fill="url(#winterBase)"/>
+  <rect width="1400" height="900" fill="url(#winterGlow)"/>
+  <g fill="#e0f2fe" fill-opacity="0.7">
+    <circle cx="160" cy="180" r="3"/>
+    <circle cx="240" cy="220" r="4"/>
+    <circle cx="360" cy="140" r="3"/>
+    <circle cx="520" cy="200" r="5"/>
+    <circle cx="660" cy="120" r="3"/>
+    <circle cx="820" cy="180" r="4"/>
+    <circle cx="980" cy="140" r="3"/>
+    <circle cx="1140" cy="210" r="5"/>
+    <circle cx="1280" cy="150" r="3"/>
+  </g>
+  <path d="M0 620 Q240 560 420 600 T840 590 T1400 640 L1400 900 L0 900 Z" fill="#a5f3fc" fill-opacity="0.08"/>
+  <path d="M0 690 Q300 640 620 670 T1100 650 T1400 690 L1400 900 L0 900 Z" fill="#22d3ee" fill-opacity="0.08"/>
+</svg>
