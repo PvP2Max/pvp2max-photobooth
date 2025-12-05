@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 export type BackgroundOption = {
   id: string;
   name: string;
   description: string;
   asset: string;
+  previewAsset?: string;
   isCustom?: boolean;
   createdAt?: string;
 };
@@ -17,6 +19,8 @@ type BackgroundRecord = {
   description: string;
   filename: string;
   contentType: string;
+  previewFilename?: string;
+  previewContentType?: string;
   createdAt: string;
 };
 
@@ -39,6 +43,37 @@ function extensionFor(contentType: string, fallback = ".png") {
   if (contentType.includes("png")) return ".png";
   if (contentType.includes("webp")) return ".webp";
   return fallback;
+}
+
+async function ensureBackgroundPreview(record: BackgroundRecord) {
+  if (record.previewFilename) {
+    try {
+      await stat(path.join(FILE_DIR, record.previewFilename));
+      return record;
+    } catch {
+      // fall through and regenerate
+    }
+  }
+  try {
+    const previewFilename = `preview-${record.id}.webp`;
+    const target = path.join(FILE_DIR, previewFilename);
+    await sharp(path.join(FILE_DIR, record.filename))
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toFile(target);
+    record.previewFilename = previewFilename;
+    record.previewContentType = "image/webp";
+    const index = await readIndex();
+    const idx = index.backgrounds.findIndex((bg) => bg.id === record.id);
+    if (idx >= 0) {
+      index.backgrounds[idx].previewFilename = previewFilename;
+      index.backgrounds[idx].previewContentType = "image/webp";
+      await writeIndex(index);
+    }
+  } catch (error) {
+    console.error("Failed to generate background preview", { id: record.id, error });
+  }
+  return record;
 }
 
 async function ensureBackgroundStorage() {
@@ -68,14 +103,20 @@ async function writeIndex(index: BackgroundIndex) {
 
 export async function listBackgrounds(): Promise<BackgroundOption[]> {
   const index = await readIndex();
-  const custom: BackgroundOption[] = index.backgrounds.map((bg) => ({
-    id: bg.id,
-    name: bg.name,
-    description: bg.description,
-    asset: `/api/backgrounds/files/${bg.id}`,
-    isCustom: true,
-    createdAt: bg.createdAt,
-  }));
+  const custom: BackgroundOption[] = await Promise.all(
+    index.backgrounds.map(async (bg) => {
+      const ensured = await ensureBackgroundPreview(bg);
+      return {
+        id: ensured.id,
+        name: ensured.name,
+        description: ensured.description,
+        asset: `/api/backgrounds/files/${ensured.id}`,
+        previewAsset: `/api/backgrounds/files/${ensured.id}?preview=1`,
+        isCustom: true,
+        createdAt: ensured.createdAt,
+      };
+    }),
+  );
 
   return [...BUILT_IN_BACKGROUNDS, ...custom];
 }
@@ -98,6 +139,19 @@ export async function addBackground({
 
   const arrayBuffer = await file.arrayBuffer();
   await writeFile(target, Buffer.from(arrayBuffer));
+  let previewFilename: string | undefined;
+  let previewContentType: string | undefined;
+  try {
+    previewFilename = `preview-${id}.webp`;
+    const previewTarget = path.join(FILE_DIR, previewFilename);
+    await sharp(target)
+      .resize({ width: 1600, withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toFile(previewTarget);
+    previewContentType = "image/webp";
+  } catch (error) {
+    console.error("Failed to generate background preview", { id, error });
+  }
 
   const record: BackgroundRecord = {
     id,
@@ -105,6 +159,8 @@ export async function addBackground({
     description,
     filename,
     contentType,
+    previewFilename,
+    previewContentType,
     createdAt: new Date().toISOString(),
   };
 
@@ -116,6 +172,7 @@ export async function addBackground({
     name,
     description,
     asset: `/api/backgrounds/files/${id}`,
+    previewAsset: `/api/backgrounds/files/${id}?preview=1`,
     isCustom: true,
     createdAt: record.createdAt,
   };
@@ -141,6 +198,10 @@ export async function findBackgroundAsset(id: string) {
   return {
     path: path.join(FILE_DIR, record.filename),
     contentType: record.contentType,
+    previewPath: record.previewFilename
+      ? path.join(FILE_DIR, record.previewFilename)
+      : undefined,
+    previewContentType: record.previewContentType,
   };
 }
 

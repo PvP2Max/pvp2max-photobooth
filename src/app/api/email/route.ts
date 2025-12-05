@@ -22,7 +22,12 @@ type Selection = {
     offsetX?: number;
     offsetY?: number;
   };
+  matchBackground?: boolean;
 };
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -135,8 +140,44 @@ export async function POST(request: NextRequest) {
             },
           )
           .toBuffer();
+        let cutoutComposite = cutoutBuffer;
+
+        if (selection.matchBackground) {
+          try {
+            const [bgStats, cutStats] = await Promise.all([
+              sharp(backgroundAsset.path).stats(),
+              sharp(cutoutBuffer).stats(),
+            ]);
+            const bgMean =
+              ((bgStats.channels?.[0]?.mean ?? 0) +
+                (bgStats.channels?.[1]?.mean ?? 0) +
+                (bgStats.channels?.[2]?.mean ?? 0)) /
+              3;
+            const cutMean =
+              ((cutStats.channels?.[0]?.mean ?? 0) +
+                (cutStats.channels?.[1]?.mean ?? 0) +
+                (cutStats.channels?.[2]?.mean ?? 0)) /
+              3;
+            const brightnessFactor =
+              cutMean > 0 ? clamp(bgMean / cutMean, 0.7, 1.3) : 1;
+            const saturationFactor = 1.05;
+            cutoutComposite = await sharp(cutoutBuffer)
+              .modulate({
+                brightness: brightnessFactor,
+                saturation: saturationFactor,
+              })
+              .toBuffer();
+          } catch (error) {
+            console.error("Color match failed", {
+              photoId: selection.photoId,
+              backgroundId: selection.backgroundId,
+              error,
+            });
+          }
+        }
+
         const composed = await background
-          .composite([{ input: cutoutBuffer, left, top }])
+          .composite([{ input: cutoutComposite, left, top }])
           .png()
           .toBuffer();
 

@@ -18,14 +18,14 @@ export async function GET(
     );
   }
 
-  if (variant !== "original" && variant !== "cutout") {
+  if (variant !== "original" && variant !== "cutout" && variant !== "preview") {
     return NextResponse.json(
       { error: "Unknown media variant" },
       { status: 400 },
     );
   }
 
-  const file = await getMediaFile(id, variant as "original" | "cutout");
+  const file = await getMediaFile(id, variant as "original" | "cutout" | "preview");
   if (!file) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

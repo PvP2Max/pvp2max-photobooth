@@ -27,16 +27,21 @@ export async function GET(
   const preview = request.nextUrl.searchParams.get("preview");
   const targetWidth = widthParam ? Math.min(parseInt(widthParam, 10) || 0, 2000) : null;
 
+  if (preview && asset.previewPath && asset.previewContentType) {
+    const previewBuffer = await readFile(asset.previewPath);
+    return new NextResponse(previewBuffer, {
+      headers: {
+        "Content-Type": asset.previewContentType,
+        "Cache-Control": "public, max-age=1200, immutable",
+      },
+    });
+  }
+
   const baseBuffer = await readFile(asset.path); // Buffer
   const sharpInput = new Uint8Array(baseBuffer);
   let buffer: Buffer = baseBuffer;
 
-  if (
-    preview &&
-    targetWidth &&
-    targetWidth > 0 &&
-    !asset.contentType.includes("svg")
-  ) {
+  if (preview && targetWidth && targetWidth > 0 && !asset.contentType.includes("svg")) {
     try {
       buffer = await sharp(sharpInput)
         .resize({ width: targetWidth, withoutEnlargement: true })

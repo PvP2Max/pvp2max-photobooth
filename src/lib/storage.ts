@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 export type PhotoRecord = {
   id: string;
@@ -10,6 +11,8 @@ export type PhotoRecord = {
   originalContentType: string;
   cutoutPath: string;
   cutoutContentType: string;
+  previewPath?: string;
+  previewContentType?: string;
   createdAt: string;
 };
 
@@ -20,6 +23,7 @@ export type PublicPhoto = {
   createdAt: string;
   originalUrl: string;
   cutoutUrl: string;
+  previewUrl?: string;
 };
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
@@ -82,7 +86,38 @@ function toPublicPhoto(record: PhotoRecord): PublicPhoto {
     createdAt: record.createdAt,
     originalUrl: `/api/media/${record.id}/original`,
     cutoutUrl: `/api/media/${record.id}/cutout`,
+    previewUrl: `/api/media/${record.id}/preview`,
   };
+}
+
+async function ensureCutoutPreview(record: PhotoRecord) {
+  if (record.previewPath) {
+    try {
+      await stat(record.previewPath);
+      return record;
+    } catch {
+      // fall through and regenerate
+    }
+  }
+  try {
+    const previewPath = path.join(photoDir(record.id), "cutout-preview.webp");
+    await sharp(record.cutoutPath)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toFile(previewPath);
+    record.previewPath = previewPath;
+    record.previewContentType = "image/webp";
+    const index = await readIndex();
+    const idx = index.photos.findIndex((p) => p.id === record.id);
+    if (idx >= 0) {
+      index.photos[idx].previewPath = previewPath;
+      index.photos[idx].previewContentType = "image/webp";
+      await writeIndex(index);
+    }
+  } catch (error) {
+    console.error("Failed to generate cutout preview", { id: record.id, error });
+  }
+  return record;
 }
 
 export async function savePhoto({
@@ -113,6 +148,17 @@ export async function savePhoto({
   const cutoutExtension = resolveExtension(cutoutContentType, ".png");
   const cutoutPath = path.join(dir, `cutout${cutoutExtension}`);
   await writeFile(cutoutPath, cutout);
+  const previewPath = path.join(dir, "cutout-preview.webp");
+  let previewContentType: string | undefined;
+  try {
+    await sharp(cutoutPath)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toFile(previewPath);
+    previewContentType = "image/webp";
+  } catch (error) {
+    console.error("Failed to create cutout preview", { email, error });
+  }
 
   const record: PhotoRecord = {
     id,
@@ -122,6 +168,8 @@ export async function savePhoto({
     originalContentType,
     cutoutPath,
     cutoutContentType,
+    previewPath: previewContentType ? previewPath : undefined,
+    previewContentType,
     createdAt: new Date().toISOString(),
   };
 
@@ -134,9 +182,10 @@ export async function savePhoto({
 export async function listPhotosByEmail(email: string): Promise<PublicPhoto[]> {
   const normalizedEmail = normalizeEmail(email);
   const index = await readIndex();
-  return index.photos
-    .filter((photo) => photo.email === normalizedEmail)
-    .map(toPublicPhoto);
+  const filtered = index.photos.filter((photo) => photo.email === normalizedEmail);
+  return Promise.all(
+    filtered.map(async (photo) => toPublicPhoto(await ensureCutoutPreview(photo))),
+  );
 }
 
 export async function listPhotoIdsByEmail(email: string): Promise<string[]> {
@@ -152,7 +201,7 @@ export async function findPhotoById(id: string) {
 
 export async function getMediaFile(
   id: string,
-  variant: "original" | "cutout",
+  variant: "original" | "cutout" | "preview",
 ) {
   const record = await findPhotoById(id);
   if (!record) return null;
@@ -162,6 +211,16 @@ export async function getMediaFile(
       path: record.originalPath,
       contentType: record.originalContentType,
     };
+  }
+
+  if (variant === "preview") {
+    const ensured = await ensureCutoutPreview(record);
+    if (ensured.previewPath && ensured.previewContentType) {
+      return {
+        path: ensured.previewPath,
+        contentType: ensured.previewContentType,
+      };
+    }
   }
 
   return {
