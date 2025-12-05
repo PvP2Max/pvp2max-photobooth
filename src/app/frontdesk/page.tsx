@@ -619,9 +619,9 @@ export default function FrontdeskPage() {
                       Scale
                       <input
                         type="range"
-                        min="0.5"
-                        max="1.5"
-                        step="0.05"
+                        min="0.25"
+                        max="2.5"
+                        step="0.01"
                         value={transforms[currentPhoto.id]?.scale ?? 1}
                         onChange={async (e) => {
                           const next = {
@@ -658,9 +658,9 @@ export default function FrontdeskPage() {
                       Offset X
                       <input
                         type="range"
-                        min="-400"
-                        max="400"
-                        step="10"
+                        min="-800"
+                        max="800"
+                        step="1"
                         value={transforms[currentPhoto.id]?.offsetX ?? 0}
                         onChange={async (e) => {
                           const next = {
@@ -697,9 +697,9 @@ export default function FrontdeskPage() {
                       Offset Y
                       <input
                         type="range"
-                        min="-400"
-                        max="400"
-                        step="10"
+                        min="-800"
+                        max="800"
+                        step="1"
                         value={transforms[currentPhoto.id]?.offsetY ?? 0}
                         onChange={async (e) => {
                           const next = {
