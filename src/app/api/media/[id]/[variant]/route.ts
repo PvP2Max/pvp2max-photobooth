@@ -1,21 +1,27 @@
 import { readFile } from "node:fs/promises";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getMediaFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _: Request,
-  { params }: { params: { id: string; variant: string } },
+  _request: NextRequest,
+  context: { params: Promise<{ id: string; variant: string }> },
 ) {
-  const { id, variant } = params;
+  const { id, variant } = await context.params;
   if (!id || !variant) {
-    return NextResponse.json({ error: "Invalid media request" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid media request" },
+      { status: 400 },
+    );
   }
 
   if (variant !== "original" && variant !== "cutout") {
-    return NextResponse.json({ error: "Unknown media variant" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Unknown media variant" },
+      { status: 400 },
+    );
   }
 
   const file = await getMediaFile(id, variant as "original" | "cutout");
