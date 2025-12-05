@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   }
 
   const html = `
-  <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#f8fafc;">
+  <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
     <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.25);">
       <div style="padding:28px 28px 12px;">
         <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BOSS Holiday Photobooth</p>
