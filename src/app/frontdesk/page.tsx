@@ -294,7 +294,7 @@ export default function FrontdeskPage() {
       return;
     }
     // Last photo -> send immediately
-    await sendEmail(true);
+    await sendEmail();
   }
 
   async function sendEmail() {
