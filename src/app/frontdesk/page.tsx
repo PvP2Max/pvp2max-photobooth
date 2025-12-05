@@ -133,10 +133,10 @@ export default function FrontdeskPage() {
         const notes = data.notifications ?? [];
         if (notes.length > 0) {
           setToasts((prev) => [
-            ...prev,
             ...notes.map(
               (n) => `${n.email}'s photos have been uploaded (${n.count})`,
             ),
+            ...prev,
           ]);
         }
       } catch {
@@ -427,6 +427,9 @@ export default function FrontdeskPage() {
     Array.from(selectedPhotos).every(
       (id) => !!selectionMap[id]?.preview && !!selectionMap[id]?.backgroundId,
     );
+  const popToast = () => {
+    setToasts((prev) => prev.slice(1));
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
@@ -448,6 +451,25 @@ export default function FrontdeskPage() {
             }`}
           >
             {error || message}
+          </div>
+        )}
+
+        {toasts.length > 0 && (
+          <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
+            {toasts.map((toast, idx) => (
+              <div
+                key={idx}
+                className="rounded-lg bg-emerald-500/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/30"
+              >
+                {toast}
+              </div>
+            ))}
+            <button
+              onClick={popToast}
+              className="self-end text-xs text-white/80 underline"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
