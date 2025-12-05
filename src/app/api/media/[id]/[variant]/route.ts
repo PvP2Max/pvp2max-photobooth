@@ -35,7 +35,8 @@ export async function GET(
   const targetWidth = widthParam ? Math.min(parseInt(widthParam, 10) || 0, 2200) : null;
 
   const baseBuffer = await readFile(file.path);
-  let buffer = baseBuffer;
+  const sharpInput = new Uint8Array(baseBuffer);
+  let buffer: Uint8Array = baseBuffer;
 
   if (
     preview &&
@@ -45,7 +46,7 @@ export async function GET(
     !file.contentType.includes("svg")
   ) {
     try {
-      buffer = await sharp(baseBuffer)
+      buffer = await sharp(sharpInput)
         .resize({ width: targetWidth, withoutEnlargement: true })
         .toBuffer();
     } catch (err) {
