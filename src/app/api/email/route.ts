@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
           Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.
         </p>
         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;margin:12px 0;">
-          <p style="margin:0;color:#cbd5e1;font-size:13px;">Your photos are attached to this email. Open and save them at your convenience.</p>
+          <p style="margin:0;color:#cbd5e1;font-size:13px;">Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.</p>
         </div>
       </div>
       <div style="padding:22px 28px;">
@@ -161,9 +161,11 @@ export async function POST(request: NextRequest) {
           With gratitude,<br/>BOSS Holiday Photobooth team
         </p>
       </div>
-      <div style="background:#0b1022;padding:12px 28px;color:#cbd5e1;font-size:11px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
-        <span>Need a photobooth for your next event? </span>
-        <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:600;">Contact Arctic Aura Designs to book.</a>
+      <div style="background:#0f172a;padding:0 28px 24px;">
+        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px 16px;text-align:center;">
+          <span style="color:#cbd5e1;font-size:12px;">Need a photobooth for your next event? </span>
+          <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:700;">Contact Arctic Aura Designs to book.</a>
+        </div>
       </div>
       <div style="background:#0b1022;padding:14px 28px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;">
         <span>© ${new Date().getFullYear()} <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;">Arctic Aura Designs</a></span>
