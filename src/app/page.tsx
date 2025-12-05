@@ -403,119 +403,133 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(190,24,93,0.12),transparent_30%)]" />
-      <main className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-10 md:py-16">
-        <header className="grid gap-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/60 to-slate-800 px-8 py-10 shadow-2xl ring-1 ring-white/10 md:grid-cols-[2fr,1fr] md:items-center">
+      <main className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10 md:py-16">
+        <header className="grid gap-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/60 to-slate-800 px-8 py-10 shadow-2xl ring-1 ring-white/10 md:grid-cols-[1.4fr,1fr] md:items-center">
           <div className="space-y-4">
             <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/80">
               Arctic Aura Photobooth
             </p>
             <h1 className="text-4xl font-semibold leading-tight text-white md:text-5xl">
-              Intake, background swaps, and delivery in one screen.
+              A polished, dual-lane workflow for the booth team.
             </h1>
             <p className="max-w-2xl text-lg text-slate-200/80">
-              Upload from the photographer&apos;s phone, let the background
-              remover do its job, and hand the polished set to your guests with
-              live previews before anything hits their inbox.
+              Photographers get a simple intake lane. Front desk gets a curated
+              review and delivery lane. Backgrounds are live-previewed, mailed,
+              and cleaned up automatically.
             </p>
-            <div className="flex flex-wrap gap-4 text-sm text-slate-200/80">
-              <span className="rounded-full bg-white/10 px-4 py-2">
-                Uses bgremover service token automatically
-              </span>
-              <span className="rounded-full bg-white/10 px-4 py-2">
-                Cleans up storage after delivery
-              </span>
-              <span className="rounded-full bg-white/10 px-4 py-2">
-                Background previews are rendered on-device
-              </span>
+            <div className="flex flex-wrap gap-3 text-sm text-slate-200/80">
+              <a
+                href="#photographer"
+                className="rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15 hover:bg-white/15"
+              >
+                Photographer lane
+              </a>
+              <a
+                href="#frontdesk"
+                className="rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15 hover:bg-white/15"
+              >
+                Front desk lane
+              </a>
+              <a
+                href="#backgrounds"
+                className="rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15 hover:bg-white/15"
+              >
+                Background library
+              </a>
             </div>
           </div>
-          <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-            <div className="space-y-2 text-sm text-slate-200">
-              <div className="flex items-center justify-between">
-                <span>Queue status</span>
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-                  {photos.length} photos
-                </span>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-pink-400 transition-all"
-                  style={{
-                    width: `${Math.min(100, photos.length * 15)}%`,
-                  }}
-                />
-              </div>
-              <p className="text-xs text-slate-300/70">
-                Searching and delivering with email: {latestEmail || "—"}
+          <div className="space-y-4 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+            <div className="flex items-center justify-between text-sm text-slate-200">
+              <span>Queue status</span>
+              <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+                {photos.length} photos
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-pink-400 transition-all"
+                style={{
+                  width: `${Math.min(100, photos.length * 15)}%`,
+                }}
+              />
+            </div>
+            <div className="space-y-2 text-xs text-slate-300/70">
+              <p>Delivering to: {latestEmail || "—"}</p>
+              <p>Selected photos: {selectedPhotos.size}</p>
+              <p>
+                Ready previews:{" "}
+                {Object.values(selectionMap).filter((s) => s.preview).length}
               </p>
             </div>
           </div>
         </header>
 
-        <section className="grid gap-6 md:grid-cols-[1.25fr,1fr]">
-          <div className="space-y-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-sm text-cyan-200/80">Photographer intake</p>
-                <h2 className="text-xl font-semibold text-white">
-                  Upload & auto-remove background
-                </h2>
-              </div>
-              <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-                Step 1
-              </span>
-            </div>
-            <form
-              onSubmit={handleUpload}
-              className="grid gap-4 rounded-2xl bg-black/20 p-4 ring-1 ring-white/5"
-            >
-              <label className="text-sm text-slate-200/80">
-                Client email to attach uploads
-                <input
-                  type="email"
-                  required
-                  value={uploadEmail}
-                  onChange={(e) => setUploadEmail(e.target.value)}
-                  placeholder="family@example.com"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-cyan-300 focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-slate-200/80">
-                Select a photo
-                <input
-                  name="file"
-                  type="file"
-                  accept="image/*"
-                  required
-                  className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={uploading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-emerald-300 disabled:opacity-50"
-              >
-                {uploading ? "Processing..." : "Upload & remove background"}
-              </button>
-              <p className="text-xs text-slate-300/70">
-                We forward the file to bgremover with the service token provided
-                for this project and store the cut-out locally until delivery.
-              </p>
-            </form>
+        <section
+          id="photographer"
+          className="grid gap-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 md:grid-cols-[1.15fr,1fr]"
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-cyan-200/80">Photographer lane</p>
+            <h2 className="text-2xl font-semibold text-white">
+              Intake & automatic background removal
+            </h2>
+            <p className="text-sm text-slate-300/80">
+              Quick drop from the camera roll, auto-sent to bgremover with the
+              service token, then stored as cut-outs for the front desk.
+            </p>
           </div>
+          <form
+            onSubmit={handleUpload}
+            className="grid gap-4 rounded-2xl bg-black/20 p-4 ring-1 ring-white/5"
+          >
+            <label className="text-sm text-slate-200/80">
+              Client email to attach uploads
+              <input
+                type="email"
+                required
+                value={uploadEmail}
+                onChange={(e) => setUploadEmail(e.target.value)}
+                placeholder="family@example.com"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-cyan-300 focus:outline-none"
+              />
+            </label>
+            <label className="text-sm text-slate-200/80">
+              Select a photo
+              <input
+                name="file"
+                type="file"
+                accept="image/*"
+                required
+                className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={uploading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-emerald-300 disabled:opacity-50"
+            >
+              {uploading ? "Processing..." : "Upload & remove background"}
+            </button>
+            <p className="text-xs text-slate-300/70">
+              We forward the file to bgremover with the service token and keep
+              the cut-out locally until delivery.
+            </p>
+          </form>
+        </section>
 
-          <div className="space-y-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-sm text-emerald-200/80">Front desk</p>
-                <h2 className="text-xl font-semibold text-white">
-                  Pull the family&apos;s queue
-                </h2>
-              </div>
-              <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-                Step 2
-              </span>
-            </div>
+        <section
+          id="frontdesk"
+          className="grid gap-6 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10 md:grid-cols-[1fr,1.2fr]"
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-emerald-200/80">Front desk lane</p>
+            <h2 className="text-2xl font-semibold text-white">
+              Pull the queue, curate, and send
+            </h2>
+            <p className="text-sm text-slate-300/80">
+              Search by family email, select photos, pick backgrounds, live
+              preview, then email and purge storage automatically.
+            </p>
             <form
               onSubmit={handleSearch}
               className="grid gap-3 rounded-2xl bg-black/20 p-4 ring-1 ring-white/5"
@@ -538,21 +552,51 @@ export default function Home() {
                 {loadingPhotos ? "Loading..." : "Load processed photos"}
               </button>
               <p className="text-xs text-slate-300/70">
-                The search only returns images that already have the background
-                removed.
+                Only returns shots that have a cut-out ready.
               </p>
             </form>
           </div>
+          <div className="space-y-3 rounded-2xl bg-black/20 p-4 ring-1 ring-white/5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-200/80">Delivery ready?</p>
+              <button
+                onClick={sendEmail}
+                disabled={sending || !readyToSend}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
+              >
+                {sending ? "Sending..." : "Send set & clean up"}
+              </button>
+            </div>
+            <div className="text-xs text-slate-300/80">
+              <p>Selected: {selectedPhotos.size}</p>
+              <p>
+                Ready previews:{" "}
+                {Object.values(selectionMap).filter((s) => s.preview).length}
+              </p>
+              <p>Delivery email: {latestEmail || "—"}</p>
+            </div>
+            <p className="text-xs text-slate-300/70">
+              Attachments are composed client-side, sent via SMTP (or saved to
+              storage/outbox if SMTP is not configured), then originals/cutouts
+              are deleted.
+            </p>
+          </div>
         </section>
 
-        <section className="space-y-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-          <div className="flex items-center justify-between gap-2">
+        <section
+          id="backgrounds"
+          className="space-y-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10"
+        >
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm text-amber-200/80">Background library</p>
               <h2 className="text-xl font-semibold text-white">
                 Upload or remove backdrops
               </h2>
             </div>
+            <p className="text-xs text-slate-300/70">
+              Built-ins stay fixed; custom uploads can be removed.
+            </p>
           </div>
           <form
             onSubmit={uploadBackground}
