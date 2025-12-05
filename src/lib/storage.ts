@@ -139,6 +139,12 @@ export async function listPhotosByEmail(email: string): Promise<PublicPhoto[]> {
     .map(toPublicPhoto);
 }
 
+export async function listPhotoIdsByEmail(email: string): Promise<string[]> {
+  const normalizedEmail = normalizeEmail(email);
+  const index = await readIndex();
+  return index.photos.filter((p) => p.email === normalizedEmail).map((p) => p.id);
+}
+
 export async function findPhotoById(id: string) {
   const index = await readIndex();
   return index.photos.find((photo) => photo.id === id);

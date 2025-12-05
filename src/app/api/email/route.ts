@@ -2,7 +2,13 @@ import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
 import { findBackgroundAsset, getBackgroundName } from "@/lib/backgrounds";
 import { sendMail } from "@/lib/mailer";
-import { findPhotoById, getMediaFile, removePhotos } from "@/lib/storage";
+import {
+  findPhotoById,
+  getMediaFile,
+  listPhotoIdsByEmail,
+  removePhotos,
+} from "@/lib/storage";
+import { saveProduction } from "@/lib/production";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,7 +45,6 @@ export async function POST(request: NextRequest) {
   }
 
   const attachments = [];
-  const processedPhotoIds = new Set<string>();
 
   for (const selection of body.selections) {
     try {
@@ -121,7 +126,6 @@ export async function POST(request: NextRequest) {
         .png()
         .toBuffer();
 
-      processedPhotoIds.add(selection.photoId);
       const backgroundName = await getBackgroundName(selection.backgroundId);
 
       attachments.push({
@@ -139,6 +143,9 @@ export async function POST(request: NextRequest) {
       );
     }
   }
+
+  // Save production copies for potential resend before emailing
+  await saveProduction(body.clientEmail, attachments);
 
   const html = `
   <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
@@ -179,8 +186,9 @@ export async function POST(request: NextRequest) {
       attachments,
     });
 
-    // Clean up all stored photo artifacts once email is dispatched.
-    await removePhotos(Array.from(processedPhotoIds));
+    // Clean up all stored photo artifacts for this client once email is dispatched.
+    const idsForEmail = await listPhotoIdsByEmail(body.clientEmail);
+    await removePhotos(idsForEmail);
 
     return NextResponse.json({ status: "ok", delivery: result });
   } catch (error) {

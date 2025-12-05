@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server";
+import {
+  deleteAllProduction,
+  deleteProduction,
+  listProduction,
+} from "@/lib/production";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const TOKEN = "ArcticAuraDesigns";
+
+function authorized(request: NextRequest) {
+  const header = request.headers.get("x-admin-token");
+  const query = request.nextUrl.searchParams.get("token");
+  return header === TOKEN || query === TOKEN;
+}
+
+export async function GET(request: NextRequest) {
+  if (!authorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const items = await listProduction();
+  const sanitized = items.map((item) => ({
+    id: item.id,
+    email: item.email,
+    createdAt: item.createdAt,
+    attachments: item.attachments.map((a) => ({
+      filename: a.filename,
+      contentType: a.contentType,
+      size: a.size,
+    })),
+  }));
+  return NextResponse.json({ items: sanitized });
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!authorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = await request.json().catch(() => ({}));
+  if (body?.all) {
+    await deleteAllProduction();
+    return NextResponse.json({ status: "ok", cleared: true });
+  }
+  if (body?.id) {
+    await deleteProduction(body.id as string);
+    return NextResponse.json({ status: "ok", id: body.id });
+  }
+  return NextResponse.json({ error: "Missing id or all flag" }, { status: 400 });
+}
