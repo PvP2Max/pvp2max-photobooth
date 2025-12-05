@@ -148,7 +148,7 @@ export default function FrontdeskPage() {
       setMessage(
         payload.photos.length === 0
           ? "No photos yet for that email."
-          : `Loaded ${payload.photos.length} processed shots.`,
+          : `Loaded ${payload.photos.length} processed shots. Invite the guest to pick their favorites.`,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to search.";
@@ -355,7 +355,8 @@ export default function FrontdeskPage() {
             Curate, preview, and deliver
           </h1>
           <p className="text-sm text-slate-300/80">
-            Use this dedicated screen for client-facing curation and delivery.
+            Guided, client-facing flow: confirm email, let them choose favorites,
+            pair backgrounds, then send.
           </p>
         </div>
 
@@ -371,57 +372,74 @@ export default function FrontdeskPage() {
           </div>
         )}
 
-        <section className="grid gap-6 md:grid-cols-[1fr,1.1fr]">
+        <section className="grid gap-6 md:grid-cols-3">
           <form
             onSubmit={handleSearch}
             className="grid gap-3 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10"
           >
-            <div className="space-y-2">
-              <p className="text-sm text-slate-200/80">Search by client email</p>
-              <input
-                type="email"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                placeholder="family@example.com"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-              />
-              <p className="text-xs text-slate-300/70">
-                Only returns shots that already have the background removed.
-              </p>
-            </div>
+            <p className="text-sm font-semibold text-white">Step 1: Confirm email</p>
+            <p className="text-xs text-slate-300/80">
+              Enter the guest's email to load their photos.
+            </p>
+            <input
+              type="email"
+              value={searchEmail}
+              onChange={(e) => setSearchEmail(e.target.value)}
+              placeholder="family@example.com"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
+            />
             <button
               type="submit"
               disabled={loadingPhotos}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
             >
-              {loadingPhotos ? "Loading..." : "Load processed photos"}
+              {loadingPhotos ? "Loading..." : "Load photos"}
             </button>
           </form>
 
-          <div className="space-y-3 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-200/80">Delivery ready?</p>
-              <button
-                onClick={sendEmail}
-                disabled={sending || !readyToSend}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
-              >
-                {sending ? "Sending..." : "Send set & clean up"}
-              </button>
-            </div>
-            <div className="text-xs text-slate-300/80">
-              <p>Selected: {selectedPhotos.size}</p>
-              <p>
-                Ready previews:{" "}
-                {Object.values(selectionMap).filter((s) => s.preview).length}
-              </p>
-              <p>Delivery email: {latestEmail || "—"}</p>
-            </div>
-            <p className="text-xs text-slate-300/70">
-              Attachments are composed client-side, sent via SMTP (or saved to
-              storage/outbox if SMTP is not configured), then originals/cutouts
-              are deleted.
+          <div className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+            <p className="text-sm font-semibold text-white">
+              Step 2: Let them pick favorites
             </p>
+            <p className="mt-2 text-xs text-slate-300/80">
+              Invite the guest to select the photos they love. Selected photos will
+              show a badge.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+            <p className="text-sm font-semibold text-white">
+              Step 3: Choose backgrounds
+            </p>
+            <p className="mt-2 text-xs text-slate-300/80">
+              For each selected photo, pick a background and show the live preview.
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">Step 4: Send</p>
+              <p className="text-xs text-slate-300/80">
+                Once every selected photo has a background, send the set.
+              </p>
+            </div>
+            <button
+              onClick={sendEmail}
+              disabled={sending || !readyToSend}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
+            >
+              {sending ? "Sending..." : "Send set & clean up"}
+            </button>
+          </div>
+          <div className="mt-3 grid gap-2 text-xs text-slate-300/80 md:grid-cols-3">
+            <p>Selected: {selectedPhotos.size}</p>
+            <p>
+              Ready previews:{" "}
+              {Object.values(selectionMap).filter((s) => s.preview).length}
+            </p>
+            <p>Delivery email: {latestEmail || "—"}</p>
           </div>
         </section>
 
