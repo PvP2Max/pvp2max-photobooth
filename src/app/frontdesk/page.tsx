@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { BackgroundOption } from "@/lib/backgrounds";
 
@@ -17,6 +16,7 @@ type Photo = {
 type Selection = {
   backgroundId: string;
   preview?: string;
+  transform?: { scale: number; offsetX: number; offsetY: number };
 };
 
 type BackgroundState = BackgroundOption & { isCustom?: boolean };
@@ -54,8 +54,12 @@ async function composePreview(
     loadImage(backgroundUrl),
   ]);
 
-  const width = background.width || cutout.width || 1280;
-  const height = background.height || Math.round(width * 0.72);
+  const realBgWidth = background.width || cutout.width || 1600;
+  const realBgHeight = background.height || Math.round(realBgWidth * 0.72);
+  const previewScale = Math.min(1, 1600 / realBgWidth, 1600 / realBgHeight);
+  const width = Math.round(realBgWidth * previewScale);
+  const height = Math.round(realBgHeight * previewScale);
+
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -64,28 +68,41 @@ async function composePreview(
 
   ctx.drawImage(background, 0, 0, width, height);
 
-  const maxWidth = width * 0.55;
-  const maxHeight = height * 0.75;
+  const maxWidth = realBgWidth * 0.55;
+  const maxHeight = realBgHeight * 0.75;
   const baseScale = Math.min(
     maxWidth / cutout.width,
     maxHeight / cutout.height,
     1.1,
   );
   const appliedScale = transform?.scale ?? baseScale;
-  const targetWidth = cutout.width * appliedScale;
-  const targetHeight = cutout.height * appliedScale;
-  const x = width / 2 - targetWidth / 2 + (transform?.offsetX ?? 0);
-  const y = height * 0.18 + (transform?.offsetY ?? 0);
+  const usedTransform = {
+    scale: appliedScale,
+    offsetX: transform?.offsetX ?? 0,
+    offsetY: transform?.offsetY ?? 0,
+  };
 
-  ctx.drawImage(cutout, x, y, targetWidth, targetHeight);
-  return canvas.toDataURL("image/png");
+  const targetWidth = cutout.width * usedTransform.scale;
+  const targetHeight = cutout.height * usedTransform.scale;
+  const x = realBgWidth / 2 - targetWidth / 2 + usedTransform.offsetX;
+  const y = realBgHeight * 0.18 + usedTransform.offsetY;
+  const drawX = Math.min(Math.max(x, 0), Math.max(realBgWidth - targetWidth, 0));
+  const drawY = Math.min(Math.max(y, 0), Math.max(realBgHeight - targetHeight, 0));
+
+  ctx.drawImage(
+    cutout,
+    drawX * previewScale,
+    drawY * previewScale,
+    targetWidth * previewScale,
+    targetHeight * previewScale,
+  );
+  return { dataUrl: canvas.toDataURL("image/png"), transform: usedTransform };
 }
 
 export default function FrontdeskPage() {
   const [searchEmail, setSearchEmail] = useState("");
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [sending, setSending] = useState(false);
-  const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
@@ -98,7 +115,6 @@ export default function FrontdeskPage() {
     "email",
   );
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
-  const [uploading, setUploading] = useState(false);
   const [toasts, setToasts] = useState<string[]>([]);
   const [transforms, setTransforms] = useState<
     Record<string, { scale: number; offsetX: number; offsetY: number }>
@@ -250,30 +266,26 @@ export default function FrontdeskPage() {
     setError(null);
     setMessage(null);
 
-    setSelectionMap((prev) => ({
-      ...prev,
-      [photo.id]: {
-        backgroundId,
-        preview: prev[photo.id]?.preview,
-      },
-    }));
-
     try {
-      const transform = transforms[photo.id] || {
-        scale: 1,
-        offsetX: 0,
-        offsetY: 0,
-      };
-      const preview = await composePreview(
+      const transform =
+        transforms[photo.id] || {
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
+        };
+      const result = await composePreview(
         photo.cutoutUrl,
         background.asset,
         transform,
       );
+      const usedTransform = result.transform;
+      setTransforms((prev) => ({ ...prev, [photo.id]: usedTransform }));
       setSelectionMap((prev) => ({
         ...prev,
         [photo.id]: {
           backgroundId,
-          preview,
+          preview: result.dataUrl,
+          transform: usedTransform,
         },
       }));
     } catch (err) {
@@ -302,7 +314,9 @@ export default function FrontdeskPage() {
       const selections = Array.from(selectedPhotos).map((photoId) => ({
         photoId,
         backgroundId: selectionMap[photoId].backgroundId,
-        compositeDataUrl: selectionMap[photoId].preview as string,
+        transform:
+          selectionMap[photoId].transform ||
+          transforms[photoId] || { scale: 1, offsetX: 0, offsetY: 0 },
       }));
 
       const response = await fetch("/api/email", {
@@ -336,97 +350,8 @@ export default function FrontdeskPage() {
     }
   }
 
-  async function uploadBackground(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    const form = event.currentTarget;
-    const fileInput = form.elements.namedItem("bgfile") as HTMLInputElement;
-    const nameInput = form.elements.namedItem("bgname") as HTMLInputElement;
-    const descInput = form.elements.namedItem("bgdesc") as HTMLInputElement;
-    const file = fileInput.files?.[0];
-    if (!file) {
-      setError("Choose a background file to upload.");
-      return;
-    }
-    if (!nameInput.value.trim()) {
-      setError("Give the background a name.");
-      return;
-    }
-
-    setBackgroundUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("name", nameInput.value);
-      formData.append("description", descInput.value);
-      formData.append("file", file);
-
-      const response = await fetch("/api/backgrounds", {
-        method: "POST",
-        body: formData,
-      });
-      const payload = (await response.json()) as {
-        background?: BackgroundState;
-        error?: string;
-      };
-      if (!response.ok || !payload.background) {
-        throw new Error(payload.error || "Failed to add background.");
-      }
-      setBackgrounds((prev) => [...prev, payload.background!]);
-      form.reset();
-      setMessage("Background added.");
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not upload background.";
-      setError(msg);
-    } finally {
-      setBackgroundUploading(false);
-    }
-  }
-
-  async function deleteBackground(id: string) {
-    setError(null);
-    setMessage(null);
-    const bg = backgrounds.find((b) => b.id === id);
-    if (!bg?.isCustom) {
-      setError("Only uploaded backgrounds can be removed.");
-      return;
-    }
-    try {
-      const response = await fetch("/api/backgrounds", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(payload.error || "Failed to delete background.");
-      }
-      setBackgrounds((prev) => prev.filter((b) => b.id !== id));
-      setSelectionMap((prev) => {
-        const next = { ...prev };
-        for (const key of Object.keys(next)) {
-          if (next[key]?.backgroundId === id) {
-            delete next[key];
-          }
-        }
-        return next;
-      });
-      setMessage("Background removed.");
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not delete background.";
-      setError(msg);
-    }
-  }
-
   const hasPhotos = photos.length > 0;
   const hasSelections = selectedPhotos.size > 0;
-  const hasBackgroundPreviews =
-    hasSelections &&
-    Array.from(selectedPhotos).every(
-      (id) => !!selectionMap[id]?.preview && !!selectionMap[id]?.backgroundId,
-    );
   const popToast = () => {
     setToasts((prev) => prev.slice(1));
   };
@@ -641,8 +566,8 @@ export default function FrontdeskPage() {
                       Scale
                       <input
                         type="range"
-                        min="0.25"
-                        max="2.5"
+                        min="0.1"
+                        max="4"
                         step="0.01"
                         value={transforms[currentPhoto.id]?.scale ?? 1}
                         onChange={async (e) => {
@@ -659,16 +584,18 @@ export default function FrontdeskPage() {
                             (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
                           );
                           if (bg) {
-                            const preview = await composePreview(
+                            const result = await composePreview(
                               currentPhoto.cutoutUrl,
                               bg.asset,
                               next,
                             );
+                            setTransforms((prev) => ({ ...prev, [currentPhoto.id]: result.transform }));
                             setSelectionMap((prev) => ({
                               ...prev,
                               [currentPhoto.id]: {
                                 backgroundId: prev[currentPhoto.id].backgroundId,
-                                preview,
+                                preview: result.dataUrl,
+                                transform: result.transform,
                               },
                             }));
                           }
@@ -680,8 +607,8 @@ export default function FrontdeskPage() {
                       Offset X
                       <input
                         type="range"
-                        min="-800"
-                        max="800"
+                        min="-1500"
+                        max="1500"
                         step="1"
                         value={transforms[currentPhoto.id]?.offsetX ?? 0}
                         onChange={async (e) => {
@@ -698,16 +625,18 @@ export default function FrontdeskPage() {
                             (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
                           );
                           if (bg) {
-                            const preview = await composePreview(
+                            const result = await composePreview(
                               currentPhoto.cutoutUrl,
                               bg.asset,
                               next,
                             );
+                            setTransforms((prev) => ({ ...prev, [currentPhoto.id]: result.transform }));
                             setSelectionMap((prev) => ({
                               ...prev,
                               [currentPhoto.id]: {
                                 backgroundId: prev[currentPhoto.id].backgroundId,
-                                preview,
+                                preview: result.dataUrl,
+                                transform: result.transform,
                               },
                             }));
                           }
@@ -719,8 +648,8 @@ export default function FrontdeskPage() {
                       Offset Y
                       <input
                         type="range"
-                        min="-800"
-                        max="800"
+                        min="-1500"
+                        max="1500"
                         step="1"
                         value={transforms[currentPhoto.id]?.offsetY ?? 0}
                         onChange={async (e) => {
@@ -737,16 +666,18 @@ export default function FrontdeskPage() {
                             (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
                           );
                           if (bg) {
-                            const preview = await composePreview(
+                            const result = await composePreview(
                               currentPhoto.cutoutUrl,
                               bg.asset,
                               next,
                             );
+                            setTransforms((prev) => ({ ...prev, [currentPhoto.id]: result.transform }));
                             setSelectionMap((prev) => ({
                               ...prev,
                               [currentPhoto.id]: {
                                 backgroundId: prev[currentPhoto.id].backgroundId,
-                                preview,
+                                preview: result.dataUrl,
+                                transform: result.transform,
                               },
                             }));
                           }
