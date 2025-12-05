@@ -89,19 +89,17 @@ export async function POST(request: NextRequest) {
 
   const html = `
   <div style="background:#0b1324;padding:32px;font-family:Arial,Helvetica,sans-serif;color:#e2e8f0;">
-    <div style="max-width:640px;margin:0 auto;background:linear-gradient(135deg,#0f172a 0%,#111827 100%);border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.35);">
+    <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.35);">
       <div style="padding:28px 28px 12px;">
         <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BOSS Holiday Photobooth</p>
         <h1 style="color:#fff;font-size:26px;margin:0 0 12px;">Your photos are ready!</h1>
         <p style="margin:0 0 16px;color:#cbd5e1;font-size:14px;line-height:1.5;">
-          Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email. We’ve paired them with your chosen backgrounds.
+          Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.
         </p>
         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;margin:12px 0;">
           <p style="margin:0;color:#e2e8f0;font-size:13px;"><strong>Backgrounds:</strong> ${bgNames.join(", ") || "Custom selection"}</p>
+          <p style="margin:6px 0 0;color:#cbd5e1;font-size:12px;">Your photos are attached to this email.</p>
         </div>
-      </div>
-      <div style="background:linear-gradient(90deg,#22d3ee,#a855f7);padding:14px 28px;color:#0b1324;font-weight:700;font-size:14px;">
-        Download your attachments below
       </div>
       <div style="padding:22px 28px;">
         <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;">
@@ -111,13 +109,12 @@ export async function POST(request: NextRequest) {
           With gratitude,<br/>BOSS Holiday Photobooth team
         </p>
       </div>
-      <div style="background:#0b1022;padding:14px 28px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;">
-        <span>© ${new Date().getFullYear()} Arctic Aura Designs</span>
-        <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;">arcticauradesigns.com</a>
-      </div>
       <div style="background:#0b1022;padding:12px 28px;color:#cbd5e1;font-size:11px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
         <span>Need a photobooth for your next event? </span>
         <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:600;">Contact Arctic Aura Designs to book.</a>
+      </div>
+      <div style="background:#0b1022;padding:14px 28px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;">
+        <span>© ${new Date().getFullYear()} <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;">Arctic Aura Designs</a></span>
       </div>
     </div>
   </div>
