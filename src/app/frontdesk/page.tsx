@@ -570,21 +570,11 @@ export default function FrontdeskPage() {
                   : "Next photo"}
               </button>
             </div>
-            <article className="mt-4 grid gap-4 md:grid-cols-[1.1fr,1fr] items-start rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold text-white">
-                    {currentPhoto.originalName}
-                  </p>
-                  <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
-                    <Image
-                    src={currentPhoto.cutoutUrl}
-                    alt={`Cutout for ${currentPhoto.originalName}`}
-                    width={1200}
-                    height={800}
-                    unoptimized
-                    className="h-56 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
-                  />
-                </div>
+            <article className="mt-4 grid gap-4 md:grid-cols-[1.05fr,1fr] items-start rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-white">
+                  {currentPhoto.originalName}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {backgrounds.map((background) => (
                     <button
@@ -602,25 +592,26 @@ export default function FrontdeskPage() {
                     </button>
                   ))}
                 </div>
+                <div className="text-[11px] text-slate-300/80">
+                  Tip: drag sliders to move/scale the subject before sending.
+                </div>
               </div>
               {selectionMap[currentPhoto.id]?.preview && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs uppercase tracking-wide text-slate-300">
-                      Live preview (drag/scale)
+                      Final preview
                     </p>
-                    <div className="text-[11px] text-slate-300/80">
-                      Tip: adjust position/scale before moving on.
-                    </div>
                   </div>
                   <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
                     <Image
                       src={selectionMap[currentPhoto.id]?.preview as string}
                       alt="Preview with background"
-                      width={1400}
-                      height={900}
+                      width={1920}
+                      height={1080}
                       unoptimized
-                      className="h-56 w-full object-cover"
+                      className="w-full rounded-xl"
+                      style={{ aspectRatio: "16/9", objectFit: "cover" }}
                     />
                   </div>
                   <div className="grid gap-2 md:grid-cols-3">
