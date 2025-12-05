@@ -14,10 +14,7 @@ Front-desk and photographer workflow for capturing shots, removing backgrounds v
 
 The included `Dockerfile` uses Bun and Next.js standalone output. A `docker-compose.yml` is provided with the required `apps-net` network for the Cloudflare tunnel. Persisted uploads/outbox live in `./storage` (mounted into the container).
 
-## Background sets
-- Christmas (12): Winter Lights, Candy Cane Stripes, Snow Globe, Pine Lanterns, Gingerbread Hall, Crimson Ornaments, Midnight Snowfall, Holly Bokeh, Cozy Fireplace, North Star, Frosted Mint, Gold Ribbon.
-- Alaska (4): Aurora Ridge (AK), Glacier Bay (AK), Spruce Sunset (AK), Icefield Dawn (AK).
-
-## Background library
-- Front desk can upload custom backgrounds (name + optional description + image) and delete uploads; built-ins are protected.
+## Backgrounds
+- No built-in backgrounds are shipped. Use the Backgrounds page to upload your own.
+- Recommended assets: PNG/WebP, 16:9, 2560x1440 (or 3200x1800) with a clear center band for subjects.
 - API: `/api/backgrounds` (list/add/delete), `/api/backgrounds/files/:id` (serve custom assets).
