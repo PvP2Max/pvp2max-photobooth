@@ -31,11 +31,11 @@ function formatDate(date: string) {
 
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
-    if (typeof Image === "undefined") {
+    if (typeof document === "undefined") {
       reject(new Error("Image constructor is not available in this environment"));
       return;
     }
-    const img = new Image(1);
+    const img = document.createElement("img");
     img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Failed to load image"));
