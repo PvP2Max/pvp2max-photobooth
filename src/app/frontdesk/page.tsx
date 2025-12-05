@@ -88,6 +88,9 @@ export default function FrontdeskPage() {
   );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"email" | "select" | "backgrounds" | "send">(
+    "email",
+  );
 
   const latestEmail = useMemo(() => searchEmail, [searchEmail]);
 
@@ -99,6 +102,14 @@ export default function FrontdeskPage() {
     }
     return true;
   }, [selectedPhotos, selectionMap]);
+
+  useEffect(() => {
+    if (readyToSend) {
+      setStep("send");
+    } else if (step === "send") {
+      setStep("backgrounds");
+    }
+  }, [readyToSend, step]);
 
   async function loadBackgrounds() {
     try {
@@ -145,6 +156,7 @@ export default function FrontdeskPage() {
       setPhotos(payload.photos);
       setSelectedPhotos(new Set());
       setSelectionMap({});
+      setStep("select");
       setMessage(
         payload.photos.length === 0
           ? "No photos yet for that email."
@@ -370,41 +382,47 @@ export default function FrontdeskPage() {
         )}
 
         {/* Step 1: Email */}
-        <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
-          <form
-            onSubmit={handleSearch}
-            className="grid gap-3 md:grid-cols-[2fr,auto] md:items-end"
-          >
-            <label className="text-sm text-slate-200/80">
-              Guest email
-              <input
-                type="email"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                placeholder="family@example.com"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={loadingPhotos}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+        {step === "email" && (
+          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+            <form
+              onSubmit={handleSearch}
+              className="grid gap-3 md:grid-cols-[2fr,auto] md:items-end"
             >
-              {loadingPhotos ? "Loading..." : "Load photos"}
-            </button>
-          </form>
-        </section>
+              <label className="text-sm text-slate-200/80">
+                Guest email
+                <input
+                  type="email"
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  placeholder="family@example.com"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={loadingPhotos}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+              >
+                {loadingPhotos ? "Loading..." : "Load photos"}
+              </button>
+            </form>
+          </section>
+        )}
 
         {/* Step 2: Select photos */}
-        {hasPhotos && (
+        {step === "select" && hasPhotos && (
           <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">Select favorites</p>
-                <p className="text-xs text-slate-300/80">
-                  Tap to select the photos the guest wants to keep.
-                </p>
               </div>
+              <button
+                onClick={() => setStep("backgrounds")}
+                disabled={!hasSelections}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+              >
+                Next: choose backgrounds
+              </button>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {photos.map((photo) => {
@@ -452,17 +470,21 @@ export default function FrontdeskPage() {
         )}
 
         {/* Step 3: Backgrounds */}
-        {hasSelections && (
+        {step === "backgrounds" && hasSelections && (
           <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">
                   Choose backgrounds for selected photos
                 </p>
-                <p className="text-xs text-slate-300/80">
-                  Pick a background and show the preview.
-                </p>
               </div>
+              <button
+                onClick={() => setStep("send")}
+                disabled={!readyToSend}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300 disabled:opacity-50"
+              >
+                Next: send email
+              </button>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {photos
@@ -519,14 +541,11 @@ export default function FrontdeskPage() {
         )}
 
         {/* Step 4: Send */}
-        {hasSelections && readyToSend && (
+        {step === "send" && hasSelections && readyToSend && (
           <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">Send to guest</p>
-                <p className="text-xs text-slate-300/80">
-                  All selected photos have backgrounds. Send and clean up storage.
-                </p>
               </div>
               <button
                 onClick={sendEmail}
