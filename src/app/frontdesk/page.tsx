@@ -92,8 +92,17 @@ export default function FrontdeskPage() {
   const [step, setStep] = useState<"email" | "select" | "backgrounds" | "send">(
     "email",
   );
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
 
   const latestEmail = useMemo(() => searchEmail, [searchEmail]);
+  const selectedList = useMemo(
+    () => photos.filter((p) => selectedPhotos.has(p.id)),
+    [photos, selectedPhotos],
+  );
+  const currentPhoto =
+    step === "backgrounds" && selectedList.length > 0
+      ? selectedList[Math.min(currentBgIndex, selectedList.length - 1)]
+      : null;
 
   const readyToSend = useMemo(() => {
     if (selectedPhotos.size === 0) return false;
@@ -111,6 +120,13 @@ export default function FrontdeskPage() {
       setStep("backgrounds");
     }
   }, [readyToSend, step]);
+
+  useEffect(() => {
+    setCurrentBgIndex(0);
+    if (step === "backgrounds" && selectedList.length === 0) {
+      setStep("select");
+    }
+  }, [selectedList.length, step]);
 
   async function loadBackgrounds() {
     try {
@@ -358,6 +374,11 @@ export default function FrontdeskPage() {
 
   const hasPhotos = photos.length > 0;
   const hasSelections = selectedPhotos.size > 0;
+  const hasBackgroundPreviews =
+    hasSelections &&
+    Array.from(selectedPhotos).every(
+      (id) => !!selectionMap[id]?.preview && !!selectionMap[id]?.backgroundId,
+    );
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
@@ -418,7 +439,10 @@ export default function FrontdeskPage() {
                 <p className="text-sm font-semibold text-white">Select favorites</p>
               </div>
               <button
-                onClick={() => setStep("backgrounds")}
+                onClick={() => {
+                  setCurrentBgIndex(0);
+                  setStep("backgrounds");
+                }}
                 disabled={!hasSelections}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
               >
@@ -471,73 +495,84 @@ export default function FrontdeskPage() {
         )}
 
         {/* Step 3: Backgrounds */}
-        {step === "backgrounds" && hasSelections && (
+        {step === "backgrounds" && hasSelections && currentPhoto && (
           <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">
-                  Choose backgrounds for selected photos
+                  Choose a background
+                </p>
+                <p className="text-xs text-slate-300/80">
+                  Photo {currentBgIndex + 1} of {selectedList.length}
                 </p>
               </div>
               <button
-                onClick={() => setStep("send")}
-                disabled={!readyToSend}
+                onClick={() => {
+                  if (currentBgIndex < selectedList.length - 1) {
+                    setCurrentBgIndex((prev) => prev + 1);
+                  } else {
+                    setStep("send");
+                  }
+                }}
+                disabled={!selectionMap[currentPhoto.id]?.preview}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300 disabled:opacity-50"
               >
-                Next: send email
+                {currentBgIndex === selectedList.length - 1
+                  ? "Next: send email"
+                  : "Next photo"}
               </button>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {photos
-                .filter((p) => selectedPhotos.has(p.id))
-                .map((photo) => {
-                  const selection = selectionMap[photo.id];
-                  return (
-                    <article
-                      key={photo.id}
-                      className="flex flex-col gap-3 rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5"
+            <article className="mt-4 grid gap-4 md:grid-cols-[1.1fr,1fr] items-start rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-white">
+                  {currentPhoto.originalName}
+                </p>
+                <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
+                  <Image
+                    src={currentPhoto.cutoutUrl}
+                    alt={`Cutout for ${currentPhoto.originalName}`}
+                    width={1200}
+                    height={800}
+                    unoptimized
+                    className="h-56 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {backgrounds.map((background) => (
+                    <button
+                      key={background.id}
+                      onClick={() => {
+                        pickBackground(currentPhoto, background.id);
+                      }}
+                      className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                        selectionMap[currentPhoto.id]?.backgroundId === background.id
+                          ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
+                          : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
+                      }`}
                     >
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-white">
-                          {photo.originalName}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          Select a background to preview.
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {backgrounds.map((background) => (
-                          <button
-                            key={background.id}
-                            onClick={() => {
-                              pickBackground(photo, background.id);
-                            }}
-                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                              selection?.backgroundId === background.id
-                                ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
-                                : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
-                            }`}
-                          >
-                            {background.name}
-                          </button>
-                        ))}
-                      </div>
-                      {selection?.preview && (
-                        <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
-                          <Image
-                            src={selection.preview}
-                            alt="Preview with background"
-                            width={1400}
-                            height={900}
-                            unoptimized
-                            className="h-56 w-full object-cover"
-                          />
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-            </div>
+                      {background.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {selectionMap[currentPhoto.id]?.preview && (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-300">
+                    Live preview
+                  </p>
+                  <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
+                    <Image
+                      src={selectionMap[currentPhoto.id]?.preview as string}
+                      alt="Preview with background"
+                      width={1400}
+                      height={900}
+                      unoptimized
+                      className="h-56 w-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+            </article>
           </section>
         )}
 
