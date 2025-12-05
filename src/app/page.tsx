@@ -410,38 +410,80 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(190,24,93,0.12),transparent_30%)]" />
+      <header className="sticky top-0 z-20 bg-slate-950/70 backdrop-blur border-b border-white/10">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-400 to-pink-400" />
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/80">
+                Arctic Aura
+              </p>
+              <p className="text-sm font-semibold text-white">Photobooth Console</p>
+            </div>
+          </div>
+          <nav className="flex items-center gap-3 text-sm text-slate-200">
+            <a
+              href="#home"
+              className="rounded-full px-3 py-2 hover:bg-white/10 transition"
+            >
+              Home
+            </a>
+            <a
+              href="#photographer"
+              className="rounded-full px-3 py-2 hover:bg-white/10 transition"
+            >
+              Photographer
+            </a>
+            <a
+              href="#frontdesk"
+              className="rounded-full px-3 py-2 hover:bg-white/10 transition"
+            >
+              Front Desk
+            </a>
+            <a
+              href="#backgrounds"
+              className="rounded-full px-3 py-2 hover:bg-white/10 transition"
+            >
+              Backgrounds
+            </a>
+          </nav>
+        </div>
+      </header>
       <main className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10 md:py-16">
-        <header className="grid gap-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/60 to-slate-800 px-8 py-10 shadow-2xl ring-1 ring-white/10 md:grid-cols-[1.4fr,1fr] md:items-center">
+        <section
+          id="home"
+          className="grid gap-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/60 to-slate-800 px-8 py-10 shadow-2xl ring-1 ring-white/10 md:grid-cols-[1.4fr,1fr] md:items-center"
+        >
           <div className="space-y-4">
             <p className="text-xs uppercase tracking-[0.25em] text-cyan-300/80">
               Arctic Aura Photobooth
             </p>
             <h1 className="text-4xl font-semibold leading-tight text-white md:text-5xl">
-              A polished, dual-lane workflow for the booth team.
+              One polished console, two dedicated lanes.
             </h1>
             <p className="max-w-2xl text-lg text-slate-200/80">
-              Photographers get a simple intake lane. Front desk gets a curated
-              review and delivery lane. Backgrounds are live-previewed, mailed,
-              and cleaned up automatically.
+              The landing view is what clients see on the mirrored screen:
+              professional, calm, and purpose-built. Jump into the photographer
+              upload lane or the front desk delivery lane with a single click.
             </p>
             <div className="flex flex-wrap gap-3 text-sm text-slate-200/80">
               <a
                 href="#photographer"
                 className="rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15 hover:bg-white/15"
               >
-                Photographer lane
+                Go to photographer lane
               </a>
               <a
                 href="#frontdesk"
                 className="rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15 hover:bg-white/15"
               >
-                Front desk lane
+                Go to front desk lane
               </a>
               <a
                 href="#backgrounds"
                 className="rounded-full bg-white/10 px-4 py-2 ring-1 ring-white/15 hover:bg-white/15"
               >
-                Background library
+                Manage backgrounds
               </a>
             </div>
           </div>
@@ -460,16 +502,28 @@ export default function Home() {
                 }}
               />
             </div>
-            <div className="space-y-2 text-xs text-slate-300/70">
-              <p>Delivering to: {latestEmail || "—"}</p>
-              <p>Selected photos: {selectedPhotos.size}</p>
-              <p>
-                Ready previews:{" "}
-                {Object.values(selectionMap).filter((s) => s.preview).length}
-              </p>
+            <div className="grid gap-2 rounded-xl bg-black/30 p-3 text-xs text-slate-300/80 ring-1 ring-white/10">
+              <div className="flex items-center justify-between">
+                <span>Delivering to</span>
+                <span className="font-semibold text-white">
+                  {latestEmail || "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Selected photos</span>
+                <span className="font-semibold text-white">
+                  {selectedPhotos.size}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Ready previews</span>
+                <span className="font-semibold text-white">
+                  {Object.values(selectionMap).filter((s) => s.preview).length}
+                </span>
+              </div>
             </div>
           </div>
-        </header>
+        </section>
 
         <section
           id="photographer"
