@@ -214,12 +214,16 @@ export default function FrontdeskPage() {
       setPhotos(payload.photos);
       setSelectedPhotos(new Set());
       setSelectionMap({});
-      setStep("select");
-      setMessage(
-        payload.photos.length === 0
-          ? "No photos yet for that email."
-          : `Loaded ${payload.photos.length} processed shots. Invite the guest to pick their favorites.`,
-      );
+      if (payload.photos.length === 0) {
+        setMessage("No photos yet for that email.");
+        setStep("email");
+        setSearchEmail("");
+      } else {
+        setStep("select");
+        setMessage(
+          `Loaded ${payload.photos.length} processed shots. Invite the guest to pick their favorites.`,
+        );
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to search.";
       setError(msg);
