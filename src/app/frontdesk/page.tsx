@@ -343,20 +343,17 @@ export default function FrontdeskPage() {
     }
   }
 
+  const hasPhotos = photos.length > 0;
+  const hasSelections = selectedPhotos.size > 0;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(190,24,93,0.12),transparent_30%)]" />
-      <main className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12">
-        <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/80">
-            Front desk lane
-          </p>
-          <h1 className="text-3xl font-semibold text-white">
-            Curate, preview, and deliver
-          </h1>
+      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-12">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-semibold text-white">Front desk</h1>
           <p className="text-sm text-slate-300/80">
-            Guided, client-facing flow: confirm email, let them choose favorites,
-            pair backgrounds, then send.
+            Simple, step-by-step flow for guests on an iPad.
           </p>
         </div>
 
@@ -372,76 +369,183 @@ export default function FrontdeskPage() {
           </div>
         )}
 
-        <section className="grid gap-6 md:grid-cols-3">
+        {/* Step 1: Email */}
+        <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
           <form
             onSubmit={handleSearch}
-            className="grid gap-3 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10"
+            className="grid gap-3 md:grid-cols-[2fr,auto] md:items-end"
           >
-            <p className="text-sm font-semibold text-white">Step 1: Confirm email</p>
-            <p className="text-xs text-slate-300/80">
-              Enter the guest's email to load their photos.
-            </p>
-            <input
-              type="email"
-              value={searchEmail}
-              onChange={(e) => setSearchEmail(e.target.value)}
-              placeholder="family@example.com"
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-            />
+            <label className="text-sm text-slate-200/80">
+              Guest email
+              <input
+                type="email"
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                placeholder="family@example.com"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
+              />
+            </label>
             <button
               type="submit"
               disabled={loadingPhotos}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
             >
               {loadingPhotos ? "Loading..." : "Load photos"}
             </button>
           </form>
-
-          <div className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <p className="text-sm font-semibold text-white">
-              Step 2: Let them pick favorites
-            </p>
-            <p className="mt-2 text-xs text-slate-300/80">
-              Invite the guest to select the photos they love. Selected photos will
-              show a badge.
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-            <p className="text-sm font-semibold text-white">
-              Step 3: Choose backgrounds
-            </p>
-            <p className="mt-2 text-xs text-slate-300/80">
-              For each selected photo, pick a background and show the live preview.
-            </p>
-          </div>
         </section>
 
-        <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-white">Step 4: Send</p>
-              <p className="text-xs text-slate-300/80">
-                Once every selected photo has a background, send the set.
-              </p>
+        {/* Step 2: Select photos */}
+        {hasPhotos && (
+          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Select favorites</p>
+                <p className="text-xs text-slate-300/80">
+                  Tap to select the photos the guest wants to keep.
+                </p>
+              </div>
             </div>
-            <button
-              onClick={sendEmail}
-              disabled={sending || !readyToSend}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
-            >
-              {sending ? "Sending..." : "Send set & clean up"}
-            </button>
-          </div>
-          <div className="mt-3 grid gap-2 text-xs text-slate-300/80 md:grid-cols-3">
-            <p>Selected: {selectedPhotos.size}</p>
-            <p>
-              Ready previews:{" "}
-              {Object.values(selectionMap).filter((s) => s.preview).length}
-            </p>
-            <p>Delivery email: {latestEmail || "—"}</p>
-          </div>
-        </section>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {photos.map((photo) => {
+                const isSelected = selectedPhotos.has(photo.id);
+                return (
+                  <article
+                    key={photo.id}
+                    className="flex flex-col gap-2 rounded-2xl bg-slate-900/60 p-3 ring-1 ring-white/5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {photo.originalName}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Uploaded {formatDate(photo.createdAt)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => togglePhoto(photo.id)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                          isSelected
+                            ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/50"
+                            : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10"
+                        }`}
+                      >
+                        {isSelected ? "Selected" : "Select"}
+                      </button>
+                    </div>
+                    <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
+                      <Image
+                        src={photo.cutoutUrl}
+                        alt={`Cutout for ${photo.originalName}`}
+                        width={1200}
+                        height={800}
+                        unoptimized
+                        className="h-48 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
+                      />
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Step 3: Backgrounds */}
+        {hasSelections && (
+          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  Choose backgrounds for selected photos
+                </p>
+                <p className="text-xs text-slate-300/80">
+                  Pick a background and show the preview.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {photos
+                .filter((p) => selectedPhotos.has(p.id))
+                .map((photo) => {
+                  const selection = selectionMap[photo.id];
+                  return (
+                    <article
+                      key={photo.id}
+                      className="flex flex-col gap-3 rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-white">
+                          {photo.originalName}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Select a background to preview.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {backgrounds.map((background) => (
+                          <button
+                            key={background.id}
+                            onClick={() => {
+                              pickBackground(photo, background.id);
+                            }}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              selection?.backgroundId === background.id
+                                ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
+                                : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
+                            }`}
+                          >
+                            {background.name}
+                          </button>
+                        ))}
+                      </div>
+                      {selection?.preview && (
+                        <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
+                          <Image
+                            src={selection.preview}
+                            alt="Preview with background"
+                            width={1400}
+                            height={900}
+                            unoptimized
+                            className="h-56 w-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+            </div>
+          </section>
+        )}
+
+        {/* Step 4: Send */}
+        {hasSelections && readyToSend && (
+          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Send to guest</p>
+                <p className="text-xs text-slate-300/80">
+                  All selected photos have backgrounds. Send and clean up storage.
+                </p>
+              </div>
+              <button
+                onClick={sendEmail}
+                disabled={sending}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
+              >
+                {sending ? "Sending..." : "Send set & clean up"}
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 text-xs text-slate-300/80 md:grid-cols-3">
+              <p>Selected: {selectedPhotos.size}</p>
+              <p>
+                Ready previews:{" "}
+                {Object.values(selectionMap).filter((s) => s.preview).length}
+              </p>
+              <p>Delivery email: {latestEmail || "—"}</p>
+            </div>
+          </section>
+        )}
 
         <section className="space-y-4 rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
           <div className="flex items-center justify-between gap-2">
