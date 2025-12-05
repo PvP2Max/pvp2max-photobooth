@@ -134,9 +134,9 @@ export default function Home() {
 
     const form = event.currentTarget;
     const fileInput = form.elements.namedItem("file") as HTMLInputElement;
-    const file = fileInput.files?.[0];
-    if (!file) {
-      setError("Choose a photo to upload first.");
+    const files = Array.from(fileInput.files ?? []);
+    if (files.length === 0) {
+      setError("Choose at least one photo to upload first.");
       return;
     }
     if (!uploadEmail) {
@@ -148,7 +148,9 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append("email", uploadEmail);
-      formData.append("file", file);
+      for (const file of files) {
+        formData.append("file", file);
+      }
 
       const response = await fetch("/api/photos", {
         method: "POST",
@@ -156,16 +158,21 @@ export default function Home() {
       });
 
       const payload = (await response.json()) as {
+        photos?: Photo[];
         photo?: Photo;
         error?: string;
       };
-      const photo = payload.photo;
-      if (!response.ok || !photo) {
+      const photosReturned = payload.photos ?? (payload.photo ? [payload.photo] : []);
+      if (!response.ok || photosReturned.length === 0) {
         throw new Error(payload.error || "Upload failed");
       }
 
-      setPhotos((prev) => [photo, ...prev]);
-      setMessage("Photo processed and ready.");
+      setPhotos((prev) => [...photosReturned, ...prev]);
+      setMessage(
+        photosReturned.length > 1
+          ? `${photosReturned.length} photos processed and ready.`
+          : "Photo processed and ready.",
+      );
       setSearchEmail(uploadEmail);
       form.reset();
     } catch (err) {
@@ -494,12 +501,13 @@ export default function Home() {
               />
             </label>
             <label className="text-sm text-slate-200/80">
-              Select a photo
+              Select one or more photos
               <input
                 name="file"
                 type="file"
                 accept="image/*"
                 required
+                multiple
                 className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
               />
             </label>

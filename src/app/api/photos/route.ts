@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const email = formData.get("email");
-  const file = formData.get("file");
+  const uploaded = formData.getAll("file");
 
   if (!email || typeof email !== "string") {
     return NextResponse.json(
@@ -31,23 +31,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!file || !(file instanceof File)) {
+  const files = uploaded.filter((f): f is File => f instanceof File);
+
+  if (files.length === 0) {
     return NextResponse.json(
-      { error: "Image file is required." },
+      { error: "At least one image file is required." },
       { status: 400 },
     );
   }
 
   try {
-    const cutout = await removeBackground(file);
-    const photo = await savePhoto({
-      email,
-      file,
-      cutout: cutout.buffer,
-      cutoutContentType: cutout.contentType,
-    });
+    const results = [];
+    for (const file of files) {
+      const cutout = await removeBackground(file);
+      const photo = await savePhoto({
+        email,
+        file,
+        cutout: cutout.buffer,
+        cutoutContentType: cutout.contentType,
+      });
+      results.push(photo);
+    }
 
-    return NextResponse.json({ photo });
+    return NextResponse.json({ photos: results });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
