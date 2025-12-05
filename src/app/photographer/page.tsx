@@ -38,15 +38,24 @@ export default function PhotographerPage() {
         body: formData,
       });
 
-      const payload = (await response.json()) as { photos?: unknown; error?: string };
+      const payload = (await response.json()) as {
+        photos?: unknown;
+        failures?: { fileName?: string; error?: string }[];
+        error?: string;
+      };
       if (!response.ok || !payload.photos) {
         throw new Error(payload.error || "Upload failed");
       }
 
+      const successCount = Array.isArray(payload.photos)
+        ? payload.photos.length
+        : 1;
+      const failureCount = payload.failures?.length ?? 0;
+
       setMessage(
-        Array.isArray(payload.photos)
-          ? `${payload.photos.length} photo(s) processed and ready.`
-          : "Photo processed and ready.",
+        failureCount > 0
+          ? `${successCount} photo(s) processed. ${failureCount} failed.`
+          : `${successCount} photo(s) processed and ready.`,
       );
       form.reset();
     } catch (err) {

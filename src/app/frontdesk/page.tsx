@@ -93,6 +93,7 @@ export default function FrontdeskPage() {
     "email",
   );
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
+  const [uploading, setUploading] = useState(false);
 
   const latestEmail = useMemo(() => searchEmail, [searchEmail]);
   const selectedList = useMemo(
@@ -158,6 +159,7 @@ export default function FrontdeskPage() {
       setError("Enter an email to search for that family's queue.");
       return;
     }
+    setUploading(true);
     setLoadingPhotos(true);
     try {
       const response = await fetch(
@@ -183,6 +185,7 @@ export default function FrontdeskPage() {
       const msg = err instanceof Error ? err.message : "Failed to search.";
       setError(msg);
     } finally {
+      setUploading(false);
       setLoadingPhotos(false);
     }
   }

@@ -41,19 +41,39 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const results = [];
+    const results: {
+      photo?: Awaited<ReturnType<typeof savePhoto>>;
+      error?: string;
+      fileName?: string;
+    }[] = [];
     for (const file of files) {
-      const cutout = await removeBackground(file);
-      const photo = await savePhoto({
-        email,
-        file,
-        cutout: cutout.buffer,
-        cutoutContentType: cutout.contentType,
-      });
-      results.push(photo);
+      try {
+        const cutout = await removeBackground(file);
+        const photo = await savePhoto({
+          email,
+          file,
+          cutout: cutout.buffer,
+          cutoutContentType: cutout.contentType,
+        });
+        results.push({ photo });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown error removing background";
+        results.push({ error: message, fileName: (file as File).name });
+      }
     }
 
-    return NextResponse.json({ photos: results });
+    const photos = results.filter((r) => r.photo).map((r) => r.photo!);
+    const failures = results.filter((r) => r.error);
+
+    if (photos.length === 0) {
+      return NextResponse.json(
+        { error: "All uploads failed to process.", failures },
+        { status: 502 },
+      );
+    }
+
+    return NextResponse.json({ photos, failures });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
