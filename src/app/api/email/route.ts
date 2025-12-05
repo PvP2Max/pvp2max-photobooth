@@ -94,9 +94,18 @@ export async function POST(request: NextRequest) {
           typeof selection.transform?.scale === "number"
             ? selection.transform.scale
             : baseScale;
-        const appliedScale = Number.isFinite(rawScale)
-          ? Math.max(0.05, Math.min(rawScale, 6))
-          : baseScale;
+        const maxScaleByBg = Math.max(
+          0.05,
+          Math.min(
+            (bgWidth - 2) / Math.max(cutoutWidth, 1),
+            (bgHeight - 2) / Math.max(cutoutHeight, 1),
+            6,
+          ),
+        );
+        const appliedScale = Math.max(
+          0.05,
+          Math.min(Number.isFinite(rawScale) ? rawScale : baseScale, maxScaleByBg),
+        );
         const offsetX = Number.isFinite(selection.transform?.offsetX)
           ? selection.transform!.offsetX!
           : 0;
