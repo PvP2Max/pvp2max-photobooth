@@ -163,14 +163,6 @@ export default function FrontdeskPage() {
   }, []);
 
   useEffect(() => {
-    if (readyToSend) {
-      setStep("send");
-    } else if (step === "send") {
-      setStep("backgrounds");
-    }
-  }, [readyToSend, step]);
-
-  useEffect(() => {
     setCurrentBgIndex(0);
     if (step === "backgrounds" && selectedList.length === 0) {
       setStep("select");
@@ -295,6 +287,16 @@ export default function FrontdeskPage() {
     }
   }
 
+  async function advanceBackgroundStep() {
+    if (!currentPhoto) return;
+    if (currentBgIndex < selectedList.length - 1) {
+      setCurrentBgIndex((prev) => prev + 1);
+      return;
+    }
+    // Last photo -> send immediately
+    await sendEmail(true);
+  }
+
   async function sendEmail() {
     setError(null);
     setMessage(null);
@@ -308,6 +310,7 @@ export default function FrontdeskPage() {
     }
 
     setSending(true);
+    setStep("send");
     try {
       const selections = Array.from(selectedPhotos).map((photoId) => ({
         photoId,
@@ -334,7 +337,7 @@ export default function FrontdeskPage() {
       setPhotos((prev) => prev.filter((photo) => !selectedPhotos.has(photo.id)));
       setSelectedPhotos(new Set());
       setSelectionMap({});
-      setMessage("Email queued and local files cleaned up.");
+      setMessage("Your photos are on the way!");
       // Soft reset after success.
       setTimeout(() => {
         window.location.href = "/frontdesk";
@@ -500,18 +503,12 @@ export default function FrontdeskPage() {
                 </p>
               </div>
               <button
-                onClick={() => {
-                  if (currentBgIndex < selectedList.length - 1) {
-                    setCurrentBgIndex((prev) => prev + 1);
-                  } else {
-                    setStep("send");
-                  }
-                }}
+                onClick={advanceBackgroundStep}
                 disabled={!selectionMap[currentPhoto.id]?.preview}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300 disabled:opacity-50"
               >
                 {currentBgIndex === selectedList.length - 1
-                  ? "Next: send email"
+                  ? "Finish & send"
                   : "Next photo"}
               </button>
             </div>
