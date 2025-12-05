@@ -27,9 +27,9 @@ export async function GET(
   const preview = request.nextUrl.searchParams.get("preview");
   const targetWidth = widthParam ? Math.min(parseInt(widthParam, 10) || 0, 2000) : null;
 
-  const baseBuffer = await readFile(asset.path);
+  const baseBuffer = await readFile(asset.path); // Buffer
   const sharpInput = new Uint8Array(baseBuffer);
-  let buffer: Uint8Array = baseBuffer;
+  let buffer: Buffer = baseBuffer;
 
   if (
     preview &&
@@ -46,7 +46,7 @@ export async function GET(
     }
   }
 
-  return new NextResponse(buffer, {
+  return new NextResponse(Buffer.from(buffer), {
     headers: {
       "Content-Type": asset.contentType,
       "Cache-Control": preview ? "public, max-age=600" : "public, max-age=300",
