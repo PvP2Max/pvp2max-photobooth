@@ -44,7 +44,11 @@ function loadImage(src: string) {
   });
 }
 
-async function composePreview(cutoutUrl: string, backgroundUrl: string) {
+async function composePreview(
+  cutoutUrl: string,
+  backgroundUrl: string,
+  transform?: { scale: number; offsetX: number; offsetY: number },
+) {
   const [cutout, background] = await Promise.all([
     loadImage(cutoutUrl),
     loadImage(backgroundUrl),
@@ -62,15 +66,16 @@ async function composePreview(cutoutUrl: string, backgroundUrl: string) {
 
   const maxWidth = width * 0.55;
   const maxHeight = height * 0.75;
-  const scale = Math.min(
+  const baseScale = Math.min(
     maxWidth / cutout.width,
     maxHeight / cutout.height,
     1.1,
   );
-  const targetWidth = cutout.width * scale;
-  const targetHeight = cutout.height * scale;
-  const x = width / 2 - targetWidth / 2;
-  const y = height * 0.18;
+  const appliedScale = transform?.scale ?? baseScale;
+  const targetWidth = cutout.width * appliedScale;
+  const targetHeight = cutout.height * appliedScale;
+  const x = width / 2 - targetWidth / 2 + (transform?.offsetX ?? 0);
+  const y = height * 0.18 + (transform?.offsetY ?? 0);
 
   ctx.drawImage(cutout, x, y, targetWidth, targetHeight);
   return canvas.toDataURL("image/png");
@@ -94,6 +99,10 @@ export default function FrontdeskPage() {
   );
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [toasts, setToasts] = useState<string[]>([]);
+  const [transforms, setTransforms] = useState<
+    Record<string, { scale: number; offsetX: number; offsetY: number }>
+  >({});
 
   const latestEmail = useMemo(() => searchEmail, [searchEmail]);
   const selectedList = useMemo(
@@ -113,6 +122,29 @@ export default function FrontdeskPage() {
     }
     return true;
   }, [selectedPhotos, selectionMap]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/notifications");
+        const data = (await res.json()) as {
+          notifications?: { email: string; count: number }[];
+        };
+        const notes = data.notifications ?? [];
+        if (notes.length > 0) {
+          setToasts((prev) => [
+            ...prev,
+            ...notes.map(
+              (n) => `${n.email}'s photos have been uploaded (${n.count})`,
+            ),
+          ]);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (readyToSend) {
@@ -227,7 +259,16 @@ export default function FrontdeskPage() {
     }));
 
     try {
-      const preview = await composePreview(photo.cutoutUrl, background.asset);
+      const transform = transforms[photo.id] || {
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+      };
+      const preview = await composePreview(
+        photo.cutoutUrl,
+        background.asset,
+        transform,
+      );
       setSelectionMap((prev) => ({
         ...prev,
         [photo.id]: {
@@ -530,12 +571,12 @@ export default function FrontdeskPage() {
               </button>
             </div>
             <article className="mt-4 grid gap-4 md:grid-cols-[1.1fr,1fr] items-start rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-white">
-                  {currentPhoto.originalName}
-                </p>
-                <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
-                  <Image
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-white">
+                    {currentPhoto.originalName}
+                  </p>
+                  <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
+                    <Image
                     src={currentPhoto.cutoutUrl}
                     alt={`Cutout for ${currentPhoto.originalName}`}
                     width={1200}
@@ -563,10 +604,15 @@ export default function FrontdeskPage() {
                 </div>
               </div>
               {selectionMap[currentPhoto.id]?.preview && (
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-slate-300">
-                    Live preview
-                  </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs uppercase tracking-wide text-slate-300">
+                      Live preview (drag/scale)
+                    </p>
+                    <div className="text-[11px] text-slate-300/80">
+                      Tip: adjust position/scale before moving on.
+                    </div>
+                  </div>
                   <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
                     <Image
                       src={selectionMap[currentPhoto.id]?.preview as string}
@@ -576,6 +622,125 @@ export default function FrontdeskPage() {
                       unoptimized
                       className="h-56 w-full object-cover"
                     />
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <label className="text-xs text-slate-300/80">
+                      Scale
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.5"
+                        step="0.05"
+                        value={transforms[currentPhoto.id]?.scale ?? 1}
+                        onChange={async (e) => {
+                          const next = {
+                            ...(transforms[currentPhoto.id] || {
+                              scale: 1,
+                              offsetX: 0,
+                              offsetY: 0,
+                            }),
+                            scale: parseFloat(e.target.value),
+                          };
+                          setTransforms((prev) => ({ ...prev, [currentPhoto.id]: next }));
+                          const bg = backgrounds.find(
+                            (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
+                          );
+                          if (bg) {
+                            const preview = await composePreview(
+                              currentPhoto.cutoutUrl,
+                              bg.asset,
+                              next,
+                            );
+                            setSelectionMap((prev) => ({
+                              ...prev,
+                              [currentPhoto.id]: {
+                                backgroundId: prev[currentPhoto.id].backgroundId,
+                                preview,
+                              },
+                            }));
+                          }
+                        }}
+                        className="mt-1 w-full"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-300/80">
+                      Offset X
+                      <input
+                        type="range"
+                        min="-400"
+                        max="400"
+                        step="10"
+                        value={transforms[currentPhoto.id]?.offsetX ?? 0}
+                        onChange={async (e) => {
+                          const next = {
+                            ...(transforms[currentPhoto.id] || {
+                              scale: 1,
+                              offsetX: 0,
+                              offsetY: 0,
+                            }),
+                            offsetX: parseFloat(e.target.value),
+                          };
+                          setTransforms((prev) => ({ ...prev, [currentPhoto.id]: next }));
+                          const bg = backgrounds.find(
+                            (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
+                          );
+                          if (bg) {
+                            const preview = await composePreview(
+                              currentPhoto.cutoutUrl,
+                              bg.asset,
+                              next,
+                            );
+                            setSelectionMap((prev) => ({
+                              ...prev,
+                              [currentPhoto.id]: {
+                                backgroundId: prev[currentPhoto.id].backgroundId,
+                                preview,
+                              },
+                            }));
+                          }
+                        }}
+                        className="mt-1 w-full"
+                      />
+                    </label>
+                    <label className="text-xs text-slate-300/80">
+                      Offset Y
+                      <input
+                        type="range"
+                        min="-400"
+                        max="400"
+                        step="10"
+                        value={transforms[currentPhoto.id]?.offsetY ?? 0}
+                        onChange={async (e) => {
+                          const next = {
+                            ...(transforms[currentPhoto.id] || {
+                              scale: 1,
+                              offsetX: 0,
+                              offsetY: 0,
+                            }),
+                            offsetY: parseFloat(e.target.value),
+                          };
+                          setTransforms((prev) => ({ ...prev, [currentPhoto.id]: next }));
+                          const bg = backgrounds.find(
+                            (b) => b.id === selectionMap[currentPhoto.id]?.backgroundId,
+                          );
+                          if (bg) {
+                            const preview = await composePreview(
+                              currentPhoto.cutoutUrl,
+                              bg.asset,
+                              next,
+                            );
+                            setSelectionMap((prev) => ({
+                              ...prev,
+                              [currentPhoto.id]: {
+                                backgroundId: prev[currentPhoto.id].backgroundId,
+                                preview,
+                              },
+                            }));
+                          }
+                        }}
+                        className="mt-1 w-full"
+                      />
+                    </label>
                   </div>
                 </div>
               )}

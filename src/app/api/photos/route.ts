@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { removeBackground } from "@/lib/bgremover";
 import { savePhoto, listPhotosByEmail } from "@/lib/storage";
+import { addNotification } from "@/lib/notifications";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
+
+    await addNotification(email, photos.length);
 
     return NextResponse.json({ photos, failures });
   } catch (error) {
