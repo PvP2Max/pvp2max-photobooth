@@ -37,14 +37,19 @@ export async function sendMail(payload: MailPayload) {
       },
     });
 
-    await transporter.sendMail({
-      to: payload.to,
-      from: process.env.EMAIL_FROM,
-      subject: payload.subject,
-      html: payload.html,
-      attachments: payload.attachments,
-    });
-    return { delivered: true, mode: "smtp" as const };
+    try {
+      await transporter.sendMail({
+        to: payload.to,
+        from: process.env.EMAIL_FROM,
+        subject: payload.subject,
+        html: payload.html,
+        attachments: payload.attachments,
+      });
+      return { delivered: true, mode: "smtp" as const };
+    } catch (error) {
+      console.error("SMTP send failed, falling back to local outbox", error);
+      // Continue to local fallback below.
+    }
   }
 
   const fallbackRoot = path.join(process.cwd(), "storage", "outbox");
