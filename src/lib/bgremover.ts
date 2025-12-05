@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 
-const DEFAULT_BGREMOVER_BASE = "https://bgremover.pvp2max.com";
+const DEFAULT_BGREMOVER_BASE = "https://bgremoval.pvp2max.com";
 
 function resolveApiBase() {
   return process.env.BGREMOVER_API_BASE?.replace(/\/$/, "") ?? DEFAULT_BGREMOVER_BASE;
