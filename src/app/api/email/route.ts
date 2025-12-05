@@ -115,6 +115,10 @@ export async function POST(request: NextRequest) {
         <span>© ${new Date().getFullYear()} Arctic Aura Designs</span>
         <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;">arcticauradesigns.com</a>
       </div>
+      <div style="background:#0b1022;padding:12px 28px;color:#cbd5e1;font-size:11px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
+        <span>Need a photobooth for your next event? </span>
+        <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:600;">Contact Arctic Aura Designs to book.</a>
+      </div>
     </div>
   </div>
   `;
