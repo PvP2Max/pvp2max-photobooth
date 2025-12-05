@@ -470,8 +470,8 @@ export default function FrontdeskPage() {
           </section>
         )}
 
-        {/* Step 3: Backgrounds */
-        {{step === "backgrounds" && hasSelections && (
+        {/* Step 3: Backgrounds */}
+        {step === "backgrounds" && hasSelections && (
           <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
             <div className="flex items-center justify-between">
               <div>
