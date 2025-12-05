@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   photobooth:
     container_name: photobooth
