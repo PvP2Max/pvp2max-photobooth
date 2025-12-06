@@ -31,6 +31,14 @@ const PREVIEW_MAX_HEIGHT = 720;
 const PREVIEW_ASSET_WIDTH = 1400;
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 
+function photoHasReadySelection(
+  selectionMap: Record<string, Slot[]>,
+  photoId: string,
+) {
+  const slots = selectionMap[photoId] ?? [];
+  return slots.some((slot) => slot.backgroundId && slot.preview);
+}
+
 function formatDate(date: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
@@ -627,7 +635,10 @@ export default function FrontdeskPage() {
               </div>
               <button
                 onClick={advanceBackgroundStep}
-                disabled={!readyToSend}
+                disabled={
+                  !currentPhoto ||
+                  !photoHasReadySelection(selectionMap, currentPhoto.id)
+                }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300 disabled:opacity-50"
               >
                 {currentBgIndex === selectedList.length - 1
