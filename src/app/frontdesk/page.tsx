@@ -782,8 +782,8 @@ export default function FrontdeskPage() {
                         Scale
                         <input
                           type="range"
-                          min="0.1"
-                          max="4"
+                          min="0.25"
+                          max="2.5"
                           step="0.01"
                           value={transform.scale}
                           onChange={(e) => {
