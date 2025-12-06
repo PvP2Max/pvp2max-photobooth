@@ -114,31 +114,31 @@ export default function PhotographerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(190,24,93,0.12),transparent_30%)]" />
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
       <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-12">
         <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.25em] text-cyan-300/80">
+          <p className="text-sm uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
             Photographer lane
           </p>
-          <h1 className="text-3xl font-semibold text-white">
+          <h1 className="text-3xl font-semibold">
             Upload & auto-remove backgrounds
           </h1>
-          <p className="text-sm text-slate-300/80">
+          <p className="text-sm text-[var(--color-text-muted)]">
             Check guests in first, then pick their email from the dropdown so uploads stay grouped for the
             front desk.
           </p>
-          <div className="flex flex-wrap gap-3 text-xs text-slate-300/80">
+          <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-muted)]">
             <Link
               href="/checkin"
-              className="rounded-full bg-white/10 px-3 py-1 ring-1 ring-white/10 transition hover:bg-white/15"
+              className="rounded-full bg-[var(--color-surface)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
             >
               Open check-in
             </Link>
             <button
               type="button"
               onClick={loadCheckins}
-              className="rounded-full bg-white/5 px-3 py-1 text-left ring-1 ring-white/10 transition hover:bg-white/10"
+              className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-left ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
             >
               Refresh dropdown
             </button>
@@ -149,8 +149,8 @@ export default function PhotographerPage() {
           <div
             className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
               error
-                ? "bg-red-500/10 text-red-100 ring-red-400/50"
-                : "bg-emerald-500/10 text-emerald-100 ring-emerald-400/50"
+                ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]"
             }`}
           >
             {error || message}
@@ -159,16 +159,16 @@ export default function PhotographerPage() {
 
         <form
           onSubmit={handleUpload}
-          className="grid gap-4 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10"
+          className="grid gap-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
         >
-          <label className="text-sm text-slate-200/80">
+          <label className="text-sm text-[var(--color-text-muted)]">
             Choose checked-in guest
             <select
               required
               value={selectedCheckinId}
               onChange={(e) => setSelectedCheckinId(e.target.value)}
               disabled={checkins.length === 0}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white focus:border-cyan-300 focus:outline-none"
+              className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none disabled:opacity-50"
             >
               <option value="" disabled>
                 {loadingCheckins ? "Loading..." : "Select a check-in"}
@@ -192,24 +192,24 @@ export default function PhotographerPage() {
               required
               multiple
               disabled={!selectedCheckin}
-              className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-2 w-full rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-3 text-sm text-[var(--color-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[rgba(155,92,255,0.18)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-50"
             />
           </label>
           <button
             type="submit"
             disabled={uploading || !selectedCheckin}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-emerald-300 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] transition hover:opacity-95 disabled:opacity-50"
           >
             {uploading ? "Processing..." : "Upload & remove background"}
           </button>
-          <p className="text-xs text-slate-300/70">
+          <p className="text-xs text-[var(--color-text-soft)]">
             Files route to bgremover with the service token, then cut-outs stay local for the front desk until
             delivery.
           </p>
           {checkins.length === 0 && (
-            <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
+            <div className="rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] px-3 py-2 text-xs text-[var(--color-text-muted)]">
               No check-ins yet. Add guests on the{" "}
-              <Link href="/checkin" className="underline text-cyan-200">
+              <Link href="/checkin" className="underline text-[var(--color-accent-soft)]">
                 check-in page
               </Link>{" "}
               before uploading.

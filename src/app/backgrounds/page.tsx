@@ -109,17 +109,17 @@ export default function BackgroundsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(190,24,93,0.12),transparent_30%)]" />
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
       <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-12">
         <div className="space-y-2">
-          <p className="text-sm uppercase tracking-[0.25em] text-amber-200/80">
+          <p className="text-sm uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
             Background library
           </p>
-          <h1 className="text-3xl font-semibold text-white">
+          <h1 className="text-3xl font-semibold">
             Curated sets and custom uploads
           </h1>
-          <p className="text-sm text-slate-300/80">
+          <p className="text-sm text-[var(--color-text-muted)]">
             Manage built-ins and your own uploads. Custom backgrounds can be removed;
             built-ins stay fixed.
           </p>
@@ -129,8 +129,8 @@ export default function BackgroundsPage() {
           <div
             className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
               error
-                ? "bg-red-500/10 text-red-100 ring-red-400/50"
-                : "bg-emerald-500/10 text-emerald-100 ring-emerald-400/50"
+                ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]"
             }`}
           >
             {error || message}
@@ -139,41 +139,41 @@ export default function BackgroundsPage() {
 
         <form
           onSubmit={uploadBackground}
-          className="grid gap-3 rounded-2xl bg-white/5 p-5 ring-1 ring-white/10"
+          className="grid gap-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
         >
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-sm text-slate-200/80">
+            <label className="text-sm text-[var(--color-text-muted)]">
               Name
               <input
                 name="bgname"
                 required
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-amber-300 focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
                 placeholder="Cozy Hearth"
               />
             </label>
-            <label className="text-sm text-slate-200/80">
+            <label className="text-sm text-[var(--color-text-muted)]">
               Description (optional)
               <input
                 name="bgdesc"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-amber-300 focus:outline-none"
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
                 placeholder="Warm fireplace glow"
               />
             </label>
           </div>
-          <label className="text-sm text-slate-200/80">
+          <label className="text-sm text-[var(--color-text-muted)]">
             Upload image
             <input
               name="bgfile"
               type="file"
               accept="image/*"
               required
-              className="mt-2 w-full rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-3 text-sm text-slate-200 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500/20 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+              className="mt-2 w-full rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-3 text-sm text-[var(--color-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[rgba(155,92,255,0.18)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-text)]"
             />
           </label>
           <button
             type="submit"
             disabled={backgroundUploading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-amber-500 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:from-amber-200 hover:to-amber-400 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] transition hover:opacity-95 disabled:opacity-50"
           >
             {backgroundUploading ? "Saving..." : "Add background"}
           </button>
@@ -183,18 +183,18 @@ export default function BackgroundsPage() {
           {backgrounds.map((bg) => (
             <div
               key={bg.id}
-              className="flex items-center justify-between rounded-xl bg-black/15 px-4 py-3 ring-1 ring-white/5"
+              className="flex items-center justify-between rounded-xl bg-[var(--color-surface)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
             >
               <div>
-                <p className="font-semibold text-white">{bg.name}</p>
-                <p className="text-xs text-slate-300/70">
+                <p className="font-semibold text-[var(--color-text)]">{bg.name}</p>
+                <p className="text-xs text-[var(--color-text-soft)]">
                   {bg.description || "—"} {bg.isCustom ? "(custom)" : ""}
                 </p>
               </div>
               {bg.isCustom && (
                 <button
                   onClick={() => deleteBackground(bg.id)}
-                  className="text-xs font-semibold text-red-200 hover:text-red-100"
+                  className="text-xs font-semibold text-[var(--color-danger)] hover:text-[var(--color-text)]"
                 >
                   Delete
                 </button>
