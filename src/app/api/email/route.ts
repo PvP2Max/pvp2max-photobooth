@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     const attachments = [];
+    let productionId: string | null = null;
 
     for (const selection of body.selections) {
       try {
@@ -211,8 +212,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save production copies for potential resend before emailing
-    await saveProduction(body.clientEmail, attachments);
+    // Save production copies for potential resend and downloads
+    const production = await saveProduction(body.clientEmail, attachments);
+    productionId = production.id;
+
+    const origin =
+      request.headers.get("origin") || process.env.APP_BASE_URL || "";
+    const baseUrl = origin.replace(/\/$/, "");
+    const downloadLinks = attachments.map(
+      (attachment, idx) =>
+        `<li><a href="${baseUrl}/api/production/files/${productionId}/${encodeURIComponent(
+          attachment.filename,
+        )}?token=ArcticAuraDesigns" style="color:#67e8f9;text-decoration:none;">Photo ${
+          idx + 1
+        }: ${attachment.filename}</a></li>`,
+    );
 
     const html = `
   <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
@@ -221,13 +235,19 @@ export async function POST(request: NextRequest) {
         <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BOSS Holiday Photobooth</p>
         <h1 style="color:#fff;font-size:26px;margin:0 0 12px;">Your photos are ready!</h1>
         <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;margin:12px 0;">
-          <p style="margin:0;color:#cbd5e1;font-size:13px;">Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Your edited shots are attached to this email, paired with your chosen backgrounds.</p>
+          <p style="margin:0;color:#cbd5e1;font-size:13px;">Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Download your edited shots below.</p>
         </div>
       </div>
       <div style="padding:22px 28px;">
         <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;">
           If you have any issues opening the files, let us know and we’ll resend them.
         </p>
+        <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;">
+          Download your photos:
+        </p>
+        <ul style="margin:0 0 12px 18px;color:#cbd5e1;font-size:13px;line-height:1.5;">
+          ${downloadLinks.join("")}
+        </ul>
         <p style="margin:0;color:#cbd5e1;font-size:12px;">
           With gratitude,<br/>BOSS Holiday Photobooth team
         </p>
@@ -243,14 +263,14 @@ export async function POST(request: NextRequest) {
       </div>
     </div>
   </div>
-  `;
+      `;
 
     try {
       const result = await sendMail({
         to: body.clientEmail,
         subject: "Your Photos are Ready! - BOSS Holiday Photobooth",
         html,
-        attachments,
+        attachments: [],
       });
 
       // Clean up all stored photo artifacts for this client once email is dispatched.
