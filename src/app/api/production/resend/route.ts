@@ -33,23 +33,31 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const record = await findProductionById(body.id);
-  if (!record) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  try {
+    const record = await findProductionById(body.id);
+    if (!record) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
-  const attachments = [];
-  for (const attachment of record.attachments) {
-    const file = await getProductionAttachment(record.id, attachment.filename);
-    if (!file) continue;
-    attachments.push({
-      filename: file.filename,
-      content: file.buffer,
-      contentType: file.contentType,
-    });
-  }
+    const attachments = [];
+    for (const attachment of record.attachments) {
+      const file = await getProductionAttachment(record.id, attachment.filename);
+      if (!file) continue;
+      attachments.push({
+        filename: file.filename,
+        content: file.buffer,
+        contentType: file.contentType,
+      });
+    }
 
-  const html = `
+    if (attachments.length === 0) {
+      return NextResponse.json(
+        { error: "No attachments found for this production record." },
+        { status: 404 },
+      );
+    }
+
+    const html = `
   <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
     <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.25);">
       <div style="padding:28px 28px 12px;">
@@ -80,7 +88,6 @@ export async function POST(request: NextRequest) {
   </div>
   `;
 
-  try {
     const result = await sendMail({
       to: body.email,
       subject: "Your Photos are Ready! - BOSS Holiday Photobooth (Resent)",
@@ -91,6 +98,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "ok", delivery: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Production resend failed", { error: message });
     return NextResponse.json(
       { error: "Failed to resend email", detail: message },
       { status: 500 },
