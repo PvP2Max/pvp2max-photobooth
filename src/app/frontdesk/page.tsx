@@ -155,6 +155,7 @@ export default function FrontdeskPage() {
   const [currentSlotId, setCurrentSlotId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<string[]>([]);
   const [transforms, setTransforms] = useState<Record<string, Transform>>({});
+  const [previewLoading, setPreviewLoading] = useState<Record<string, boolean>>({});
   const previewTimers = useRef<Record<string, number>>({});
 
   const latestEmail = useMemo(() => searchEmail, [searchEmail]);
@@ -326,6 +327,43 @@ export default function FrontdeskPage() {
     return slotId;
   }
 
+  function duplicateSlot(photoId: string, slotId: string) {
+    setSelectionMap((prev) => {
+      const existing = prev[photoId] ?? [];
+      const slot = existing.find((s) => s.id === slotId);
+      if (!slot) return prev;
+      const clone: Slot = {
+        ...slot,
+        id: createSlotId(),
+        preview: slot.preview,
+        transform: slot.transform,
+      };
+      return { ...prev, [photoId]: [...existing, clone] };
+    });
+  }
+
+  function removeSlot(photoId: string, slotId: string) {
+    setSelectionMap((prev) => {
+      const existing = prev[photoId] ?? [];
+      if (existing.length <= 1) return prev;
+      const filtered = existing.filter((s) => s.id !== slotId);
+      return { ...prev, [photoId]: filtered };
+    });
+    setTransforms((prev) => {
+      const next = { ...prev };
+      delete next[slotId];
+      return next;
+    });
+    setPreviewLoading((prev) => {
+      const next = { ...prev };
+      delete next[slotId];
+      return next;
+    });
+    if (currentSlotId === slotId) {
+      setCurrentSlotId(null);
+    }
+  }
+
   async function pickBackground(photo: Photo, slotId: string, backgroundId: string) {
     const background = backgrounds.find((bg) => bg.id === backgroundId);
     if (!background) return;
@@ -347,6 +385,7 @@ export default function FrontdeskPage() {
       const backgroundSrc =
         background.previewAsset ||
         withPreview(background.asset, PREVIEW_ASSET_WIDTH);
+      setPreviewLoading((prev) => ({ ...prev, [slotId]: true }));
       const result = await composePreview(
         cutoutSrc,
         backgroundSrc,
@@ -371,12 +410,14 @@ export default function FrontdeskPage() {
               );
         return { ...prev, [photo.id]: nextSlots };
       });
+      setPreviewLoading((prev) => ({ ...prev, [slotId]: false }));
     } catch (err) {
       const msg =
         err instanceof Error
           ? err.message
           : "Could not generate preview for that background.";
       setError(msg);
+      setPreviewLoading((prev) => ({ ...prev, [slotId]: false }));
     }
   }
 
@@ -391,6 +432,7 @@ export default function FrontdeskPage() {
       : withPreview(photo.cutoutUrl, PREVIEW_ASSET_WIDTH);
     const backgroundSrc =
       background.previewAsset || withPreview(background.asset, PREVIEW_ASSET_WIDTH);
+    setPreviewLoading((prev) => ({ ...prev, [slotId]: true }));
     const result = await composePreview(cutoutSrc, backgroundSrc, nextTransform);
     setTransforms((prev) => ({ ...prev, [slotId]: result.transform }));
     setSelectionMap((prev) => {
@@ -401,6 +443,7 @@ export default function FrontdeskPage() {
       );
       return { ...prev, [photo.id]: updated };
     });
+    setPreviewLoading((prev) => ({ ...prev, [slotId]: false }));
   }
 
   async function advanceBackgroundStep() {
@@ -487,12 +530,12 @@ export default function FrontdeskPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(56,189,248,0.14),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(190,24,93,0.12),transparent_30%)]" />
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
       <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-12">
         <div className="space-y-1">
-          <h1 className="text-3xl font-semibold text-white">Front desk</h1>
-          <p className="text-sm text-slate-300/80">
+          <h1 className="text-3xl font-semibold">Front desk</h1>
+          <p className="text-sm text-[var(--color-text-muted)]">
             Simple, step-by-step flow for guests on an iPad.
           </p>
         </div>
@@ -684,6 +727,32 @@ export default function FrontdeskPage() {
                     );
                   })}
                 </div>
+                <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                  {(() => {
+                    const slots = selectionMap[currentPhoto.id] ?? [];
+                    const activeSlot =
+                      slots.find((s) => s.id === currentSlotId) || slots[0];
+                    if (!activeSlot) return null;
+                    return (
+                      <>
+                        <button
+                          className="rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(155,92,255,0.35)] text-[var(--color-text)]"
+                          onClick={() => duplicateSlot(currentPhoto.id, activeSlot.id)}
+                        >
+                          Duplicate slot
+                        </button>
+                        {slots.length > 1 && (
+                          <button
+                            className="rounded-full bg-[rgba(249,115,115,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]"
+                            onClick={() => removeSlot(currentPhoto.id, activeSlot.id)}
+                          >
+                            Remove slot
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {backgrounds.map((background) => {
                     const activeSlot =
@@ -765,7 +834,7 @@ export default function FrontdeskPage() {
                       </label>
                     </div>
                     {activeSlot.preview && (
-                      <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
+                      <div className="relative overflow-hidden rounded-xl ring-1 ring-white/5">
                         <Image
                           src={activeSlot.preview as string}
                           alt="Preview with background"
@@ -775,6 +844,11 @@ export default function FrontdeskPage() {
                           className="w-full rounded-xl"
                           style={{ aspectRatio: "16/9", objectFit: "cover" }}
                         />
+                        {previewLoading[activeSlot.id] && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white">
+                            Rendering…
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="grid gap-2 md:grid-cols-3">
@@ -859,13 +933,25 @@ export default function FrontdeskPage() {
                               90,
                             );
                           }}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                    </div>
+                        className="mt-1 w-full"
+                      />
+                    </label>
                   </div>
-                );
-              })()}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+                      onClick={() => {
+                        const reset: Transform = { scale: 1, offsetX: 0, offsetY: 0 };
+                        setTransforms((prev) => ({ ...prev, [activeSlot.id]: reset }));
+                        refreshPreview(currentPhoto, activeSlot.id, reset);
+                      }}
+                    >
+                      Reset transforms
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
             </article>
           </section>
         )}

@@ -1,13 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #e2e8f0;
+  /* ==== BRAND / PRIMARY ==== */
+  --color-primary: #9b5cff;
+  --color-primary-soft: #b983ff;
+  --color-primary-dark: #3b2a68;
+
+  --color-accent: #22d3ee;
+  --color-accent-soft: #38e3ff;
+  --gradient-brand: linear-gradient(135deg, #9b5cff 0%, #22d3ee 100%);
+
+  /* ==== NEUTRALS / BACKGROUND ==== */
+  --color-bg: #050712;
+  --color-bg-subtle: #0b0f1e;
+  --color-surface: #141827;
+  --color-surface-elevated: #1c2233;
+  --color-border-subtle: #262b3d;
+  --color-border-strong: #3a4260;
+  --color-overlay: rgba(3, 5, 12, 0.72);
+
+  /* ==== TEXT ==== */
+  --color-text: #f7f7ff;
+  --color-text-muted: #a3aac7;
+  --color-text-soft: #7b81a3;
+  --color-text-on-primary: #0b0613;
+  --color-text-on-dark: #f9f9ff;
+
+  /* ==== STATES ==== */
+  --color-success: #22c55e;
+  --color-success-soft: rgba(34, 197, 94, 0.14);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgba(251, 191, 36, 0.16);
+  --color-danger: #f97373;
+  --color-danger-soft: rgba(249, 115, 115, 0.16);
+  --color-info: #38bdf8;
+  --color-info-soft: rgba(56, 189, 248, 0.18);
+
+  /* ==== FOCUS / SHADOWS ==== */
+  --color-focus-ring: rgba(34, 211, 238, 0.9);
+  --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.52);
+  --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.6);
+
+  /* ==== COMPONENT TOKENS ==== */
+  --btn-primary-bg: var(--color-primary);
+  --btn-primary-bg-hover: var(--color-primary-soft);
+  --btn-primary-text: var(--color-text-on-primary);
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: var(--color-border-strong);
+  --btn-secondary-bg-hover: rgba(148, 163, 255, 0.08);
+  --btn-secondary-text: var(--color-text);
+  --input-bg: #101427;
+  --input-border: var(--color-border-subtle);
+  --input-border-focus: var(--color-accent);
+  --input-placeholder: var(--color-text-soft);
+  --badge-bg: rgba(155, 92, 255, 0.16);
+  --badge-text: var(--color-primary-soft);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -19,8 +71,8 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: var(--font-geist-sans), "Inter", "Helvetica Neue", Arial,
     sans-serif;
   margin: 0;
