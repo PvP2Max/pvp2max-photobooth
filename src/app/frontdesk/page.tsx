@@ -36,7 +36,7 @@ function photoHasReadySelection(
   photoId: string,
 ) {
   const slots = selectionMap[photoId] ?? [];
-  return slots.some((slot) => slot.backgroundId && slot.preview);
+  return slots.some((slot) => slot.backgroundId);
 }
 
 function formatDate(date: string) {
