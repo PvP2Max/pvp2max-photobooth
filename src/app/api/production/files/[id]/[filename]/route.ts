@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProductionAttachment } from "@/lib/production";
+import { getProductionAttachment, verifyProductionToken } from "@/lib/production";
+import { rateLimiter, requestKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TOKEN = "ArcticAuraDesigns";
 
-function authorized(request: NextRequest) {
+function isAdmin(request: NextRequest) {
   const header = request.headers.get("x-admin-token");
   const query = request.nextUrl.searchParams.get("token");
   return header === TOKEN || query === TOKEN;
@@ -16,13 +17,24 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string; filename: string }> },
 ) {
-  if (!authorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { id, filename } = await context.params;
   if (!id || !filename) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  if (!isAdmin(request)) {
+    const rate = rateLimiter(`dl-${requestKey(request.headers)}`, 120, 60_000);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
+    const token = request.nextUrl.searchParams.get("token");
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const valid = await verifyProductionToken(id, token);
+    if (!valid) {
+      return NextResponse.json({ error: "Invalid or expired link" }, { status: 401 });
+    }
   }
 
   const file = await getProductionAttachment(id, filename);

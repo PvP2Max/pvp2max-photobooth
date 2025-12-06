@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
       (attachment, idx) =>
         `<li><a href="${baseUrl}/api/production/files/${productionId}/${encodeURIComponent(
           attachment.filename,
-        )}?token=ArcticAuraDesigns" style="color:#67e8f9;text-decoration:none;">Photo ${
+        )}?token=${production.downloadToken}" style="color:#67e8f9;text-decoration:none;">Photo ${
           idx + 1
         }: ${attachment.filename}</a></li>`,
     );

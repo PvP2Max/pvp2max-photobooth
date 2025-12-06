@@ -4,6 +4,7 @@ import {
   getProductionAttachment,
 } from "@/lib/production";
 import { sendMail } from "@/lib/mailer";
+import { rateLimiter, requestKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,10 @@ export async function POST(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const rate = rateLimiter(`admin-resend-${requestKey(request.headers)}`, 20, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
 
   const body = (await request.json().catch(() => ({}))) as {
     id?: string;
@@ -34,10 +39,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const record = await findProductionById(body.id);
-    if (!record) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
+  const record = await findProductionById(body.id);
+  if (!record) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
     const attachments = [];
     for (const attachment of record.attachments) {
@@ -88,14 +93,31 @@ export async function POST(request: NextRequest) {
   </div>
   `;
 
+    const origin =
+      request.headers.get("origin") || process.env.APP_BASE_URL || "";
+    const baseUrl = origin.replace(/\/$/, "");
+    const downloadLinks = record.attachments.map(
+      (attachment, idx) =>
+        `<li><a href="${baseUrl}/api/production/files/${record.id}/${encodeURIComponent(
+          attachment.filename,
+        )}?token=${record.downloadToken}" style="color:#67e8f9;text-decoration:none;">Photo ${
+          idx + 1
+        }: ${attachment.filename}</a></li>`,
+    );
+
+    const htmlWithLinks = html.replace(
+      "</ul>",
+      downloadLinks.join("") + "</ul>",
+    );
+
     const result = await sendMail({
       to: body.email,
       subject: "Your Photos are Ready! - BOSS Holiday Photobooth (Resent)",
-      html,
-      attachments,
+      html: htmlWithLinks,
+      attachments: [],
     });
 
-    return NextResponse.json({ status: "ok", delivery: result });
+    return NextResponse.json({ status: "ok", delivery: result, downloadLinks });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Production resend failed", { error: message });

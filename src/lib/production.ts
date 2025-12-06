@@ -13,6 +13,8 @@ export type ProductionSet = {
   id: string;
   email: string;
   createdAt: string;
+  downloadToken: string;
+  tokenExpiresAt: string;
   attachments: ProductionAttachment[];
 };
 
@@ -49,10 +51,12 @@ async function writeIndex(index: ProductionIndex) {
   await writeFile(INDEX_FILE, JSON.stringify(index, null, 2), "utf8");
 }
 
-export async function saveProduction(email: string, attachments: { filename: string; content: Buffer; contentType: string }[]) {
+export async function saveProduction(email: string, attachments: { filename: string; content: Buffer; contentType: string }[], ttlHours = 72) {
   await ensureProductionStorage();
   const index = await readIndex();
   const id = randomUUID();
+  const downloadToken = randomUUID();
+  const tokenExpiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString();
   const folder = path.join(PRODUCTION_DIR, id);
   await mkdir(folder, { recursive: true });
 
@@ -73,6 +77,8 @@ export async function saveProduction(email: string, attachments: { filename: str
     id,
     email,
     createdAt: new Date().toISOString(),
+    downloadToken,
+    tokenExpiresAt,
     attachments: savedAttachments,
   };
   index.items.unshift(record);
@@ -120,6 +126,17 @@ export async function getProductionAttachment(id: string, filename: string) {
 export async function findProductionById(id: string) {
   const index = await readIndex();
   return index.items.find((i) => i.id === id);
+}
+
+export async function verifyProductionToken(id: string, token: string) {
+  const record = await findProductionById(id);
+  if (!record) return null;
+  const now = Date.now();
+  const expires = new Date(record.tokenExpiresAt).getTime();
+  if (token !== record.downloadToken || (expires && expires < now)) {
+    return null;
+  }
+  return record;
 }
 
 export function productionRoot() {

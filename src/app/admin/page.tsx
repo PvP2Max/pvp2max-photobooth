@@ -6,6 +6,8 @@ type ProductionItem = {
   id: string;
   email: string;
   createdAt: string;
+  downloadToken?: string;
+  tokenExpiresAt?: string;
   attachments: { filename: string; contentType: string; size: number }[];
 };
 
@@ -182,6 +184,11 @@ export default function AdminPage() {
                     <p className="text-xs text-[var(--color-text-soft)]">
                       Saved {new Date(item.createdAt).toLocaleString()}
                     </p>
+                    {item.tokenExpiresAt && (
+                      <p className="text-[11px] text-[var(--color-text-soft)]">
+                        Link expires: {new Date(item.tokenExpiresAt).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <input
@@ -199,6 +206,14 @@ export default function AdminPage() {
                     >
                       Resend
                     </button>
+                    {item.downloadToken && (
+                      <a
+                        href={`/api/production/archive?token=${item.downloadToken}&id=${item.id}`}
+                        className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                      >
+                        Download zip
+                      </a>
+                    )}
                     <button
                       onClick={() => deleteItem(item.id)}
                       className="rounded-lg bg-[var(--color-danger)]/85 px-3 py-2 text-xs font-semibold text-[var(--color-text)]"
@@ -207,16 +222,16 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {item.attachments.map((a) => (
-                    <a
-                      key={a.filename}
-                      href={`/api/production/files/${item.id}/${encodeURIComponent(a.filename)}?token=${PASSWORD}`}
-                      className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-1 text-[11px] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                    >
-                      {a.filename} ({Math.round(a.size / 1024)} KB)
-                    </a>
-                  ))}
+                  <div className="flex flex-wrap gap-2">
+                    {item.attachments.map((a) => (
+                      <a
+                        key={a.filename}
+                        href={`/api/production/files/${item.id}/${encodeURIComponent(a.filename)}?token=${item.downloadToken ?? PASSWORD}`}
+                        className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-1 text-[11px] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                      >
+                        {a.filename} ({Math.round(a.size / 1024)} KB)
+                      </a>
+                    ))}
                 </div>
               </div>
             ))}

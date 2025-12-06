@@ -4,6 +4,8 @@ import {
   deleteProduction,
   listProduction,
 } from "@/lib/production";
+import { rateLimiter, requestKey } from "@/lib/rate-limit";
+import { rateLimiter } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +22,18 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const rate = rateLimiter(`admin-prod-${requestKey(request.headers)}`, 60, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   const items = await listProduction();
   const sanitized = items.map((item) => ({
     id: item.id,
     email: item.email,
     createdAt: item.createdAt,
+    downloadToken: item.downloadToken,
+    tokenExpiresAt: item.tokenExpiresAt,
     attachments: item.attachments.map((a) => ({
       filename: a.filename,
       contentType: a.contentType,
@@ -37,6 +46,10 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const rate = rateLimiter(`admin-prod-${requestKey(request.headers)}`, 30, 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
   const body = await request.json().catch(() => ({}));
   if (body?.all) {
