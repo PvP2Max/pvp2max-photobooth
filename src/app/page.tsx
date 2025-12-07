@@ -4,40 +4,45 @@ import Link from "next/link";
 
 const highlights = [
   {
-    title: "Multi-business ready",
-    body: "Event-scoped storage, per-event access keys, and admin download controls so each client stays isolated.",
+    title: "Event + photographer ready",
+    body: "Run self-serve booths or upload pro shots. Event plans, photographer subscriptions, and per-event credits baked in.",
   },
   {
-    title: "On-site, cloud-free",
-    body: "Background removal runs locally (withoutbg) with zero external upload; assets purge after delivery.",
+    title: "Local-first privacy",
+    body: "Background removal runs on your hardware (withoutbg). AI backgrounds are opt-in and metered.",
   },
   {
-    title: "Frictionless dual-lane",
-    body: "Check-in, photographer upload, and front-desk styling stay in sync with live notifications.",
+    title: "Booth + console",
+    body: "Full-screen booth for iPad/phone/webcam, plus business console for events, galleries, and resend.",
   },
   {
-    title: "Share-ready in minutes",
-    body: "Live previews, color-match toggle, and multiple backgrounds per photo—then link-only delivery.",
+    title: "Fast delivery",
+    body: "Email-first with SMS-ready plumbing; link-only downloads to dodge attachment limits; auto-cleanup.",
   },
 ];
 
 const workflow = [
-  { title: "Check-in", body: "Collect guest name + email once; auto-cleared after upload." },
   {
-    title: "Capture",
-    body: "Photographer picks the guest from a dropdown and uploads—cutouts process instantly.",
+    title: "Create event",
+    body: "Pick a theme, upload an overlay/logo, set delivery (email/SMS), and choose a plan or photographer pass.",
   },
   {
-    title: "Style",
-    body: "Front desk adds multiple backgrounds per photo, tweaks scale/position, and optional color-match.",
+    title: "Run the booth",
+    body: "Open the Live Booth URL on an iPad/phone/webcam—countdown, filters, overlays, instant cutouts.",
   },
   {
-    title: "Deliver",
-    body: "Email sends download links (no size limits); originals, cutouts, and composites are wiped.",
+    title: "Style or auto-send",
+    body: "Let guests email themselves instantly, or route to front desk to apply backgrounds and resend.",
   },
+  { title: "Gallery", body: "Host view with delete/zip download, public toggle, and resend controls." },
 ];
 
 const consoleLinks = [
+  {
+    title: "Business console",
+    body: "Create events, rotate keys, manage usage, copy booth links.",
+    href: "/business",
+  },
   { title: "Check-in", body: "Register guests fast; auto-clear after upload.", href: "/checkin" },
   {
     title: "Photographer lane",
@@ -69,29 +74,29 @@ export default function Home() {
               </span>
             </div>
             <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
-              BoothOS for on-site teams and multi-client events.
+              The self-serve booth and photographer console built for real events.
             </h1>
             <p className="text-lg text-[var(--color-text-muted)]">
-              Local processing, per-event access control, dual-lane workflow, multi-background previews, and link-only delivery that skips email size limits. Built to run on your own hardware or tunnel.
+              Spin up an event, launch a full-screen booth on any device, or upload DSLR shots. Background-free, branded overlays, AI backgrounds by credit, and instant delivery—without leaking data to the cloud.
             </p>
             <div className="flex flex-wrap gap-3 text-sm">
               <Link
-                href="/frontdesk"
+                href="/business"
                 className="rounded-full bg-[var(--gradient-brand)] px-5 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_15px_40px_rgba(155,92,255,0.35)] transition hover:opacity-95"
               >
-                Launch console
+                Sign in / create event
               </Link>
               <Link
-                href="/checkin"
+                href="/event/default"
                 className="rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
               >
-                Start check-in
+                Open booth demo
               </Link>
               <Link
-                href="/admin"
+                href="/frontdesk"
                 className="rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
               >
-                Admin
+                Styling console
               </Link>
             </div>
             <div className="flex flex-wrap gap-4 text-xs text-[var(--color-text-soft)]">
@@ -115,7 +120,7 @@ export default function Home() {
             <div className="absolute -left-10 bottom-6 h-24 w-24 rounded-full bg-[rgba(34,211,238,0.25)] blur-3xl" />
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-[var(--color-text)]">Live console</p>
+                <p className="text-sm font-semibold text-[var(--color-text)]">Live Booth</p>
                 <span className="rounded-full bg-[rgba(34,197,94,0.18)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]">
                   Background free
                 </span>
@@ -235,6 +240,54 @@ export default function Home() {
                 <span className="transition group-hover:translate-x-1">→</span>
               </span>
             </Link>
+          ))}
+        </section>
+
+        <section className="grid gap-6 rounded-3xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] md:grid-cols-3">
+          {[
+            {
+              name: "Event — Basic",
+              price: "$10 / event",
+              detail: "100 photos, email delivery, overlays, booth + console.",
+            },
+            {
+              name: "Event — Unlimited",
+              price: "$20 / event",
+              detail: "Unlimited photos, email delivery, overlays, booth + console.",
+            },
+            {
+              name: "Event — AI",
+              price: "$30 / event",
+              detail: "Unlimited photos + AI backgrounds credits, overlays, booth + console.",
+            },
+            {
+              name: "Photographer Event",
+              price: "$100 / event",
+              detail: "Full features for pro uploads, AI credits included.",
+            },
+            {
+              name: "Photographer Monthly",
+              price: "$250 / month",
+              detail: "Unlimited photographer events; add AI credits as needed.",
+            },
+          ].map((plan) => (
+            <div
+              key={plan.name}
+              className="flex flex-col gap-2 rounded-2xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]"
+            >
+              <p className="text-sm uppercase tracking-wide text-[var(--color-text-soft)]">
+                {plan.name}
+              </p>
+              <p className="text-lg font-semibold text-[var(--color-text)]">{plan.price}</p>
+              <p className="text-sm text-[var(--color-text-muted)]">{plan.detail}</p>
+              <Link
+                href="/business"
+                className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-[var(--color-surface)] px-3 py-2 text-xs font-semibold ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/70"
+              >
+                Choose plan
+                <span>→</span>
+              </Link>
+            </div>
           ))}
         </section>
       </main>

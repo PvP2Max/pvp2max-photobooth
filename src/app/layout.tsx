@@ -58,6 +58,12 @@ export default function RootLayout({
               >
                 Backgrounds
               </Link>
+              <Link
+                href="/business"
+                className="rounded-full bg-[rgba(34,211,238,0.14)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(34,211,238,0.35)] transition hover:bg-[rgba(34,211,238,0.24)]"
+              >
+                Log in
+              </Link>
             </nav>
           </div>
         </header>
