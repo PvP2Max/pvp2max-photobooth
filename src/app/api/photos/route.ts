@@ -3,7 +3,7 @@ import { removeBackground } from "@/lib/bgremover";
 import { savePhoto, listPhotosByEmail } from "@/lib/storage";
 import { addNotification } from "@/lib/notifications";
 import { removeCheckinByEmail } from "@/lib/checkins";
-import { getEventContext } from "@/lib/tenants";
+import { getEventContext, incrementEventUsage, eventUsage } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -31,9 +31,37 @@ export async function POST(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
+  const currentUsage = eventUsage(context.event);
+  if (currentUsage.photoCap !== null && currentUsage.photoUsed >= currentUsage.photoCap) {
+    return NextResponse.json(
+      { error: "Photo limit reached for this event. Top up to continue." },
+      { status: 402 },
+    );
+  }
   const formData = await request.formData();
   const email = formData.get("email");
   const uploaded = formData.getAll("file");
+  const removeBgInput = formData.get("removeBackground");
+  const removeBg = removeBgInput === null ? true : removeBgInput === "true" || removeBgInput === "1";
+  const aiPromptRaw = formData.get("aiPrompt");
+  const wantsAiBackground =
+    aiPromptRaw && typeof aiPromptRaw === "string" && aiPromptRaw.trim().length > 0;
+
+  if (wantsAiBackground) {
+    if (!context.event.allowAiBackgrounds) {
+      return NextResponse.json(
+        { error: "AI backgrounds are not enabled for this event." },
+        { status: 403 },
+      );
+    }
+    const remainingAi = currentUsage.remainingAi ?? 0;
+    if (remainingAi <= 0) {
+      return NextResponse.json(
+        { error: "AI credits exhausted for this event. Top up to continue." },
+        { status: 402 },
+      );
+    }
+  }
 
   if (!email || typeof email !== "string") {
     return NextResponse.json(
@@ -59,7 +87,9 @@ export async function POST(request: NextRequest) {
     }[] = [];
     for (const file of files) {
       try {
-        const cutout = await removeBackground(file);
+        const cutout = removeBg
+          ? await removeBackground(file)
+          : { buffer: Buffer.from(await file.arrayBuffer()), contentType: (file as Blob).type || "image/png" };
         const photo = await savePhoto({
           email,
           file,
@@ -85,10 +115,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const usage = await incrementEventUsage(context.scope, {
+      photos: photos.length,
+      aiCredits: wantsAiBackground ? 1 : 0,
+    });
     await addNotification(context.scope, email, photos.length);
     await removeCheckinByEmail(context.scope, email);
 
-    return NextResponse.json({ photos, failures });
+    return NextResponse.json({ photos, failures, usage: usage.usage ?? eventUsage(context.event) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(

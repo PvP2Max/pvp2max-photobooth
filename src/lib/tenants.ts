@@ -3,6 +3,14 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
 
+export type BoothEventPlan =
+  | "free"
+  | "event-basic"
+  | "event-unlimited"
+  | "event-ai"
+  | "photographer-single"
+  | "photographer-monthly";
+
 export type BoothEvent = {
   id: string;
   name: string;
@@ -13,6 +21,21 @@ export type BoothEvent = {
   startsAt?: string;
   endsAt?: string;
   createdAt: string;
+  plan?: BoothEventPlan;
+  photoCap?: number | null;
+  photoUsed?: number;
+  aiCredits?: number;
+  aiUsed?: number;
+  allowBackgroundRemoval?: boolean;
+  allowAiBackgrounds?: boolean;
+  allowAiFilters?: boolean;
+  deliveryEmail?: boolean;
+  deliverySms?: boolean;
+  overlayTheme?: string;
+  overlayLogo?: string;
+  galleryPublic?: boolean;
+  eventDate?: string;
+  eventTime?: string;
 };
 
 export type BoothBusiness = {
@@ -53,6 +76,24 @@ const ADMIN_TOKEN = process.env.BOOTHOS_ADMIN_TOKEN ?? "ArcticAuraDesigns";
 const SESSION_SECRET = process.env.BOOTHOS_SESSION_SECRET ?? "boothos-dev-session-secret";
 const SESSION_TTL_HOURS = Number(process.env.BOOTHOS_SESSION_TTL_HOURS ?? "12");
 
+function planDefaults(plan: BoothEventPlan | undefined) {
+  switch (plan) {
+    case "event-basic":
+      return { photoCap: 100, aiCredits: 0 };
+    case "event-unlimited":
+      return { photoCap: null, aiCredits: 0 };
+    case "event-ai":
+      return { photoCap: null, aiCredits: 10 };
+    case "photographer-single":
+      return { photoCap: null, aiCredits: 20 };
+    case "photographer-monthly":
+      return { photoCap: null, aiCredits: 40 };
+    case "free":
+    default:
+      return { photoCap: 50, aiCredits: 0 };
+  }
+}
+
 function slugify(input: string, fallback: string) {
   const slug = input
     .toLowerCase()
@@ -69,6 +110,26 @@ function hashSecret(secret: string) {
 function secretHint(secret: string) {
   const trimmed = secret.trim();
   return trimmed.slice(-4) || "????";
+}
+
+function withEventDefaults(event: BoothEvent): BoothEvent {
+  const plan = event.plan ?? "event-basic";
+  const defaults = planDefaults(plan);
+  return {
+    ...event,
+    plan,
+    photoCap: event.photoCap ?? defaults.photoCap,
+    photoUsed: event.photoUsed ?? 0,
+    aiCredits: event.aiCredits ?? defaults.aiCredits,
+    aiUsed: event.aiUsed ?? 0,
+    allowBackgroundRemoval: event.allowBackgroundRemoval ?? true,
+    allowAiBackgrounds: event.allowAiBackgrounds ?? false,
+    allowAiFilters: event.allowAiFilters ?? false,
+    deliveryEmail: event.deliveryEmail ?? true,
+    deliverySms: event.deliverySms ?? false,
+    overlayTheme: event.overlayTheme ?? "default",
+    galleryPublic: event.galleryPublic ?? false,
+  };
 }
 
 async function ensureTenantStorage() {
@@ -96,6 +157,8 @@ async function ensureTenantStorage() {
     );
     const eventKey =
       process.env.BOOTHOS_DEFAULT_EVENT_KEY ?? "boothos-default-event-key";
+    const defaultPlan = "event-basic" as BoothEventPlan;
+    const defaults = planDefaults(defaultPlan);
 
     const seed: TenantIndex = {
       businesses: [
@@ -115,6 +178,18 @@ async function ensureTenantStorage() {
               accessHint: secretHint(eventKey),
               status: "live",
               createdAt: new Date().toISOString(),
+              plan: defaultPlan,
+              photoCap: defaults.photoCap,
+              photoUsed: 0,
+              aiCredits: defaults.aiCredits,
+              aiUsed: 0,
+              allowBackgroundRemoval: true,
+              allowAiBackgrounds: false,
+              allowAiFilters: false,
+              deliveryEmail: true,
+              deliverySms: false,
+              overlayTheme: "default",
+              galleryPublic: false,
             },
           ],
         },
@@ -127,7 +202,12 @@ async function ensureTenantStorage() {
 async function readTenantIndex(): Promise<TenantIndex> {
   await ensureTenantStorage();
   const raw = await readFile(TENANT_FILE, "utf8");
-  return JSON.parse(raw) as TenantIndex;
+  const parsed = JSON.parse(raw) as TenantIndex;
+  parsed.businesses = parsed.businesses.map((business) => ({
+    ...business,
+    events: business.events.map((event) => withEventDefaults(event)),
+  }));
+  return parsed;
 }
 
 async function writeTenantIndex(index: TenantIndex) {
@@ -191,7 +271,38 @@ export async function createEvent(
     slug,
     accessCode,
     status = "live",
-  }: { name: string; slug?: string; accessCode?: string; status?: BoothEvent["status"] },
+    plan = "event-basic",
+    photoCap,
+    aiCredits,
+    allowBackgroundRemoval = true,
+    allowAiBackgrounds = false,
+    allowAiFilters = false,
+    deliveryEmail = true,
+    deliverySms = false,
+    overlayTheme = "default",
+    overlayLogo,
+    galleryPublic = false,
+    eventDate,
+    eventTime,
+  }: {
+    name: string;
+    slug?: string;
+    accessCode?: string;
+    status?: BoothEvent["status"];
+    plan?: BoothEventPlan;
+    photoCap?: number | null;
+    aiCredits?: number;
+    allowBackgroundRemoval?: boolean;
+    allowAiBackgrounds?: boolean;
+    allowAiFilters?: boolean;
+    deliveryEmail?: boolean;
+    deliverySms?: boolean;
+    overlayTheme?: string;
+    overlayLogo?: string;
+    galleryPublic?: boolean;
+    eventDate?: string;
+    eventTime?: string;
+  },
 ) {
   const index = await readTenantIndex();
   const business = index.businesses.find((b) => b.id === businessId);
@@ -201,6 +312,7 @@ export async function createEvent(
   if (business.events.some((e) => e.slug === safeSlug)) {
     throw new Error("Event slug already exists for this business.");
   }
+  const defaults = planDefaults(plan);
   const event: BoothEvent = {
     id: randomUUID(),
     name,
@@ -209,6 +321,21 @@ export async function createEvent(
     accessHint: secretHint(code),
     status,
     createdAt: new Date().toISOString(),
+    plan,
+    photoCap: photoCap ?? defaults.photoCap,
+    photoUsed: 0,
+    aiCredits: aiCredits ?? defaults.aiCredits,
+    aiUsed: 0,
+    allowBackgroundRemoval,
+    allowAiBackgrounds,
+    allowAiFilters,
+    deliveryEmail,
+    deliverySms,
+    overlayTheme,
+    overlayLogo,
+    galleryPublic,
+    eventDate,
+    eventTime,
   };
   business.events.push(event);
   await writeTenantIndex(index);
@@ -307,11 +434,42 @@ export function sanitizeEvent(event: BoothEvent) {
     endsAt: event.endsAt,
     accessHint: event.accessHint,
     createdAt: event.createdAt,
+    plan: event.plan,
+    photoCap: event.photoCap,
+    photoUsed: event.photoUsed,
+    aiCredits: event.aiCredits,
+    aiUsed: event.aiUsed,
+    allowBackgroundRemoval: event.allowBackgroundRemoval,
+    allowAiBackgrounds: event.allowAiBackgrounds,
+    allowAiFilters: event.allowAiFilters,
+    deliveryEmail: event.deliveryEmail,
+    deliverySms: event.deliverySms,
+    overlayTheme: event.overlayTheme,
+    overlayLogo: event.overlayLogo,
+    galleryPublic: event.galleryPublic,
+    eventDate: event.eventDate,
+    eventTime: event.eventTime,
   };
 }
 
 export function sanitizeEventWithSecret(event: BoothEvent) {
   return { ...sanitizeEvent(event), accessHash: undefined };
+}
+
+export function eventUsage(event: BoothEvent) {
+  const defaults = planDefaults(event.plan ?? "event-basic");
+  const cap = event.photoCap ?? defaults.photoCap ?? null;
+  const used = event.photoUsed ?? 0;
+  const aiCap = event.aiCredits ?? defaults.aiCredits ?? 0;
+  const aiUsed = event.aiUsed ?? 0;
+  return {
+    photoCap: cap,
+    photoUsed: used,
+    remainingPhotos: cap === null ? null : Math.max(cap - used, 0),
+    aiCredits: aiCap,
+    aiUsed,
+    remainingAi: Math.max(aiCap - aiUsed, 0),
+  };
 }
 
 export function createSessionToken(scope: TenantScope) {
@@ -521,4 +679,41 @@ export async function updateEventStatus(
   event.status = status;
   await writeTenantIndex(index);
   return event;
+}
+
+export async function updateEventConfig(
+  businessId: string,
+  eventId: string,
+  updates: Partial<BoothEvent>,
+) {
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === businessId);
+  if (!business) throw new Error("Business not found");
+  const event = business.events.find((e) => e.id === eventId);
+  if (!event) throw new Error("Event not found");
+  Object.assign(event, updates);
+  business.events = business.events.map((ev) =>
+    ev.id === eventId ? withEventDefaults(ev) : ev,
+  );
+  await writeTenantIndex(index);
+  return business.events.find((ev) => ev.id === eventId)!;
+}
+
+export async function incrementEventUsage(
+  scope: TenantScope,
+  { photos = 0, aiCredits = 0 }: { photos?: number; aiCredits?: number },
+) {
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === scope.businessId);
+  if (!business) throw new Error("Business not found");
+  const event = business.events.find((e) => e.id === scope.eventId);
+  if (!event) throw new Error("Event not found");
+  event.photoUsed = Math.max(0, (event.photoUsed ?? 0) + photos);
+  event.aiUsed = Math.max(0, (event.aiUsed ?? 0) + aiCredits);
+  business.events = business.events.map((ev) =>
+    ev.id === event.id ? withEventDefaults(ev) : ev,
+  );
+  await writeTenantIndex(index);
+  const updated = business.events.find((ev) => ev.id === event.id)!;
+  return { event: updated, usage: eventUsage(updated) };
 }

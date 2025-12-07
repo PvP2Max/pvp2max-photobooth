@@ -16,6 +16,20 @@ type EventItem = {
   status?: "draft" | "live" | "closed";
   accessHint?: string;
   createdAt?: string;
+  plan?: string;
+  photoCap?: number | null;
+  photoUsed?: number;
+  aiCredits?: number;
+  aiUsed?: number;
+  allowBackgroundRemoval?: boolean;
+  allowAiBackgrounds?: boolean;
+  allowAiFilters?: boolean;
+  deliveryEmail?: boolean;
+  deliverySms?: boolean;
+  overlayTheme?: string;
+  galleryPublic?: boolean;
+  eventDate?: string;
+  eventTime?: string;
 };
 
 type ProductionItem = {
@@ -32,6 +46,22 @@ function linkFor(pathname: string, business: string, event: string) {
   return `${pathname}?${qs}`;
 }
 
+function usageFor(event: EventItem) {
+  const cap = event.photoCap ?? null;
+  const used = event.photoUsed ?? 0;
+  const remaining = cap === null ? null : Math.max(cap - used, 0);
+  const aiCap = event.aiCredits ?? 0;
+  const aiUsed = event.aiUsed ?? 0;
+  return {
+    photoCap: cap,
+    photoUsed: used,
+    remainingPhotos: remaining,
+    aiCredits: aiCap,
+    aiUsed,
+    remainingAi: Math.max(aiCap - aiUsed, 0),
+  };
+}
+
 export default function BusinessPage() {
   const [session, setSession] = useState<BusinessSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +72,15 @@ export default function BusinessPage() {
   const [newEventName, setNewEventName] = useState("");
   const [newEventSlug, setNewEventSlug] = useState("");
   const [newEventKey, setNewEventKey] = useState("");
+  const [newPlan, setNewPlan] = useState("event-basic");
+  const [newAllowBgRemoval, setNewAllowBgRemoval] = useState(true);
+  const [newAllowAiBg, setNewAllowAiBg] = useState(false);
+  const [newAllowAiFilters, setNewAllowAiFilters] = useState(false);
+  const [newDeliverySms, setNewDeliverySms] = useState(false);
+  const [newGalleryPublic, setNewGalleryPublic] = useState(false);
+  const [newOverlayTheme, setNewOverlayTheme] = useState("default");
+  const [newEventDate, setNewEventDate] = useState("");
+  const [newEventTime, setNewEventTime] = useState("");
   const [issuingKey, setIssuingKey] = useState<Record<string, string>>({});
   const [resendEmail, setResendEmail] = useState<Record<string, string>>({});
   const [productionEvent, setProductionEvent] = useState<string>("");
@@ -125,6 +164,16 @@ export default function BusinessPage() {
           name: newEventName,
           slug: newEventSlug || undefined,
           accessCode: newEventKey || undefined,
+          plan: newPlan,
+          allowBackgroundRemoval: newAllowBgRemoval,
+          allowAiBackgrounds: newAllowAiBg,
+          allowAiFilters: newAllowAiFilters,
+          deliveryEmail: true,
+          deliverySms: newDeliverySms,
+          overlayTheme: newOverlayTheme,
+          galleryPublic: newGalleryPublic,
+          eventDate: newEventDate || undefined,
+          eventTime: newEventTime || undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -144,6 +193,15 @@ export default function BusinessPage() {
       setNewEventName("");
       setNewEventSlug("");
       setNewEventKey("");
+      setNewPlan("event-basic");
+      setNewAllowBgRemoval(true);
+      setNewAllowAiBg(false);
+      setNewAllowAiFilters(false);
+      setNewDeliverySms(false);
+      setNewGalleryPublic(false);
+      setNewOverlayTheme("default");
+      setNewEventDate("");
+      setNewEventTime("");
     } catch {
       setError("Could not create event.");
     }
@@ -384,6 +442,83 @@ export default function BusinessPage() {
             placeholder="Event access key (optional)"
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
           />
+          <select
+            value={newPlan}
+            onChange={(e) => setNewPlan(e.target.value)}
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          >
+            <option value="event-basic">$10 / 100 photos</option>
+            <option value="event-unlimited">$20 / unlimited</option>
+            <option value="event-ai">$30 / unlimited + AI credits</option>
+            <option value="photographer-single">$100 photographer event</option>
+            <option value="photographer-monthly">$250 photographer monthly</option>
+          </select>
+          <select
+            value={newOverlayTheme}
+            onChange={(e) => setNewOverlayTheme(e.target.value)}
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          >
+            <option value="default">Overlay: Default</option>
+            <option value="wedding">Overlay: Wedding</option>
+            <option value="birthday">Overlay: Birthday</option>
+            <option value="military">Overlay: Military Ball</option>
+            <option value="christmas">Overlay: Christmas</option>
+            <option value="valentines">Overlay: Valentines</option>
+          </select>
+          <input
+            value={newEventDate}
+            onChange={(e) => setNewEventDate(e.target.value)}
+            placeholder="Event date (optional)"
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          />
+          <input
+            value={newEventTime}
+            onChange={(e) => setNewEventTime(e.target.value)}
+            placeholder="Event time (optional)"
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          />
+          <div className="md:col-span-3 flex flex-wrap gap-4 text-sm text-[var(--color-text-muted)]">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={newAllowBgRemoval}
+                onChange={(e) => setNewAllowBgRemoval(e.target.checked)}
+              />
+              Background removal
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={newAllowAiBg}
+                onChange={(e) => setNewAllowAiBg(e.target.checked)}
+              />
+              AI backgrounds (uses credits)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={newAllowAiFilters}
+                onChange={(e) => setNewAllowAiFilters(e.target.checked)}
+              />
+              AI filters (future)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={newDeliverySms}
+                onChange={(e) => setNewDeliverySms(e.target.checked)}
+              />
+              Enable SMS delivery (placeholder)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={newGalleryPublic}
+                onChange={(e) => setNewGalleryPublic(e.target.checked)}
+              />
+              Public gallery
+            </label>
+          </div>
           <div className="md:col-span-3 flex justify-end">
             <button
               type="submit"
@@ -407,9 +542,11 @@ export default function BusinessPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {activeEvents.map((event) => {
+              const usage = usageFor(event);
               const checkin = linkFor("/checkin", session.business.slug, event.slug);
               const photographer = linkFor("/photographer", session.business.slug, event.slug);
               const frontdesk = linkFor("/frontdesk", session.business.slug, event.slug);
+              const booth = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
               return (
                 <div
                   key={event.id}
@@ -420,6 +557,9 @@ export default function BusinessPage() {
                       <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
                       <p className="text-xs text-[var(--color-text-muted)]">
                         Slug: {event.slug} • Created {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Plan: {event.plan ?? "event-basic"} • Overlay: {event.overlayTheme ?? "default"}
                       </p>
                       <p className="text-[11px] text-[var(--color-text-soft)]">
                         Access key hint: {event.accessHint ?? "—"}
@@ -443,10 +583,21 @@ export default function BusinessPage() {
                     </div>
                   </div>
                   <div className="grid gap-2 text-xs">
+                    <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                      <span>
+                        Photos: {usage.photoUsed}
+                        {usage.photoCap === null ? " / ∞" : ` / ${usage.photoCap}`} (remaining{" "}
+                        {usage.remainingPhotos === null ? "∞" : usage.remainingPhotos})
+                      </span>
+                      <span>
+                        AI credits: {usage.aiUsed} / {usage.aiCredits} (remaining {usage.remainingAi})
+                      </span>
+                    </div>
                     {[
                       { label: "Check-in link", href: checkin },
                       { label: "Photographer link", href: photographer },
                       { label: "Front desk link", href: frontdesk },
+                      { label: "Booth link", href: booth },
                     ].map((link) => (
                       <button
                         key={link.label}

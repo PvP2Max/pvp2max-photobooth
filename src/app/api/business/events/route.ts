@@ -5,6 +5,7 @@ import {
   sanitizeBusiness,
   sanitizeEvent,
 } from "@/lib/tenants";
+import type { BoothEventPlan } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +32,19 @@ export async function POST(request: NextRequest) {
     slug?: string;
     accessCode?: string;
     status?: "draft" | "live" | "closed";
+    plan?: string;
+    photoCap?: number | null;
+    aiCredits?: number;
+    allowBackgroundRemoval?: boolean;
+    allowAiBackgrounds?: boolean;
+    allowAiFilters?: boolean;
+    deliveryEmail?: boolean;
+    deliverySms?: boolean;
+    overlayTheme?: string;
+    overlayLogo?: string;
+    galleryPublic?: boolean;
+    eventDate?: string;
+    eventTime?: string;
   };
   if (!body.name) {
     return NextResponse.json({ error: "Name is required." }, { status: 400 });
@@ -42,6 +56,19 @@ export async function POST(request: NextRequest) {
       slug: body.slug,
       accessCode: body.accessCode,
       status: body.status ?? "live",
+      plan: (body.plan as BoothEventPlan | undefined) ?? "event-basic",
+      photoCap: body.photoCap ?? undefined,
+      aiCredits: body.aiCredits ?? undefined,
+      allowBackgroundRemoval: body.allowBackgroundRemoval ?? true,
+      allowAiBackgrounds: body.allowAiBackgrounds ?? false,
+      allowAiFilters: body.allowAiFilters ?? false,
+      deliveryEmail: body.deliveryEmail ?? true,
+      deliverySms: body.deliverySms ?? false,
+      overlayTheme: body.overlayTheme ?? "default",
+      overlayLogo: body.overlayLogo,
+      galleryPublic: body.galleryPublic ?? false,
+      eventDate: body.eventDate,
+      eventTime: body.eventTime,
     });
     return NextResponse.json({
       business: sanitizeBusiness(session.business),
