@@ -70,6 +70,9 @@ export default function BusinessPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [registering, setRegistering] = useState(false);
+  const [newBusinessName, setNewBusinessName] = useState("");
+  const [newBusinessSlug, setNewBusinessSlug] = useState("");
   const [newEventName, setNewEventName] = useState("");
   const [newEventSlug, setNewEventSlug] = useState("");
   const [newEventKey, setNewEventKey] = useState("");
@@ -140,6 +143,33 @@ export default function BusinessPage() {
       window.localStorage.setItem("boothos-last-business", loginEmail);
     } catch {
       setError("Could not reach the server.");
+    }
+  }
+
+  async function registerAccount(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword,
+          businessName: newBusinessName || "My Business",
+          businessSlug: newBusinessSlug || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as BusinessSession & { error?: string };
+      if (!res.ok) {
+        setError(data.error || "Could not create account.");
+        return;
+      }
+      setMessage("Account created. Please sign in.");
+      setRegistering(false);
+    } catch {
+      setError("Could not create account.");
     }
   }
 
@@ -330,16 +360,53 @@ export default function BusinessPage() {
       <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-xl rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Business Console</p>
-          <h1 className="mt-2 text-3xl font-semibold text-[var(--color-text)]">Sign in</h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Use your email and password to manage events, links, and gallery.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="mt-2 text-3xl font-semibold text-[var(--color-text)]">
+                {registering ? "Create account" : "Sign in"}
+              </h1>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {registering
+                  ? "Spin up a business and your first event in minutes."
+                  : "Use your email and password to manage events, links, and gallery."}
+              </p>
+            </div>
+            <button
+              onClick={() => setRegistering((v) => !v)}
+              className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+            >
+              {registering ? "Have an account? Sign in" : "New here? Create one"}
+            </button>
+          </div>
           {error && (
             <div className="mt-3 rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
               {error}
             </div>
           )}
-          <form onSubmit={login} className="mt-4 space-y-3">
+          <form onSubmit={registering ? registerAccount : login} className="mt-4 space-y-3">
+            {registering && (
+              <>
+                <label className="block text-sm text-[var(--color-text-muted)]">
+                  Business name
+                  <input
+                    required
+                    value={newBusinessName}
+                    onChange={(e) => setNewBusinessName(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                    placeholder="Aurora Booths"
+                  />
+                </label>
+                <label className="block text-sm text-[var(--color-text-muted)]">
+                  Business slug (optional)
+                  <input
+                    value={newBusinessSlug}
+                    onChange={(e) => setNewBusinessSlug(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                    placeholder="aurora-booths"
+                  />
+                </label>
+              </>
+            )}
             <label className="block text-sm text-[var(--color-text-muted)]">
               Email
               <input
@@ -366,7 +433,7 @@ export default function BusinessPage() {
               type="submit"
               className="w-full rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
             >
-              Sign in
+              {registering ? "Create account" : "Sign in"}
             </button>
           </form>
         </div>
