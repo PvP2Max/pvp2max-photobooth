@@ -168,6 +168,7 @@ export default function FrontdeskPage() {
     step === "backgrounds" && selectedList.length > 0
       ? selectedList[Math.min(currentBgIndex, selectedList.length - 1)]
       : null;
+  const currentPhotoId = currentPhoto?.id;
 
   const readyToSend = useMemo(() => {
     if (selectedPhotos.size === 0) return false;
@@ -213,14 +214,14 @@ export default function FrontdeskPage() {
   }, [selectedList.length, step]);
 
   useEffect(() => {
-    if (step !== "backgrounds" || !currentPhoto) return;
-    ensureSlotForPhoto(currentPhoto.id);
-    const slots = selectionMap[currentPhoto.id];
+    if (step !== "backgrounds" || !currentPhotoId) return;
+    ensureSlotForPhoto(currentPhotoId);
+    const slots = selectionMap[currentPhotoId];
     const slotIds = slots?.map((s) => s.id) ?? [];
     if (slots?.length && (!currentSlotId || !slotIds.includes(currentSlotId))) {
       setCurrentSlotId(slots[0].id);
     }
-  }, [step, currentPhoto?.id, selectionMap, currentSlotId]);
+  }, [step, currentPhotoId, selectionMap, currentSlotId]);
 
   async function loadBackgrounds() {
     try {

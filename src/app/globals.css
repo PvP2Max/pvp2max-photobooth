@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 :root {
+  --font-geist-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+
   /* ==== BRAND / PRIMARY ==== */
   --color-primary: #9b5cff;
   --color-primary-soft: #b983ff;

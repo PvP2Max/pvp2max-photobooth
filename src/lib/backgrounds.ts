@@ -52,7 +52,7 @@ function extensionFor(contentType: string, fallback = ".png") {
 }
 
 async function ensureBackgroundPreview(scope: TenantScope, record: BackgroundRecord) {
-  const { fileDir, index } = backgroundPaths(scope);
+  const { fileDir } = backgroundPaths(scope);
   if (record.previewFilename) {
     try {
       await stat(path.join(fileDir, record.previewFilename));
@@ -71,7 +71,7 @@ async function ensureBackgroundPreview(scope: TenantScope, record: BackgroundRec
     record.previewFilename = previewFilename;
     record.previewContentType = "image/webp";
     const currentIndex = await readIndex(scope);
-    const idx = index.backgrounds.findIndex((bg) => bg.id === record.id);
+    const idx = currentIndex.backgrounds.findIndex((bg) => bg.id === record.id);
     if (idx >= 0) {
       currentIndex.backgrounds[idx].previewFilename = previewFilename;
       currentIndex.backgrounds[idx].previewContentType = "image/webp";

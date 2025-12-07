@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import EventAccessGate from "../event-access";
 
 type Checkin = { id: string; name: string; email: string; createdAt: string };
@@ -19,7 +19,7 @@ export default function PhotographerPage() {
     [checkins, selectedCheckinId],
   );
 
-  async function loadCheckins() {
+  const loadCheckins = useCallback(async () => {
     setLoadingCheckins(true);
     setError(null);
     try {
@@ -48,11 +48,11 @@ export default function PhotographerPage() {
     } finally {
       setLoadingCheckins(false);
     }
-  }
+  }, [selectedCheckinId]);
 
   useEffect(() => {
     loadCheckins();
-  }, []);
+  }, [loadCheckins]);
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
