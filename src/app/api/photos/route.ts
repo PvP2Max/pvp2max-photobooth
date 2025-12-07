@@ -3,7 +3,12 @@ import { removeBackground } from "@/lib/bgremover";
 import { savePhoto, listPhotosByEmail } from "@/lib/storage";
 import { addNotification } from "@/lib/notifications";
 import { removeCheckinByEmail } from "@/lib/checkins";
-import { getEventContext, incrementEventUsage, eventUsage } from "@/lib/tenants";
+import {
+  getEventContext,
+  incrementEventUsage,
+  eventUsage,
+  eventRequiresPayment,
+} from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,6 +37,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
   const currentUsage = eventUsage(context.event);
+  if (eventRequiresPayment(context.event)) {
+    return NextResponse.json(
+      { error: "Event requires payment before uploads. Complete checkout to continue." },
+      { status: 402 },
+    );
+  }
   if (currentUsage.photoCap !== null && currentUsage.photoUsed >= currentUsage.photoCap) {
     return NextResponse.json(
       { error: "Photo limit reached for this event. Top up to continue." },
@@ -46,6 +57,15 @@ export async function POST(request: NextRequest) {
   const aiPromptRaw = formData.get("aiPrompt");
   const wantsAiBackground =
     aiPromptRaw && typeof aiPromptRaw === "string" && aiPromptRaw.trim().length > 0;
+  const overlayPack = formData.get("overlayPack");
+  const filterUsed = formData.get("filter");
+
+  if (removeBg && !context.event.allowBackgroundRemoval) {
+    return NextResponse.json(
+      { error: "Background removal is disabled for this event." },
+      { status: 403 },
+    );
+  }
 
   if (wantsAiBackground) {
     if (!context.event.allowAiBackgrounds) {
@@ -96,6 +116,9 @@ export async function POST(request: NextRequest) {
           cutout: cutout.buffer,
           cutoutContentType: cutout.contentType,
           scope: context.scope,
+          overlayPack: typeof overlayPack === "string" ? overlayPack : undefined,
+          filterUsed: typeof filterUsed === "string" ? filterUsed : undefined,
+          mode: context.event.mode,
         });
         results.push({ photo });
       } catch (error) {

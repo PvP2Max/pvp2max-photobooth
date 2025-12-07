@@ -1,5 +1,4 @@
 "use client";
-"use client";
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +14,12 @@ type SessionResponse = {
     allowBackgroundRemoval?: boolean;
     allowAiBackgrounds?: boolean;
     allowAiFilters?: boolean;
+    overlaysAll?: boolean;
+    premiumFilters?: boolean;
+    watermarkEnabled?: boolean;
+    smsEnabled?: boolean;
+    mode?: "self-serve" | "photographer";
+    paymentStatus?: "unpaid" | "pending" | "paid";
     overlayTheme?: string;
   };
 };
@@ -33,7 +38,12 @@ const FILTERS = [
   { id: "bw", label: "B&W", filter: "grayscale(1)" },
   { id: "warm", label: "Warm Glow", filter: "contrast(1.05) saturate(1.1) sepia(0.12)" },
   { id: "cool", label: "Cool", filter: "saturate(0.95) hue-rotate(-8deg)" },
-  { id: "vintage", label: "Vintage", filter: "sepia(0.35) contrast(1.05) saturate(0.9)" },
+];
+
+const PREMIUM_FILTERS = [
+  { id: "vintage", label: "Vintage Film", filter: "sepia(0.35) contrast(1.05) saturate(0.9)" },
+  { id: "glam", label: "Glam", filter: "contrast(1.15) saturate(1.12) brightness(1.05)" },
+  { id: "neon", label: "Neon", filter: "saturate(1.4) hue-rotate(12deg) contrast(1.1)" },
   { id: "dramatic", label: "Dramatic", filter: "contrast(1.2) saturate(1.15)" },
 ];
 
@@ -57,8 +67,16 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   const [sending, setSending] = useState(false);
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<{
+    allowAiBackgrounds: boolean;
+    premiumFilters: boolean;
+  }>({ allowAiBackgrounds: false, premiumFilters: false });
 
   const activeFilter = useMemo(() => FILTERS.find((f) => f.id === filter)?.filter || "none", [filter]);
+  const availableFilters = useMemo(() => {
+    if (planFeatures.premiumFilters) return [...FILTERS, ...PREMIUM_FILTERS];
+    return FILTERS;
+  }, [planFeatures.premiumFilters]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -106,6 +124,10 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         const data = (await res.json()) as SessionResponse;
         setSession(data);
         setRemoveBackground(data.event.allowBackgroundRemoval ?? true);
+        setPlanFeatures({
+          allowAiBackgrounds: data.event.allowAiBackgrounds ?? false,
+          premiumFilters: data.event.premiumFilters ?? false,
+        });
       } else {
         setSession(null);
       }
@@ -174,6 +196,10 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       setError("Enter an email to deliver the photo.");
       return;
     }
+    if (usage?.remainingPhotos === 0) {
+      setError("Photo limit reached. Upgrade to continue.");
+      return;
+    }
     setSending(true);
     setError(null);
     setStatus("Uploading...");
@@ -224,7 +250,8 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
             </h1>
             <p className="text-sm text-[var(--color-text-muted)]">
               Business: {session?.business?.slug || businessSlug || "Unknown"} • Plan:{" "}
-              {session?.event?.plan ?? "event-basic"}
+              {session?.event?.plan ?? "event-basic"} • Mode: {session?.event?.mode ?? "self-serve"}
+              {session?.event?.paymentStatus && ` • Payment: ${session.event.paymentStatus}`}
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
@@ -280,7 +307,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                 </button>
               )}
               <div className="flex flex-wrap gap-2">
-                {FILTERS.map((f) => (
+                {availableFilters.map((f) => (
                   <button
                     key={f.id}
                     onClick={() => setFilter(f.id)}
@@ -309,6 +336,11 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                 {error}
               </div>
             )}
+            {usage?.remainingPhotos === 0 && (
+              <div className="rounded-xl bg-[var(--color-warning-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(251,191,36,0.35)]">
+                Photo limit reached for this event. Upgrade or top up to continue.
+              </div>
+            )}
             <label className="block text-sm text-[var(--color-text-muted)]">
               Guest email
               <input
@@ -333,7 +365,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                   type="checkbox"
                   checked={useAiBackground}
                   onChange={(e) => setUseAiBackground(e.target.checked)}
-                  disabled={!session?.event?.allowAiBackgrounds}
+                  disabled={!planFeatures.allowAiBackgrounds || (usage?.remainingAi ?? 0) <= 0}
                 />
                 AI background (credits)
               </label>

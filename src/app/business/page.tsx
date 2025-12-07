@@ -22,6 +22,7 @@ type EventItem = {
   photoUsed?: number;
   aiCredits?: number;
   aiUsed?: number;
+  mode?: "self-serve" | "photographer";
   allowBackgroundRemoval?: boolean;
   allowAiBackgrounds?: boolean;
   allowAiFilters?: boolean;
@@ -31,6 +32,8 @@ type EventItem = {
   galleryPublic?: boolean;
   eventDate?: string;
   eventTime?: string;
+  allowedSelections?: number;
+  paymentStatus?: "unpaid" | "pending" | "paid";
 };
 
 type ProductionItem = {
@@ -77,6 +80,8 @@ export default function BusinessPage() {
   const [newEventSlug, setNewEventSlug] = useState("");
   const [newEventKey, setNewEventKey] = useState("");
   const [newPlan, setNewPlan] = useState("event-basic");
+  const [newMode, setNewMode] = useState<"self-serve" | "photographer">("self-serve");
+  const [newAllowedSelections, setNewAllowedSelections] = useState(3);
   const [newAllowBgRemoval, setNewAllowBgRemoval] = useState(true);
   const [newAllowAiBg, setNewAllowAiBg] = useState(false);
   const [newAllowAiFilters, setNewAllowAiFilters] = useState(false);
@@ -196,6 +201,7 @@ export default function BusinessPage() {
           slug: newEventSlug || undefined,
           accessCode: newEventKey || undefined,
           plan: newPlan,
+          mode: newMode,
           allowBackgroundRemoval: newAllowBgRemoval,
           allowAiBackgrounds: newAllowAiBg,
           allowAiFilters: newAllowAiFilters,
@@ -205,6 +211,7 @@ export default function BusinessPage() {
           galleryPublic: newGalleryPublic,
           eventDate: newEventDate || undefined,
           eventTime: newEventTime || undefined,
+          allowedSelections: newMode === "photographer" ? newAllowedSelections : undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -225,6 +232,8 @@ export default function BusinessPage() {
       setNewEventSlug("");
       setNewEventKey("");
       setNewPlan("event-basic");
+      setNewMode("self-serve");
+      setNewAllowedSelections(3);
       setNewAllowBgRemoval(true);
       setNewAllowAiBg(false);
       setNewAllowAiFilters(false);
@@ -512,15 +521,31 @@ export default function BusinessPage() {
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
           />
           <select
+            value={newMode}
+            onChange={(e) => setNewMode(e.target.value as "self-serve" | "photographer")}
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          >
+            <option value="self-serve">Self-service booth</option>
+            <option value="photographer">Photographer mode</option>
+          </select>
+          <select
             value={newPlan}
             onChange={(e) => setNewPlan(e.target.value)}
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
           >
-            <option value="event-basic">$10 / 100 photos</option>
-            <option value="event-unlimited">$20 / unlimited</option>
-            <option value="event-ai">$30 / unlimited + AI credits</option>
-            <option value="photographer-single">$100 photographer event</option>
-            <option value="photographer-monthly">$250 photographer monthly</option>
+            {newMode === "self-serve" ? (
+              <>
+                <option value="free">Free (50 photos, basic overlays)</option>
+                <option value="event-basic">$10 / 100 photos</option>
+                <option value="event-unlimited">$20 / unlimited</option>
+                <option value="event-ai">$30 / unlimited + AI backgrounds</option>
+              </>
+            ) : (
+              <>
+                <option value="photographer-single">$100 photographer event</option>
+                <option value="photographer-monthly">$250 photographer monthly</option>
+              </>
+            )}
           </select>
           <select
             value={newOverlayTheme}
@@ -546,6 +571,16 @@ export default function BusinessPage() {
             placeholder="Event time (optional)"
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
           />
+          {newMode === "photographer" && (
+            <input
+              type="number"
+              min={1}
+              value={newAllowedSelections}
+              onChange={(e) => setNewAllowedSelections(Number(e.target.value) || 1)}
+              placeholder="Selections per guest"
+              className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+            />
+          )}
           <div className="md:col-span-3 flex flex-wrap gap-4 text-sm text-[var(--color-text-muted)]">
             <label className="flex items-center gap-2">
               <input
@@ -628,7 +663,8 @@ export default function BusinessPage() {
                         Slug: {event.slug} • Created {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}
                       </p>
                       <p className="text-xs text-[var(--color-text-muted)]">
-                        Plan: {event.plan ?? "event-basic"} • Overlay: {event.overlayTheme ?? "default"}
+                        Mode: {event.mode ?? "self-serve"} • Plan: {event.plan ?? "event-basic"} • Overlay:{" "}
+                        {event.overlayTheme ?? "default"}
                       </p>
                       <p className="text-[11px] text-[var(--color-text-soft)]">
                         Access key hint: {event.accessHint ?? "—"}
@@ -636,6 +672,12 @@ export default function BusinessPage() {
                       {issuingKey[event.id] && (
                         <p className="mt-1 text-[11px] text-[var(--color-success)]">
                           New key: {issuingKey[event.id]}
+                        </p>
+                      )}
+                      {event.mode === "photographer" && (
+                        <p className="text-[11px] text-[var(--color-text-muted)]">
+                          Payment: {event.paymentStatus ?? "unpaid"} • Allowed selections:{" "}
+                          {event.allowedSelections ?? 3}
                         </p>
                       )}
                     </div>

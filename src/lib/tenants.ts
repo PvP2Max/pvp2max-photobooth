@@ -15,6 +15,7 @@ export type BoothEvent = {
   id: string;
   name: string;
   slug: string;
+  mode: "self-serve" | "photographer";
   accessHash: string;
   accessHint: string;
   status: "draft" | "live" | "closed";
@@ -26,6 +27,15 @@ export type BoothEvent = {
   photoUsed?: number;
   aiCredits?: number;
   aiUsed?: number;
+  overlayPack?: string;
+  overlaysAll?: boolean;
+  premiumFilters?: boolean;
+  watermarkEnabled?: boolean;
+  brandingRemoval?: boolean;
+  smsEnabled?: boolean;
+  galleryZipEnabled?: boolean;
+  customUrl?: string;
+  analyticsEnabled?: boolean;
   allowBackgroundRemoval?: boolean;
   allowAiBackgrounds?: boolean;
   allowAiFilters?: boolean;
@@ -36,6 +46,8 @@ export type BoothEvent = {
   galleryPublic?: boolean;
   eventDate?: string;
   eventTime?: string;
+  allowedSelections?: number;
+  paymentStatus?: "unpaid" | "pending" | "paid";
 };
 
 export type BoothBusiness = {
@@ -90,18 +102,66 @@ export type BoothUser = {
 function planDefaults(plan: BoothEventPlan | undefined) {
   switch (plan) {
     case "event-basic":
-      return { photoCap: 100, aiCredits: 0 };
+      return {
+        photoCap: 100,
+        aiCredits: 0,
+        overlaysAll: true,
+        premiumFilters: true,
+        watermarkEnabled: false,
+        smsEnabled: true,
+        allowAiBackgrounds: false,
+      };
     case "event-unlimited":
-      return { photoCap: null, aiCredits: 0 };
+      return {
+        photoCap: null,
+        aiCredits: 0,
+        overlaysAll: true,
+        premiumFilters: true,
+        watermarkEnabled: false,
+        smsEnabled: true,
+        allowAiBackgrounds: false,
+      };
     case "event-ai":
-      return { photoCap: null, aiCredits: 10 };
+      return {
+        photoCap: null,
+        aiCredits: 10,
+        overlaysAll: true,
+        premiumFilters: true,
+        watermarkEnabled: false,
+        smsEnabled: true,
+        allowAiBackgrounds: true,
+      };
     case "photographer-single":
-      return { photoCap: null, aiCredits: 20 };
+      return {
+        photoCap: null,
+        aiCredits: 20,
+        overlaysAll: true,
+        premiumFilters: true,
+        watermarkEnabled: false,
+        smsEnabled: true,
+        allowAiBackgrounds: true,
+      };
     case "photographer-monthly":
-      return { photoCap: null, aiCredits: 40 };
+      return {
+        photoCap: null,
+        aiCredits: 40,
+        overlaysAll: true,
+        premiumFilters: true,
+        watermarkEnabled: false,
+        smsEnabled: true,
+        allowAiBackgrounds: true,
+      };
     case "free":
     default:
-      return { photoCap: 50, aiCredits: 0 };
+      return {
+        photoCap: 50,
+        aiCredits: 0,
+        overlaysAll: false,
+        premiumFilters: false,
+        watermarkEnabled: true,
+        smsEnabled: false,
+        allowAiBackgrounds: false,
+      };
   }
 }
 
@@ -144,13 +204,25 @@ function withEventDefaults(event: BoothEvent): BoothEvent {
     photoUsed: event.photoUsed ?? 0,
     aiCredits: event.aiCredits ?? defaults.aiCredits,
     aiUsed: event.aiUsed ?? 0,
+    mode: event.mode ?? "self-serve",
+    overlayPack: event.overlayPack ?? "basic",
+    overlaysAll: event.overlaysAll ?? defaults.overlaysAll ?? false,
+    premiumFilters: event.premiumFilters ?? defaults.premiumFilters ?? false,
+    watermarkEnabled: event.watermarkEnabled ?? defaults.watermarkEnabled ?? true,
+    brandingRemoval: event.brandingRemoval ?? false,
+    smsEnabled: event.smsEnabled ?? defaults.smsEnabled ?? false,
+    galleryZipEnabled: event.galleryZipEnabled ?? false,
+    customUrl: event.customUrl ?? "",
+    analyticsEnabled: event.analyticsEnabled ?? false,
     allowBackgroundRemoval: event.allowBackgroundRemoval ?? true,
-    allowAiBackgrounds: event.allowAiBackgrounds ?? false,
-    allowAiFilters: event.allowAiFilters ?? false,
+    allowAiBackgrounds: event.allowAiBackgrounds ?? defaults.allowAiBackgrounds ?? false,
+    allowAiFilters: event.allowAiFilters ?? event.allowAiBackgrounds ?? false,
     deliveryEmail: event.deliveryEmail ?? true,
-    deliverySms: event.deliverySms ?? false,
+    deliverySms: event.deliverySms ?? (defaults.smsEnabled ?? false),
     overlayTheme: event.overlayTheme ?? "default",
     galleryPublic: event.galleryPublic ?? false,
+    allowedSelections: event.allowedSelections ?? (event.mode === "photographer" ? 3 : undefined),
+    paymentStatus: event.paymentStatus ?? (event.mode === "photographer" ? "unpaid" : "paid"),
   };
 }
 
@@ -196,6 +268,7 @@ async function ensureTenantStorage() {
               id: randomUUID(),
               name: eventName,
               slug: eventSlug,
+              mode: "self-serve",
               accessHash: hashSecret(eventKey),
               accessHint: secretHint(eventKey),
               status: "live",
@@ -372,6 +445,7 @@ export async function createEvent(
     slug,
     accessCode,
     status = "live",
+    mode = "self-serve",
     plan = "event-basic",
     photoCap,
     aiCredits,
@@ -390,6 +464,7 @@ export async function createEvent(
     slug?: string;
     accessCode?: string;
     status?: BoothEvent["status"];
+    mode?: BoothEvent["mode"];
     plan?: BoothEventPlan;
     photoCap?: number | null;
     aiCredits?: number;
@@ -418,6 +493,7 @@ export async function createEvent(
     id: randomUUID(),
     name,
     slug: safeSlug,
+    mode,
     accessHash: hashSecret(code),
     accessHint: secretHint(code),
     status,
@@ -550,6 +626,8 @@ export function sanitizeEvent(event: BoothEvent) {
     galleryPublic: event.galleryPublic,
     eventDate: event.eventDate,
     eventTime: event.eventTime,
+    allowedSelections: event.allowedSelections,
+    paymentStatus: event.paymentStatus,
   };
 }
 
@@ -570,7 +648,26 @@ export function eventUsage(event: BoothEvent) {
     aiCredits: aiCap,
     aiUsed,
     remainingAi: Math.max(aiCap - aiUsed, 0),
+    watermark: event.watermarkEnabled ?? defaults.watermarkEnabled ?? false,
+    premiumFilters: event.premiumFilters ?? defaults.premiumFilters ?? false,
+    overlaysAll: event.overlaysAll ?? defaults.overlaysAll ?? false,
+    smsEnabled: event.smsEnabled ?? defaults.smsEnabled ?? false,
+    allowAiBackgrounds: event.allowAiBackgrounds ?? defaults.allowAiBackgrounds ?? false,
+    mode: event.mode ?? "self-serve",
+    paymentStatus: event.paymentStatus ?? (event.mode === "photographer" ? "unpaid" : "paid"),
   };
+}
+
+export function isPhotographerPlan(plan?: BoothEventPlan) {
+  return plan === "photographer-single" || plan === "photographer-monthly";
+}
+
+export function eventRequiresPayment(event: BoothEvent) {
+  if (event.mode === "photographer") {
+    if (!isPhotographerPlan(event.plan)) return true;
+    return event.paymentStatus !== "paid";
+  }
+  return false;
 }
 
 export function createSessionToken(scope: TenantScope) {

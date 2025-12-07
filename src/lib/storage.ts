@@ -17,6 +17,9 @@ export type PhotoRecord = {
   createdAt: string;
   businessId?: string;
   eventId?: string;
+  mode?: "self-serve" | "photographer";
+  overlayPack?: string;
+  filterUsed?: string;
 };
 
 export type PublicPhoto = {
@@ -136,12 +139,18 @@ export async function savePhoto({
   cutout,
   cutoutContentType,
   scope,
+  overlayPack,
+  filterUsed,
+  mode,
 }: {
   email: string;
   file: File;
   cutout: Buffer;
   cutoutContentType: string;
   scope: TenantScope;
+  overlayPack?: string;
+  filterUsed?: string;
+  mode?: "self-serve" | "photographer";
 }) {
   const normalizedEmail = normalizeEmail(email);
   const index = await readIndex(scope);
@@ -185,6 +194,9 @@ export async function savePhoto({
     createdAt: new Date().toISOString(),
     businessId: scope.businessId,
     eventId: scope.eventId,
+    overlayPack,
+    filterUsed,
+    mode,
   };
 
   index.photos.push(record);
