@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { eventId: string } },
+  context: { params: Promise<{ eventId: string }> },
 ) {
   const session = await getBusinessContext(request);
   if (!session?.business) {
@@ -19,7 +19,7 @@ export async function POST(
   try {
     const updated = await updateEventStatus(
       session.business.id,
-      params.eventId,
+      (await context.params).eventId,
       body.status as "live" | "draft" | "closed",
     );
     return NextResponse.json({ event: sanitizeEvent(updated) });
