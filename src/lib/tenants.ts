@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
@@ -72,9 +72,20 @@ const STORAGE_ROOT = path.join(process.cwd(), "storage");
 const TENANT_FILE = path.join(STORAGE_ROOT, "tenants.json");
 const SESSION_COOKIE_NAME = "boothos_session";
 const BUSINESS_SESSION_COOKIE_NAME = "boothos_business";
+const USER_SESSION_COOKIE_NAME = "boothos_user";
 const ADMIN_TOKEN = process.env.BOOTHOS_ADMIN_TOKEN ?? "ArcticAuraDesigns";
 const SESSION_SECRET = process.env.BOOTHOS_SESSION_SECRET ?? "boothos-dev-session-secret";
 const SESSION_TTL_HOURS = Number(process.env.BOOTHOS_SESSION_TTL_HOURS ?? "12");
+const USERS_FILE = path.join(STORAGE_ROOT, "users.json");
+
+export type BoothUser = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  passwordSalt: string;
+  businessId: string;
+  createdAt: string;
+};
 
 function planDefaults(plan: BoothEventPlan | undefined) {
   switch (plan) {
@@ -110,6 +121,17 @@ function hashSecret(secret: string) {
 function secretHint(secret: string) {
   const trimmed = secret.trim();
   return trimmed.slice(-4) || "????";
+}
+
+function hashPassword(password: string, salt?: string) {
+  const useSalt = salt ?? randomUUID().replace(/-/g, "");
+  const hash = pbkdf2Sync(password, useSalt, 5000, 64, "sha512").toString("hex");
+  return { hash, salt: useSalt };
+}
+
+function verifyPassword(password: string, salt: string, expectedHash: string) {
+  const { hash } = hashPassword(password, salt);
+  return timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
 }
 
 function withEventDefaults(event: BoothEvent): BoothEvent {
@@ -199,6 +221,27 @@ async function ensureTenantStorage() {
   }
 }
 
+async function ensureUserStorage(defaultBusinessId: string) {
+  await mkdir(STORAGE_ROOT, { recursive: true });
+  try {
+    await readFile(USERS_FILE, "utf8");
+    return;
+  } catch {
+    const email = process.env.BOOTHOS_DEFAULT_USER_EMAIL ?? "founder@arcticauradesigns.com";
+    const password = process.env.BOOTHOS_DEFAULT_USER_PASSWORD ?? "change-me";
+    const hashed = hashPassword(password);
+    const user: BoothUser = {
+      id: randomUUID(),
+      email: email.toLowerCase(),
+      passwordHash: hashed.hash,
+      passwordSalt: hashed.salt,
+      businessId: defaultBusinessId,
+      createdAt: new Date().toISOString(),
+    };
+    await writeFile(USERS_FILE, JSON.stringify({ users: [user] }, null, 2), "utf8");
+  }
+}
+
 async function readTenantIndex(): Promise<TenantIndex> {
   await ensureTenantStorage();
   const raw = await readFile(TENANT_FILE, "utf8");
@@ -210,6 +253,25 @@ async function readTenantIndex(): Promise<TenantIndex> {
   return parsed;
 }
 
+async function readUsers(): Promise<BoothUser[]> {
+  await ensureTenantStorage();
+  const rawTenants = await readFile(TENANT_FILE, "utf8");
+  const tenantData = JSON.parse(rawTenants) as TenantIndex;
+  const defaultBusinessId = tenantData.businesses[0]?.id;
+  await ensureUserStorage(defaultBusinessId ?? randomUUID());
+  try {
+    const raw = await readFile(USERS_FILE, "utf8");
+    const parsed = JSON.parse(raw) as { users: BoothUser[] };
+    return parsed.users ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeUsers(users: BoothUser[]) {
+  await writeFile(USERS_FILE, JSON.stringify({ users }, null, 2), "utf8");
+}
+
 async function writeTenantIndex(index: TenantIndex) {
   await writeFile(TENANT_FILE, JSON.stringify(index, null, 2), "utf8");
 }
@@ -217,6 +279,45 @@ async function writeTenantIndex(index: TenantIndex) {
 export async function listBusinesses(): Promise<BoothBusiness[]> {
   const index = await readTenantIndex();
   return index.businesses;
+}
+
+export async function findUserByEmail(email: string) {
+  const users = await readUsers();
+  return users.find((u) => u.email === email.toLowerCase());
+}
+
+export async function createUser({
+  email,
+  password,
+  businessId,
+}: {
+  email: string;
+  password: string;
+  businessId: string;
+}) {
+  const users = await readUsers();
+  if (users.find((u) => u.email === email.toLowerCase())) {
+    throw new Error("User already exists");
+  }
+  const hashed = hashPassword(password);
+  const user: BoothUser = {
+    id: randomUUID(),
+    email: email.toLowerCase(),
+    passwordHash: hashed.hash,
+    passwordSalt: hashed.salt,
+    businessId,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(user);
+  await writeUsers(users);
+  return user;
+}
+
+export async function verifyUserCredentials(email: string, password: string) {
+  const user = await findUserByEmail(email);
+  if (!user) return null;
+  const valid = verifyPassword(password, user.passwordSalt, user.passwordHash);
+  return valid ? user : null;
 }
 
 export async function findBusinessBySlug(slug: string) {
@@ -361,7 +462,7 @@ function eventIsActive(event: BoothEvent) {
   return true;
 }
 
-async function findEventBySlugs(
+export async function findEventBySlugs(
   businessSlug: string,
   eventSlug: string,
 ): Promise<EventContext | null> {
@@ -513,6 +614,48 @@ export async function contextFromSessionToken(token: string): Promise<EventConte
   return { ...context, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
 }
 
+export function createUserSessionToken(user: BoothUser) {
+  const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
+  const payload = Buffer.from(
+    JSON.stringify({
+      uid: user.id,
+      bid: user.businessId,
+      exp,
+    }),
+  ).toString("base64url");
+  const signature = createHmac("sha256", SESSION_SECRET)
+    .update(payload)
+    .digest("base64url");
+  return { token: `${payload}.${signature}`, expiresAt: new Date(exp).toISOString() };
+}
+
+async function userFromSessionToken(token: string): Promise<{ user: BoothUser; expiresAt?: string } | null> {
+  if (!token || !token.includes(".")) return null;
+  const [body, signature] = token.split(".");
+  const expected = createHmac("sha256", SESSION_SECRET)
+    .update(body)
+    .digest("base64url");
+  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    return null;
+  }
+  let payload: { uid: string; bid?: string; exp?: number };
+  try {
+    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
+      uid: string;
+      bid?: string;
+      exp?: number;
+    };
+  } catch {
+    return null;
+  }
+  if (!payload.uid) return null;
+  if (payload.exp && payload.exp < Date.now()) return null;
+  const users = await readUsers();
+  const user = users.find((u) => u.id === payload.uid);
+  if (!user) return null;
+  return { user, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
+}
+
 export function createBusinessSessionToken(business: BoothBusiness) {
   const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
   const payload = Buffer.from(
@@ -633,6 +776,18 @@ export const sessionCookieName = SESSION_COOKIE_NAME;
 export const adminToken = ADMIN_TOKEN;
 
 export async function getBusinessContext(request: NextRequest) {
+  const userCookie = request.cookies.get(USER_SESSION_COOKIE_NAME)?.value;
+  if (userCookie) {
+    const userSession = await userFromSessionToken(userCookie);
+    if (userSession?.user) {
+      const index = await readTenantIndex();
+      const business = index.businesses.find((b) => b.id === userSession.user.businessId);
+      if (business) {
+        return { business, user: userSession.user, expiresAt: userSession.expiresAt };
+      }
+    }
+  }
+
   const cookieToken = request.cookies.get(BUSINESS_SESSION_COOKIE_NAME)?.value;
   if (cookieToken) {
     const session = await businessFromSessionToken(cookieToken);

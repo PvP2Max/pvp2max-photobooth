@@ -7,6 +7,7 @@ type BusinessSession = {
   business: { id: string; name: string; slug: string; apiKeyHint?: string };
   events: EventItem[];
   expiresAt?: string;
+  user?: { id: string; email: string };
 };
 
 type EventItem = {
@@ -67,8 +68,8 @@ export default function BusinessPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [loginSlug, setLoginSlug] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [newEventName, setNewEventName] = useState("");
   const [newEventSlug, setNewEventSlug] = useState("");
   const [newEventKey, setNewEventKey] = useState("");
@@ -94,7 +95,7 @@ export default function BusinessPage() {
 
   useEffect(() => {
     const last = window.localStorage.getItem("boothos-last-business") ?? "";
-    setLoginSlug(last);
+    setLoginEmail(last);
     void loadSession();
   }, []);
 
@@ -106,7 +107,7 @@ export default function BusinessPage() {
       if (res.ok) {
         const data = (await res.json()) as BusinessSession;
         setSession(data);
-        setLoginSlug(data.business.slug);
+        setLoginEmail(data.user?.email ?? "");
       } else {
         setSession(null);
       }
@@ -126,7 +127,7 @@ export default function BusinessPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ businessSlug: loginSlug, apiKey }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
       const data = (await res.json().catch(() => ({}))) as BusinessSession & { error?: string };
       if (!res.ok) {
@@ -135,8 +136,8 @@ export default function BusinessPage() {
         return;
       }
       setSession(data);
-      setApiKey("");
-      window.localStorage.setItem("boothos-last-business", loginSlug);
+      setLoginPassword("");
+      window.localStorage.setItem("boothos-last-business", loginEmail);
     } catch {
       setError("Could not reach the server.");
     }
@@ -331,7 +332,7 @@ export default function BusinessPage() {
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Business Console</p>
           <h1 className="mt-2 text-3xl font-semibold text-[var(--color-text)]">Sign in</h1>
           <p className="text-sm text-[var(--color-text-muted)]">
-            Use the business slug and API key to manage events and links.
+            Use your email and password to manage events, links, and gallery.
           </p>
           {error && (
             <div className="mt-3 rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
@@ -340,22 +341,23 @@ export default function BusinessPage() {
           )}
           <form onSubmit={login} className="mt-4 space-y-3">
             <label className="block text-sm text-[var(--color-text-muted)]">
-              Business slug
+              Email
               <input
                 required
-                value={loginSlug}
-                onChange={(e) => setLoginSlug(e.target.value)}
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
                 className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                placeholder="arctic-aura"
+                placeholder="you@example.com"
               />
             </label>
             <label className="block text-sm text-[var(--color-text-muted)]">
-              API key
+              Password
               <input
                 required
                 type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
                 className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
                 placeholder="••••••••"
               />
@@ -381,7 +383,7 @@ export default function BusinessPage() {
             {session.business.name}
           </h1>
           <p className="text-sm text-[var(--color-text-muted)]">
-            Slug: {session.business.slug} • API key ends with {session.business.apiKeyHint}
+            Slug: {session.business.slug} • Signed in as {session.user?.email ?? "user"}
           </p>
         </div>
         <div className="flex items-center gap-2">

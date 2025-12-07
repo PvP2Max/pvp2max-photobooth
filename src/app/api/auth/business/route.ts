@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   businessSessionCookieName,
   createBusinessSessionToken,
+  createUserSessionToken,
   getBusinessContext,
   sanitizeBusiness,
   sanitizeEvent,
   verifyBusinessAccess,
+  verifyUserCredentials,
+  findBusinessBySlug,
 } from "@/lib/tenants";
 
 export const runtime = "nodejs";
@@ -29,6 +32,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     business: sanitizeBusiness(session.business),
     events: session.business.events.map(sanitizeEvent),
+    user: "user" in session && session.user ? { id: session.user.id, email: session.user.email } : undefined,
     expiresAt: session.expiresAt,
   });
 }
@@ -37,7 +41,38 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as {
     businessSlug?: string;
     apiKey?: string;
+    email?: string;
+    password?: string;
   } | null;
+
+  if (body?.email && body?.password) {
+    const user = await verifyUserCredentials(
+      body.email.toString().trim(),
+      body.password.toString(),
+    );
+    if (!user) {
+      return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
+    }
+    const business =
+      (body.businessSlug && (await findBusinessBySlug(body.businessSlug))) || (await getBusinessContext(request))?.business;
+    const response = NextResponse.json({
+      business: business ? sanitizeBusiness(business) : undefined,
+      events: business ? business.events.map(sanitizeEvent) : [],
+      user: { id: user.id, email: user.email },
+    });
+    const userSession = createUserSessionToken(user);
+    response.cookies.set("boothos_user", userSession.token, cookieOptions(userSession.expiresAt));
+    if (business) {
+      const bizSession = createBusinessSessionToken(business);
+      response.cookies.set(
+        businessSessionCookieName,
+        bizSession.token,
+        cookieOptions(bizSession.expiresAt),
+      );
+    }
+    return response;
+  }
+
   const businessSlug = body?.businessSlug?.toString().trim();
   const apiKey = body?.apiKey?.toString().trim();
   if (!businessSlug || !apiKey) {
@@ -64,6 +99,13 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   const response = NextResponse.json({ status: "signed-out" });
+  response.cookies.set("boothos_user", "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(0),
+  });
   response.cookies.set(businessSessionCookieName, "", {
     httpOnly: true,
     sameSite: "lax",
