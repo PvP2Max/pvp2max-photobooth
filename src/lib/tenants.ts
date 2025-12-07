@@ -48,6 +48,7 @@ type TenantIndex = {
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
 const TENANT_FILE = path.join(STORAGE_ROOT, "tenants.json");
 const SESSION_COOKIE_NAME = "boothos_session";
+const BUSINESS_SESSION_COOKIE_NAME = "boothos_business";
 const ADMIN_TOKEN = process.env.BOOTHOS_ADMIN_TOKEN ?? "ArcticAuraDesigns";
 const SESSION_SECRET = process.env.BOOTHOS_SESSION_SECRET ?? "boothos-dev-session-secret";
 const SESSION_TTL_HOURS = Number(process.env.BOOTHOS_SESSION_TTL_HOURS ?? "12");
@@ -138,6 +139,11 @@ export async function listBusinesses(): Promise<BoothBusiness[]> {
   return index.businesses;
 }
 
+export async function findBusinessBySlug(slug: string) {
+  const index = await readTenantIndex();
+  return index.businesses.find((b) => b.slug === slugify(slug, slug));
+}
+
 export async function createBusiness({
   name,
   slug,
@@ -165,6 +171,17 @@ export async function createBusiness({
   index.businesses.push(business);
   await writeTenantIndex(index);
   return { business, apiKey: secret };
+}
+
+export async function rotateBusinessKey(businessId: string) {
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === businessId);
+  if (!business) throw new Error("Business not found");
+  const apiKey = randomUUID().replace(/-/g, "");
+  business.apiKeyHash = hashSecret(apiKey);
+  business.apiKeyHint = secretHint(apiKey);
+  await writeTenantIndex(index);
+  return { business, apiKey };
 }
 
 export async function createEvent(
@@ -293,6 +310,10 @@ export function sanitizeEvent(event: BoothEvent) {
   };
 }
 
+export function sanitizeEventWithSecret(event: BoothEvent) {
+  return { ...sanitizeEvent(event), accessHash: undefined };
+}
+
 export function createSessionToken(scope: TenantScope) {
   const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
   const payload = Buffer.from(
@@ -334,9 +355,63 @@ export async function contextFromSessionToken(token: string): Promise<EventConte
   return { ...context, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
 }
 
+export function createBusinessSessionToken(business: BoothBusiness) {
+  const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
+  const payload = Buffer.from(
+    JSON.stringify({
+      bid: business.id,
+      exp,
+    }),
+  ).toString("base64url");
+  const signature = createHmac("sha256", SESSION_SECRET)
+    .update(payload)
+    .digest("base64url");
+  return { token: `${payload}.${signature}`, expiresAt: new Date(exp).toISOString() };
+}
+
+async function businessFromSessionToken(token: string): Promise<{ business: BoothBusiness; expiresAt?: string } | null> {
+  if (!token || !token.includes(".")) return null;
+  const [body, signature] = token.split(".");
+  const expected = createHmac("sha256", SESSION_SECRET)
+    .update(body)
+    .digest("base64url");
+  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    return null;
+  }
+  let payload: { bid: string; exp?: number };
+  try {
+    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
+      bid: string;
+      exp?: number;
+    };
+  } catch {
+    return null;
+  }
+  if (!payload.bid) return null;
+  if (payload.exp && payload.exp < Date.now()) return null;
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === payload.bid);
+  if (!business) return null;
+  return { business, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
+}
+
+export async function verifyBusinessAccess({
+  businessSlug,
+  apiKey,
+}: {
+  businessSlug: string;
+  apiKey: string;
+}) {
+  const business = await findBusinessBySlug(businessSlug);
+  if (!business) return null;
+  const hashed = hashSecret(apiKey);
+  if (!timingSafeEqual(Buffer.from(hashed), Buffer.from(business.apiKeyHash))) return null;
+  return business;
+}
+
 export async function getEventContext(
   request: NextRequest,
-  options?: { allowUnauthedHeader?: boolean },
+  options?: { allowUnauthedHeader?: boolean; allowBusinessSession?: boolean },
 ): Promise<{ context?: EventContext; error?: string; status?: number }> {
   await ensureTenantStorage();
 
@@ -345,6 +420,8 @@ export async function getEventContext(
     const context = await contextFromSessionToken(cookieToken);
     if (context) return { context };
   }
+
+  const businessSession = await getBusinessContext(request);
 
   const businessSlug =
     request.headers.get("x-boothos-business") ||
@@ -370,6 +447,13 @@ export async function getEventContext(
     return { error: "Unauthorized event access.", status: 401 };
   }
 
+  if (options?.allowBusinessSession && businessSession?.business && businessSlug && eventSlug) {
+    const ctx = await findEventBySlugs(businessSlug, eventSlug);
+    if (ctx && ctx.business.id === businessSession.business.id) {
+      return { context: { ...ctx, expiresAt: businessSession.expiresAt } };
+    }
+  }
+
   if (options?.allowUnauthedHeader && businessSlug && eventSlug) {
     const ctx = await findEventBySlugs(businessSlug, eventSlug);
     if (ctx) return { context: ctx };
@@ -389,3 +473,52 @@ export function isAdminRequest(request: NextRequest) {
 
 export const sessionCookieName = SESSION_COOKIE_NAME;
 export const adminToken = ADMIN_TOKEN;
+
+export async function getBusinessContext(request: NextRequest) {
+  const cookieToken = request.cookies.get(BUSINESS_SESSION_COOKIE_NAME)?.value;
+  if (cookieToken) {
+    const session = await businessFromSessionToken(cookieToken);
+    if (session) return session;
+  }
+
+  const headerSlug = request.headers.get("x-boothos-business");
+  const headerKey = request.headers.get("x-boothos-business-key");
+  if (headerSlug && headerKey) {
+    const business = await verifyBusinessAccess({
+      businessSlug: headerSlug,
+      apiKey: headerKey,
+    });
+    if (business) return { business };
+  }
+  return null;
+}
+
+export const businessSessionCookieName = BUSINESS_SESSION_COOKIE_NAME;
+
+export async function rotateEventAccess(businessId: string, eventId: string) {
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === businessId);
+  if (!business) throw new Error("Business not found");
+  const event = business.events.find((e) => e.id === eventId);
+  if (!event) throw new Error("Event not found");
+  const code = randomUUID().replace(/-/g, "");
+  event.accessHash = hashSecret(code);
+  event.accessHint = secretHint(code);
+  await writeTenantIndex(index);
+  return { event, accessCode: code };
+}
+
+export async function updateEventStatus(
+  businessId: string,
+  eventId: string,
+  status: BoothEvent["status"],
+) {
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === businessId);
+  if (!business) throw new Error("Business not found");
+  const event = business.events.find((e) => e.id === eventId);
+  if (!event) throw new Error("Event not found");
+  event.status = status;
+  await writeTenantIndex(index);
+  return event;
+}

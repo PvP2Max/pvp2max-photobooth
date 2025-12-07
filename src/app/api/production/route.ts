@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteAllProduction, deleteProduction, listProduction } from "@/lib/production";
 import { rateLimiter, requestKey } from "@/lib/rate-limit";
-import { getEventContext, isAdminRequest } from "@/lib/tenants";
+import { getBusinessContext, getEventContext, isAdminRequest } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  if (!isAdminRequest(request)) {
+  const isAdmin = isAdminRequest(request);
+  const businessSession = await getBusinessContext(request);
+  if (!isAdmin && !businessSession?.business) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const rate = rateLimiter(`admin-prod-${requestKey(request.headers)}`, 60, 60_000);
@@ -15,7 +17,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
-  const { context, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  const { context, error, status } = await getEventContext(request, {
+    allowUnauthedHeader: true,
+    allowBusinessSession: true,
+  });
   if (!context) {
     return NextResponse.json(
       { error: error ?? "Event scope is required for admin actions." },
@@ -40,14 +45,19 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  if (!isAdminRequest(request)) {
+  const isAdmin = isAdminRequest(request);
+  const businessSession = await getBusinessContext(request);
+  if (!isAdmin && !businessSession?.business) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const rate = rateLimiter(`admin-prod-${requestKey(request.headers)}`, 30, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
-  const { context, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  const { context, error, status } = await getEventContext(request, {
+    allowUnauthedHeader: true,
+    allowBusinessSession: true,
+  });
   if (!context) {
     return NextResponse.json(
       { error: error ?? "Event scope is required for admin actions." },

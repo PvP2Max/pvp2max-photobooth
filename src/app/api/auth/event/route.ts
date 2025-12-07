@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createSessionToken,
   getEventContext,
-  sanitizeBusiness,
+  getBusinessContext,
+  findBusinessBySlug,
   sanitizeEvent,
+  sanitizeBusiness,
   sessionCookieName,
   verifyEventAccess,
 } from "@/lib/tenants";
@@ -47,18 +49,32 @@ export async function POST(request: NextRequest) {
   const eventSlug = body?.eventSlug?.toString().trim();
   const accessCode = body?.accessCode?.toString().trim();
 
-  if (!businessSlug || !eventSlug || !accessCode) {
+  if (!businessSlug || !eventSlug) {
     return NextResponse.json(
-      { error: "businessSlug, eventSlug, and accessCode are required." },
+      { error: "businessSlug and eventSlug are required." },
       { status: 400 },
     );
   }
 
-  const verified = await verifyEventAccess({
-    businessSlug,
-    eventSlug,
-    accessCode,
-  });
+  let verified = null;
+
+  if (accessCode) {
+    verified = await verifyEventAccess({
+      businessSlug,
+      eventSlug,
+      accessCode,
+    });
+  } else {
+    const businessSession = await getBusinessContext(request);
+    if (businessSession?.business && businessSession.business.slug === businessSlug) {
+      const business = await findBusinessBySlug(businessSlug);
+      const event = business?.events.find((e) => e.slug === eventSlug);
+      if (business && event && event.status !== "closed") {
+        verified = { business, event, scope: { businessId: business.id, businessSlug: business.slug, businessName: business.name, eventId: event.id, eventSlug: event.slug, eventName: event.name } };
+      }
+    }
+  }
+
   if (!verified) {
     return NextResponse.json(
       { error: "Invalid event credentials or inactive event." },

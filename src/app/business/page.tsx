@@ -1,0 +1,601 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+type BusinessSession = {
+  business: { id: string; name: string; slug: string; apiKeyHint?: string };
+  events: EventItem[];
+  expiresAt?: string;
+};
+
+type EventItem = {
+  id: string;
+  name: string;
+  slug: string;
+  status?: "draft" | "live" | "closed";
+  accessHint?: string;
+  createdAt?: string;
+};
+
+type ProductionItem = {
+  id: string;
+  email: string;
+  createdAt: string;
+  downloadToken?: string;
+  tokenExpiresAt?: string;
+  attachments: { filename: string; contentType: string; size: number }[];
+};
+
+function linkFor(pathname: string, business: string, event: string) {
+  const qs = new URLSearchParams({ business, event }).toString();
+  return `${pathname}?${qs}`;
+}
+
+export default function BusinessPage() {
+  const [session, setSession] = useState<BusinessSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loginSlug, setLoginSlug] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [newEventName, setNewEventName] = useState("");
+  const [newEventSlug, setNewEventSlug] = useState("");
+  const [newEventKey, setNewEventKey] = useState("");
+  const [issuingKey, setIssuingKey] = useState<Record<string, string>>({});
+  const [resendEmail, setResendEmail] = useState<Record<string, string>>({});
+  const [productionEvent, setProductionEvent] = useState<string>("");
+  const [productions, setProductions] = useState<Record<string, ProductionItem[]>>({});
+  const [loadingProductions, setLoadingProductions] = useState(false);
+
+  const activeEvents = useMemo(() => {
+    const events = session?.events ?? [];
+    return [...events].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }, [session]);
+
+  useEffect(() => {
+    const last = window.localStorage.getItem("boothos-last-business") ?? "";
+    setLoginSlug(last);
+    void loadSession();
+  }, []);
+
+  async function loadSession() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/business", { credentials: "include" });
+      if (res.ok) {
+        const data = (await res.json()) as BusinessSession;
+        setSession(data);
+        setLoginSlug(data.business.slug);
+      } else {
+        setSession(null);
+      }
+    } catch {
+      setSession(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function login(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/auth/business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ businessSlug: loginSlug, apiKey }),
+      });
+      const data = (await res.json().catch(() => ({}))) as BusinessSession & { error?: string };
+      if (!res.ok) {
+        setError(data.error || "Invalid credentials.");
+        setSession(null);
+        return;
+      }
+      setSession(data);
+      setApiKey("");
+      window.localStorage.setItem("boothos-last-business", loginSlug);
+    } catch {
+      setError("Could not reach the server.");
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/business", { method: "DELETE", credentials: "include" });
+    await fetch("/api/auth/event", { method: "DELETE", credentials: "include" });
+    setSession(null);
+    setProductions({});
+    setResendEmail({});
+  }
+
+  async function createEvent(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!session) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/business/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: newEventName,
+          slug: newEventSlug || undefined,
+          accessCode: newEventKey || undefined,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        event?: EventItem;
+        accessCode?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.event) {
+        setError(data.error || "Could not create event.");
+        return;
+      }
+      setSession({
+        ...session,
+        events: [data.event, ...session.events],
+      });
+      setMessage(`Created event "${data.event.name}". Save this key: ${data.accessCode}`);
+      setNewEventName("");
+      setNewEventSlug("");
+      setNewEventKey("");
+    } catch {
+      setError("Could not create event.");
+    }
+  }
+
+  async function rotateKey(eventId: string) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/business/events/${eventId}/rotate`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { event?: EventItem; accessCode?: string; error?: string };
+      if (!res.ok || !data.event || !data.accessCode) {
+        setError(data.error || "Failed to rotate key.");
+        return;
+      }
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              events: prev.events.map((ev) => (ev.id === eventId ? { ...ev, ...data.event } : ev)),
+            }
+          : prev,
+      );
+      setIssuingKey((prev) => ({ ...prev, [eventId]: data.accessCode! }));
+      setMessage("New event key issued. Share it with staff.");
+    } catch {
+      setError("Failed to rotate key.");
+    }
+  }
+
+  async function updateStatus(eventId: string, status: "live" | "closed" | "draft") {
+    setError(null);
+    try {
+      const res = await fetch(`/api/business/events/${eventId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { event?: EventItem; error?: string };
+      if (!res.ok || !data.event) {
+        setError(data.error || "Failed to update event.");
+        return;
+      }
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              events: prev.events.map((ev) => (ev.id === eventId ? { ...ev, ...data.event } : ev)),
+            }
+          : prev,
+      );
+      setMessage(`Event "${data.event.name}" is now ${data.event.status}.`);
+    } catch {
+      setError("Failed to update event.");
+    }
+  }
+
+  async function loadProductions(eventSlug: string) {
+    if (!session) return;
+    setLoadingProductions(true);
+    setError(null);
+    setProductionEvent(eventSlug);
+    try {
+      const res = await fetch(
+        `/api/production?business=${session.business.slug}&event=${eventSlug}`,
+        { credentials: "include" },
+      );
+      const data = (await res.json().catch(() => ({}))) as { items?: ProductionItem[]; error?: string };
+      if (!res.ok || !data.items) {
+        setError(data.error || "Failed to load deliveries.");
+        return;
+      }
+      setProductions((prev) => ({ ...prev, [eventSlug]: data.items! }));
+    } catch {
+      setError("Failed to load deliveries.");
+    } finally {
+      setLoadingProductions(false);
+    }
+  }
+
+  async function resend(id: string, eventSlug: string) {
+    if (!session) return;
+    const email = resendEmail[id];
+    if (!email) {
+      setError("Enter an email to resend.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    const res = await fetch(
+      `/api/production/resend?business=${session.business.slug}&event=${eventSlug}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id, email }),
+      },
+    );
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setError(data.error || "Failed to resend email.");
+      return;
+    }
+    setMessage("Resent photos.");
+  }
+
+  function copy(text: string) {
+    navigator.clipboard?.writeText(text).catch(() => {});
+    setMessage("Copied to clipboard.");
+  }
+
+  if (loading) {
+    return (
+      <main className="mx-auto max-w-5xl px-6 py-12 text-[var(--color-text-muted)]">
+        <p>Loading business console…</p>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-5xl flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-xl rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Business Console</p>
+          <h1 className="mt-2 text-3xl font-semibold text-[var(--color-text)]">Sign in</h1>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Use the business slug and API key to manage events and links.
+          </p>
+          {error && (
+            <div className="mt-3 rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
+              {error}
+            </div>
+          )}
+          <form onSubmit={login} className="mt-4 space-y-3">
+            <label className="block text-sm text-[var(--color-text-muted)]">
+              Business slug
+              <input
+                required
+                value={loginSlug}
+                onChange={(e) => setLoginSlug(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                placeholder="arctic-aura"
+              />
+            </label>
+            <label className="block text-sm text-[var(--color-text-muted)]">
+              API key
+              <input
+                required
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                placeholder="••••••••"
+              />
+            </label>
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
+            >
+              Sign in
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Business Console</p>
+          <h1 className="text-3xl font-semibold text-[var(--color-text)]">
+            {session.business.name}
+          </h1>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Slug: {session.business.slug} • API key ends with {session.business.apiKeyHint}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadSession}
+            className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={logout}
+            className="rounded-full bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+
+      {(message || error) && (
+        <div
+          className={`mt-4 rounded-2xl px-4 py-3 text-sm ring-1 ${
+            error
+              ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-[rgba(249,115,115,0.35)]"
+              : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
+          }`}
+        >
+          {error || message}
+        </div>
+      )}
+
+      <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Create event</p>
+            <h2 className="text-xl font-semibold">Spin up a new event</h2>
+          </div>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Keys are shown once; rotate anytime.
+          </p>
+        </div>
+        <form onSubmit={createEvent} className="grid gap-3 md:grid-cols-3">
+          <input
+            required
+            value={newEventName}
+            onChange={(e) => setNewEventName(e.target.value)}
+            placeholder="Event name (e.g., Winter Gala)"
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          />
+          <input
+            value={newEventSlug}
+            onChange={(e) => setNewEventSlug(e.target.value)}
+            placeholder="Slug (optional)"
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          />
+          <input
+            value={newEventKey}
+            onChange={(e) => setNewEventKey(e.target.value)}
+            placeholder="Event access key (optional)"
+            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+          />
+          <div className="md:col-span-3 flex justify-end">
+            <button
+              type="submit"
+              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
+            >
+              Create event
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-6 grid gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
+          <p className="text-xs text-[var(--color-text-muted)]">
+            Copy the links and share with your staff. If you’re logged in, no event key is needed.
+          </p>
+        </div>
+        {activeEvents.length === 0 ? (
+          <p className="text-sm text-[var(--color-text-muted)]">No events yet.</p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {activeEvents.map((event) => {
+              const checkin = linkFor("/checkin", session.business.slug, event.slug);
+              const photographer = linkFor("/photographer", session.business.slug, event.slug);
+              const frontdesk = linkFor("/frontdesk", session.business.slug, event.slug);
+              return (
+                <div
+                  key={event.id}
+                  className="rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Slug: {event.slug} • Created {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-soft)]">
+                        Access key hint: {event.accessHint ?? "—"}
+                      </p>
+                      {issuingKey[event.id] && (
+                        <p className="mt-1 text-[11px] text-[var(--color-success)]">
+                          New key: {issuingKey[event.id]}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${
+                          event.status === "closed"
+                            ? "bg-[rgba(249,115,115,0.16)] text-[var(--color-text)] ring-[rgba(249,115,115,0.35)]"
+                            : "bg-[rgba(34,197,94,0.14)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
+                        }`}
+                      >
+                        {event.status ?? "live"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 text-xs">
+                    {[
+                      { label: "Check-in link", href: checkin },
+                      { label: "Photographer link", href: photographer },
+                      { label: "Front desk link", href: frontdesk },
+                    ].map((link) => (
+                      <button
+                        key={link.label}
+                        onClick={() => copy(link.href)}
+                        className="flex items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface)]"
+                      >
+                        <div>
+                          <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
+                          <p className="truncate font-mono text-[11px] text-[var(--color-text)]">{link.href}</p>
+                        </div>
+                        <span className="text-[10px] text-[var(--color-text-soft)]">Copy</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <button
+                      onClick={() => rotateKey(event.id)}
+                      className="rounded-full bg-[var(--color-primary)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                    >
+                      Rotate access key
+                    </button>
+                    {event.status === "closed" ? (
+                      <button
+                        onClick={() => updateStatus(event.id, "live")}
+                        className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                      >
+                        Reopen
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => updateStatus(event.id, "closed")}
+                        className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                      >
+                        Close event
+                      </button>
+                    )}
+                    <button
+                      onClick={() => loadProductions(event.slug)}
+                      className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                    >
+                      View deliveries
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Deliveries</p>
+            <h2 className="text-xl font-semibold text-[var(--color-text)]">Resend & manage</h2>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            {session.events.map((ev) => (
+              <button
+                key={ev.id}
+                onClick={() => loadProductions(ev.slug)}
+                className={`rounded-full px-3 py-2 ring-1 ${
+                  productionEvent === ev.slug
+                    ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
+                    : "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
+                }`}
+              >
+                {ev.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        {loadingProductions ? (
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">Loading deliveries…</p>
+        ) : productionEvent && productions[productionEvent]?.length ? (
+          <div className="mt-4 space-y-3">
+            {productions[productionEvent]?.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--color-text)]">{item.email}</p>
+                    <p className="text-[11px] text-[var(--color-text-soft)]">
+                      Sent {new Date(item.createdAt).toLocaleString()}
+                    </p>
+                    {item.tokenExpiresAt && (
+                      <p className="text-[11px] text-[var(--color-text-soft)]">
+                        Link expires {new Date(item.tokenExpiresAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="email"
+                      placeholder="Resend to"
+                      value={resendEmail[item.id] ?? ""}
+                      onChange={(e) =>
+                        setResendEmail((prev) => ({ ...prev, [item.id]: e.target.value }))
+                      }
+                      className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)]"
+                    />
+                    <button
+                      onClick={() => resend(item.id, productionEvent)}
+                      className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                    >
+                      Resend
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] text-[var(--color-text-muted)]">
+                  {item.attachments.length} file(s) •{" "}
+                  {item.downloadToken ? "Tokenized download ready" : "No download token"}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">Select an event to view deliveries.</p>
+        )}
+      </section>
+
+      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+        <h3 className="text-lg font-semibold text-[var(--color-text)]">Staff links</h3>
+        <p className="text-sm text-[var(--color-text-muted)]">
+          Share these with your team. When they are signed in as the business, they won’t be prompted for an event key.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/photographer"
+            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
+          >
+            Photographer console
+          </Link>
+          <Link
+            href="/frontdesk"
+            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
+          >
+            Front desk console
+          </Link>
+          <Link
+            href="/checkin"
+            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
+          >
+            Check-in kiosk
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}

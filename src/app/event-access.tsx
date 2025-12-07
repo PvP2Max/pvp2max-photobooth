@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type SessionResponse = {
   business: { id: string; name: string; slug: string; apiKeyHint?: string };
@@ -19,6 +19,10 @@ type Props = {
 };
 
 export default function EventAccessGate({ children }: Props) {
+  const [businessSession, setBusinessSession] = useState<{
+    business: { id: string; name: string; slug: string; apiKeyHint?: string };
+    events: { id: string; name: string; slug: string; status?: string; accessHint?: string }[];
+  } | null>(null);
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,29 +30,71 @@ export default function EventAccessGate({ children }: Props) {
   const [eventSlug, setEventSlug] = useState("");
   const [accessCode, setAccessCode] = useState("");
 
+  const refreshSession = useCallback(
+    async (prefillBusiness?: string, prefillEvent?: string) => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/event", { credentials: "include" });
+        if (res.ok) {
+          const data = (await res.json()) as SessionResponse;
+          setSession(data);
+          setError(null);
+        } else {
+          setSession(null);
+        }
+
+        const businessRes = await fetch("/api/auth/business", { credentials: "include" });
+        if (businessRes.ok) {
+          const data = (await businessRes.json()) as {
+            business: { id: string; name: string; slug: string; apiKeyHint?: string };
+            events: { id: string; name: string; slug: string; status?: string; accessHint?: string }[];
+            expiresAt?: string;
+          };
+          setBusinessSession({ business: data.business, events: data.events });
+          if (!session && (prefillBusiness || businessSlug) && (prefillEvent || eventSlug)) {
+            void autoUnlock(prefillBusiness ?? businessSlug, prefillEvent ?? eventSlug);
+          }
+        } else {
+          setBusinessSession(null);
+        }
+      } catch {
+        setSession(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [businessSlug, eventSlug, session],
+  );
+
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qBusiness = params.get("business") ?? "";
+    const qEvent = params.get("event") ?? "";
     const lastBiz = window.localStorage.getItem("boothos-last-business") ?? "";
     const lastEvent = window.localStorage.getItem("boothos-last-event") ?? "";
-    setBusinessSlug(lastBiz);
-    setEventSlug(lastEvent);
-    refreshSession();
-  }, []);
+    setBusinessSlug(qBusiness || lastBiz);
+    setEventSlug(qEvent || lastEvent);
+    void refreshSession(qBusiness || lastBiz, qEvent || lastEvent);
+  }, [refreshSession]);
 
-  async function refreshSession() {
-    setLoading(true);
+  async function autoUnlock(business: string, event: string) {
+    if (!business || !event) return;
     try {
-      const res = await fetch("/api/auth/event", { credentials: "include" });
+      const res = await fetch("/api/auth/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ businessSlug: business, eventSlug: event }),
+      });
       if (res.ok) {
         const data = (await res.json()) as SessionResponse;
         setSession(data);
         setError(null);
-      } else {
-        setSession(null);
+        window.localStorage.setItem("boothos-last-business", business);
+        window.localStorage.setItem("boothos-last-event", event);
       }
     } catch {
-      setSession(null);
-    } finally {
-      setLoading(false);
+      // ignore auto-unlock failures
     }
   }
 
@@ -104,13 +150,18 @@ export default function EventAccessGate({ children }: Props) {
             </p>
             <h1 className="text-2xl font-semibold">Choose business + event</h1>
             <p className="text-sm text-[var(--color-text-muted)]">
-              Enter the business slug, event slug, and event key shared with this team.
+              Enter the business slug and event slug. If you are signed in as the business, you won’t need the event key.
             </p>
           </div>
           <div className="rounded-full bg-[rgba(155,92,255,0.16)] px-3 py-1 text-[11px] font-semibold text-[var(--color-primary-soft)] ring-1 ring-[var(--color-border-strong)]">
             BoothOS
           </div>
         </div>
+        {businessSession && (
+          <div className="mb-3 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+            Signed in as <strong>{businessSession.business.name}</strong>. Pick one of your events or enter a slug to switch.
+          </div>
+        )}
         {error && (
           <div className="mb-3 rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
             {error}
@@ -137,16 +188,18 @@ export default function EventAccessGate({ children }: Props) {
               className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
             />
           </label>
-          <label className="text-sm text-[var(--color-text-muted)] md:col-span-2">
-            Event key
-            <input
-              required
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              placeholder="••••••"
-              className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-            />
-          </label>
+          {!businessSession && (
+            <label className="text-sm text-[var(--color-text-muted)] md:col-span-2">
+              Event key
+              <input
+                required
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                placeholder="••••••"
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              />
+            </label>
+          )}
           <div className="md:col-span-2 flex items-center justify-between">
             <p className="text-xs text-[var(--color-text-soft)]">
               Keep this tab open to maintain your event session. Switching events will clear the session cookie.
