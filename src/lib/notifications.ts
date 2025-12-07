@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { TenantScope, scopedStorageRoot } from "./tenants";
 
 type Notification = {
   email: string;
@@ -7,35 +8,41 @@ type Notification = {
   createdAt: string;
 };
 
-const STORAGE_ROOT = path.join(process.cwd(), "storage");
-const NOTIFY_DIR = path.join(STORAGE_ROOT, "notifications");
-const NOTIFY_FILE = path.join(NOTIFY_DIR, "notifications.json");
+function notifyPaths(scope: TenantScope) {
+  const root = scopedStorageRoot(scope);
+  const dir = path.join(root, "notifications");
+  const file = path.join(dir, "notifications.json");
+  return { dir, file };
+}
 
-async function ensureStorage() {
-  await mkdir(NOTIFY_DIR, { recursive: true });
+async function ensureStorage(scope: TenantScope) {
+  const { dir, file } = notifyPaths(scope);
+  await mkdir(dir, { recursive: true });
   try {
-    await readFile(NOTIFY_FILE, "utf8");
+    await readFile(file, "utf8");
   } catch {
-    await writeFile(NOTIFY_FILE, JSON.stringify({ items: [] }), "utf8");
+    await writeFile(file, JSON.stringify({ items: [] }), "utf8");
   }
 }
 
-export async function addNotification(email: string, count: number) {
-  await ensureStorage();
-  const raw = await readFile(NOTIFY_FILE, "utf8").catch(() => '{"items":[]}');
+export async function addNotification(scope: TenantScope, email: string, count: number) {
+  await ensureStorage(scope);
+  const { file } = notifyPaths(scope);
+  const raw = await readFile(file, "utf8").catch(() => '{"items":[]}');
   const data = JSON.parse(raw) as { items: Notification[] };
   data.items.push({
     email,
     count,
     createdAt: new Date().toISOString(),
   });
-  await writeFile(NOTIFY_FILE, JSON.stringify(data, null, 2), "utf8");
+  await writeFile(file, JSON.stringify(data, null, 2), "utf8");
 }
 
-export async function popNotifications() {
-  await ensureStorage();
-  const raw = await readFile(NOTIFY_FILE, "utf8").catch(() => '{"items":[]}');
+export async function popNotifications(scope: TenantScope) {
+  await ensureStorage(scope);
+  const { file } = notifyPaths(scope);
+  const raw = await readFile(file, "utf8").catch(() => '{"items":[]}');
   const data = JSON.parse(raw) as { items: Notification[] };
-  await writeFile(NOTIFY_FILE, JSON.stringify({ items: [] }, null, 2), "utf8");
+  await writeFile(file, JSON.stringify({ items: [] }, null, 2), "utf8");
   return data.items;
 }

@@ -4,6 +4,10 @@ import Link from "next/link";
 
 const highlights = [
   {
+    title: "Multi-business ready",
+    body: "Event-scoped storage, per-event access keys, and admin download controls so each client stays isolated.",
+  },
+  {
     title: "On-site, cloud-free",
     body: "Background removal runs locally (withoutbg) with zero external upload; assets purge after delivery.",
   },
@@ -59,16 +63,16 @@ export default function Home() {
         <section className="grid gap-10 overflow-hidden rounded-3xl bg-[var(--color-surface)] px-8 py-12 shadow-[var(--shadow-soft)] ring-1 ring-[var(--color-border-subtle)] md:grid-cols-[1.35fr,1fr] md:items-center">
           <div className="space-y-5">
             <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--color-primary-soft)] ring-1 ring-[var(--color-border-strong)]">
-              Arctic Aura Photobooth
+              BoothOS by Arctic Aura
               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(34,211,238,0.18)] text-[10px] text-[var(--color-text)]">
                 SaaS
               </span>
             </div>
             <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
-              Photobooth-as-a-Service for on-site teams, cloud optional.
+              BoothOS for on-site teams and multi-client events.
             </h1>
             <p className="text-lg text-[var(--color-text-muted)]">
-              Local processing, dual-lane workflow, multi-background previews, and link-only delivery that skips email size limits. Built to run on your own hardware or tunnel.
+              Local processing, per-event access control, dual-lane workflow, multi-background previews, and link-only delivery that skips email size limits. Built to run on your own hardware or tunnel.
             </p>
             <div className="flex flex-wrap gap-3 text-sm">
               <Link

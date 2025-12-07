@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Photobooth | Arctic Aura Designs",
+  title: "BoothOS | Arctic Aura Designs",
   description:
     "Upload, style, and deliver background-free photobooth shots with live previews.",
 };
@@ -35,7 +35,7 @@ export default function RootLayout({
                 <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-text-soft)]">
                   Arctic Aura
                 </p>
-                <p className="text-sm font-semibold text-[var(--color-text)]">Photobooth SaaS</p>
+                <p className="text-sm font-semibold text-[var(--color-text)]">BoothOS</p>
               </div>
             </Link>
             <nav className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">

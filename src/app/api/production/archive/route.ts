@@ -1,29 +1,29 @@
 import { spawn } from "node:child_process";
+import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { productionRoot } from "@/lib/production";
-import path from "node:path";
+import { getEventContext, isAdminRequest } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TOKEN = "ArcticAuraDesigns";
-
-function authorized(request: NextRequest) {
-  const header = request.headers.get("x-admin-token");
-  const query = request.nextUrl.searchParams.get("token");
-  const id = request.nextUrl.searchParams.get("id");
-  return header === TOKEN || (query && id);
-}
-
 export async function GET(request: NextRequest) {
-  if (!authorized(request)) {
+  if (!isAdminRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { context, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  if (!context) {
+    return NextResponse.json(
+      { error: error ?? "Event scope is required for archive downloads." },
+      { status: status ?? 401 },
+    );
+  }
+
   const id = request.nextUrl.searchParams.get("id");
-  if (id && request.nextUrl.searchParams.get("token") !== TOKEN) {
-    // Per-record zip
-    const recordRoot = path.join(productionRoot(), id);
+  const root = productionRoot(context.scope);
+  if (id) {
+    const recordRoot = path.join(root, id);
     const parentDir = path.dirname(recordRoot);
     const folderName = path.basename(recordRoot);
     const tar = spawn("tar", ["-czf", "-", folderName], { cwd: parentDir });
@@ -36,8 +36,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Stream a tar.gz of the production directory
-  const root = productionRoot();
   const parentDir = path.dirname(root);
   const folderName = path.basename(root);
 

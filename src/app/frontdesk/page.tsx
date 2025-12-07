@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BackgroundOption } from "@/lib/backgrounds";
+import EventAccessGate from "../event-access";
 
 type Photo = {
   id: string;
@@ -530,461 +531,463 @@ export default function FrontdeskPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
-      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-12">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold">Front desk</h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Simple, step-by-step flow for guests on an iPad.
-          </p>
-        </div>
-
-        {(message || error) && (
-          <div
-            className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
-              error
-                ? "bg-red-500/10 text-red-100 ring-red-400/50"
-                : "bg-emerald-500/10 text-emerald-100 ring-emerald-400/50"
-            }`}
-          >
-            {error || message}
+    <EventAccessGate>
+      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
+        <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-12">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-semibold">Front desk</h1>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Simple, step-by-step flow for guests on an iPad.
+            </p>
           </div>
-        )}
 
-        {toasts.length > 0 && (
-          <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
-            {toasts.map((toast, idx) => (
-              <div
-                key={idx}
-                className="rounded-lg bg-emerald-500/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/30"
-              >
-                {toast}
-              </div>
-            ))}
-            <button
-              onClick={popToast}
-              className="self-end text-xs text-white/80 underline"
+          {(message || error) && (
+            <div
+              className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
+                error
+                  ? "bg-red-500/10 text-red-100 ring-red-400/50"
+                  : "bg-emerald-500/10 text-emerald-100 ring-emerald-400/50"
+              }`}
             >
-              Dismiss
-            </button>
-          </div>
-        )}
+              {error || message}
+            </div>
+          )}
 
-        {/* Step 1: Email */}
-        {step === "email" && (
-          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
-            <form
-              onSubmit={handleSearch}
-              className="grid gap-3 md:grid-cols-[2fr,auto] md:items-end"
-            >
-              <label className="text-sm text-slate-200/80">
-                Guest email
-                <input
-                  type="email"
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                  placeholder="family@example.com"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-                />
-              </label>
+          {toasts.length > 0 && (
+            <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
+              {toasts.map((toast, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg bg-emerald-500/90 px-4 py-2 text-sm text-white shadow-lg ring-1 ring-white/30"
+                >
+                  {toast}
+                </div>
+              ))}
               <button
-                type="submit"
-                disabled={loadingPhotos}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+                onClick={popToast}
+                className="self-end text-xs text-white/80 underline"
               >
-                {loadingPhotos ? "Loading..." : "Load photos"}
-              </button>
-            </form>
-          </section>
-        )}
-
-        {/* Step 2: Select photos */}
-        {step === "select" && hasPhotos && (
-          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">Select favorites</p>
-              </div>
-              <button
-                onClick={() => {
-                  Array.from(selectedPhotos).forEach((id) => ensureSlotForPhoto(id));
-                  setCurrentBgIndex(0);
-                  setStep("backgrounds");
-                }}
-                disabled={!hasSelections}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
-              >
-                Next: choose backgrounds
+                Dismiss
               </button>
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {photos.map((photo) => {
-                const isSelected = selectedPhotos.has(photo.id);
-                return (
-                  <article
-                    key={photo.id}
-                    className="flex flex-col gap-2 rounded-2xl bg-slate-900/60 p-3 ring-1 ring-white/5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {photo.originalName}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          Uploaded {formatDate(photo.createdAt)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => togglePhoto(photo.id)}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                          isSelected
-                            ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/50"
-                            : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10"
-                        }`}
-                      >
-                        {isSelected ? "Selected" : "Select"}
-                      </button>
-                    </div>
-                    <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
-                      <Image
-                        src={photo.previewUrl || withPreview(photo.cutoutUrl, 900)}
-                        alt={`Cutout for ${photo.originalName}`}
-                        width={1200}
-                        height={800}
-                        unoptimized
-                        loading="lazy"
-                        className="h-48 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
-                      />
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
+          )}
 
-        {/* Step 3: Backgrounds */}
-        {step === "backgrounds" && hasSelections && currentPhoto && (
-          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  Choose backgrounds (Photo {currentBgIndex + 1} of {selectedList.length})
-                </p>
-                <p className="text-xs text-slate-300/80">
-                  Add multiple backgrounds per photo; each slot sends as its own image.
-                </p>
-              </div>
-              <button
-                onClick={advanceBackgroundStep}
-                disabled={
-                  !currentPhoto ||
-                  !photoHasReadySelection(selectionMap, currentPhoto.id)
-                }
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300 disabled:opacity-50"
+          {/* Step 1: Email */}
+          {step === "email" && (
+            <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+              <form
+                onSubmit={handleSearch}
+                className="grid gap-3 md:grid-cols-[2fr,auto] md:items-end"
               >
-                {currentBgIndex === selectedList.length - 1
-                  ? "Finish & send"
-                  : "Next photo"}
-              </button>
-            </div>
-            <article className="mt-4 grid gap-4 md:grid-cols-[1.05fr,1fr] items-start rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-white">
-                    {currentPhoto.originalName}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newId = addSlot(currentPhoto.id);
-                      setCurrentSlotId(newId);
-                    }}
-                    className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 ring-1 ring-white/15 hover:bg-white/15"
-                  >
-                    Add background slot
-                  </button>
+                <label className="text-sm text-slate-200/80">
+                  Guest email
+                  <input
+                    type="email"
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    placeholder="family@example.com"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loadingPhotos}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+                >
+                  {loadingPhotos ? "Loading..." : "Load photos"}
+                </button>
+              </form>
+            </section>
+          )}
+
+          {/* Step 2: Select photos */}
+          {step === "select" && hasPhotos && (
+            <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Select favorites</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {(selectionMap[currentPhoto.id] ?? []).map((slot) => {
-                    const backgroundName = backgrounds.find(
-                      (bg) => bg.id === slot.backgroundId,
-                    )?.name;
-                    const active = slot.id === currentSlotId;
-                    return (
-                      <button
-                        key={slot.id}
-                        onClick={() => setCurrentSlotId(slot.id)}
-                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                          active
-                            ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
-                            : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
-                        }`}
-                      >
-                        {backgroundName || "Slot"} {slot.preview ? "✓" : ""}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                  {(() => {
-                    const slots = selectionMap[currentPhoto.id] ?? [];
-                    const activeSlot =
-                      slots.find((s) => s.id === currentSlotId) || slots[0];
-                    if (!activeSlot) return null;
-                    return (
-                      <>
-                        <button
-                          className="rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(155,92,255,0.35)] text-[var(--color-text)]"
-                          onClick={() => duplicateSlot(currentPhoto.id, activeSlot.id)}
-                        >
-                          Duplicate slot
-                        </button>
-                        {slots.length > 1 && (
-                          <button
-                            className="rounded-full bg-[rgba(249,115,115,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]"
-                            onClick={() => removeSlot(currentPhoto.id, activeSlot.id)}
-                          >
-                            Remove slot
-                          </button>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {backgrounds.map((background) => {
-                    const activeSlot =
-                      selectionMap[currentPhoto.id]?.find((s) => s.id === currentSlotId) ||
-                      selectionMap[currentPhoto.id]?.[0];
-                    const isSelected =
-                      activeSlot?.backgroundId === background.id;
-                    return (
-                      <button
-                        key={background.id}
-                        onClick={() => {
-                          const slotId =
-                            currentSlotId ||
-                            selectionMap[currentPhoto.id]?.[0]?.id ||
-                            createSlotId();
-                          setCurrentSlotId(slotId);
-                          pickBackground(currentPhoto, slotId, background.id);
-                        }}
-                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                          isSelected
-                            ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
-                            : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
-                        }`}
-                      >
-                        {background.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="text-[11px] text-slate-300/80">
-                  Tip: drag sliders to move/scale; add slots to deliver multiple backgrounds for one photo.
-                </div>
+                <button
+                  onClick={() => {
+                    Array.from(selectedPhotos).forEach((id) => ensureSlotForPhoto(id));
+                    setCurrentBgIndex(0);
+                    setStep("backgrounds");
+                  }}
+                  disabled={!hasSelections}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
+                >
+                  Next: choose backgrounds
+                </button>
               </div>
-              {(() => {
-                const slots = selectionMap[currentPhoto.id] ?? [];
-                const activeSlot =
-                  slots.find((s) => s.id === currentSlotId) || slots[0];
-                if (!activeSlot) {
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {photos.map((photo) => {
+                  const isSelected = selectedPhotos.has(photo.id);
                   return (
-                    <div className="rounded-xl border border-dashed border-white/10 bg-black/30 p-4 text-sm text-slate-300">
-                      Add a background slot to start.
-                    </div>
-                  );
-                }
-                const transform =
-                  transforms[activeSlot.id] ||
-                  activeSlot.transform || { scale: 1, offsetX: 0, offsetY: 0 };
-                return (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-wide text-slate-300">
-                        Final preview
-                      </p>
-                      <label className="flex items-center gap-2 text-xs text-slate-200/80">
-                        <input
-                          type="checkbox"
-                          checked={activeSlot.matchBackground ?? false}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setSelectionMap((prev) => {
-                              const updated = (prev[currentPhoto.id] || []).map((slot) =>
-                                slot.id === activeSlot.id
-                                  ? { ...slot, matchBackground: checked }
-                                  : slot,
-                              );
-                              return { ...prev, [currentPhoto.id]: updated };
-                            });
-                            const next: Transform = { ...transform };
-                            if (previewTimers.current[activeSlot.id]) {
-                              clearTimeout(previewTimers.current[activeSlot.id]);
-                            }
-                            previewTimers.current[activeSlot.id] = window.setTimeout(
-                              () => refreshPreview(currentPhoto, activeSlot.id, next),
-                              60,
-                            );
-                          }}
-                        />
-                        Auto-match to background
-                      </label>
-                    </div>
-                    {activeSlot.preview && (
-                      <div className="relative overflow-hidden rounded-xl ring-1 ring-white/5">
-                        <Image
-                          src={activeSlot.preview as string}
-                          alt="Preview with background"
-                          width={1920}
-                          height={1080}
-                          unoptimized
-                          className="w-full rounded-xl"
-                          style={{ aspectRatio: "16/9", objectFit: "cover" }}
-                        />
-                        {previewLoading[activeSlot.id] && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white">
-                            Rendering…
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="grid gap-2 md:grid-cols-3">
-                      <label className="text-xs text-slate-300/80">
-                        Scale
-                        <input
-                          type="range"
-                          min="0.25"
-                          max="2.5"
-                          step="0.01"
-                          value={transform.scale}
-                          onChange={(e) => {
-                            const next: Transform = {
-                              ...transform,
-                              scale: parseFloat(e.target.value),
-                            };
-                            setTransforms((prev) => ({
-                              ...prev,
-                              [activeSlot.id]: next,
-                            }));
-                            if (previewTimers.current[activeSlot.id]) {
-                              clearTimeout(previewTimers.current[activeSlot.id]);
-                            }
-                            previewTimers.current[activeSlot.id] = window.setTimeout(
-                              () => refreshPreview(currentPhoto, activeSlot.id, next),
-                              90,
-                            );
-                          }}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                      <label className="text-xs text-slate-300/80">
-                        Offset X
-                        <input
-                          type="range"
-                          min="-1500"
-                          max="1500"
-                          step="1"
-                          value={transform.offsetX}
-                          onChange={(e) => {
-                            const next: Transform = {
-                              ...transform,
-                              offsetX: parseFloat(e.target.value),
-                            };
-                            setTransforms((prev) => ({
-                              ...prev,
-                              [activeSlot.id]: next,
-                            }));
-                            if (previewTimers.current[activeSlot.id]) {
-                              clearTimeout(previewTimers.current[activeSlot.id]);
-                            }
-                            previewTimers.current[activeSlot.id] = window.setTimeout(
-                              () => refreshPreview(currentPhoto, activeSlot.id, next),
-                              90,
-                            );
-                          }}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                      <label className="text-xs text-slate-300/80">
-                        Offset Y
-                        <input
-                          type="range"
-                          min="-1500"
-                          max="1500"
-                          step="1"
-                          value={transform.offsetY}
-                          onChange={(e) => {
-                            const next: Transform = {
-                              ...transform,
-                              offsetY: parseFloat(e.target.value),
-                            };
-                            setTransforms((prev) => ({
-                              ...prev,
-                              [activeSlot.id]: next,
-                            }));
-                            if (previewTimers.current[activeSlot.id]) {
-                              clearTimeout(previewTimers.current[activeSlot.id]);
-                            }
-                            previewTimers.current[activeSlot.id] = window.setTimeout(
-                              () => refreshPreview(currentPhoto, activeSlot.id, next),
-                              90,
-                            );
-                          }}
-                        className="mt-1 w-full"
-                      />
-                    </label>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
-                      onClick={() => {
-                        const reset: Transform = { scale: 1, offsetX: 0, offsetY: 0 };
-                        setTransforms((prev) => ({ ...prev, [activeSlot.id]: reset }));
-                        refreshPreview(currentPhoto, activeSlot.id, reset);
-                      }}
+                    <article
+                      key={photo.id}
+                      className="flex flex-col gap-2 rounded-2xl bg-slate-900/60 p-3 ring-1 ring-white/5"
                     >
-                      Reset transforms
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-white">
+                            {photo.originalName}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Uploaded {formatDate(photo.createdAt)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => togglePhoto(photo.id)}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                            isSelected
+                              ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/50"
+                              : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10"
+                          }`}
+                        >
+                          {isSelected ? "Selected" : "Select"}
+                        </button>
+                      </div>
+                      <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
+                        <Image
+                          src={photo.previewUrl || withPreview(photo.cutoutUrl, 900)}
+                          alt={`Cutout for ${photo.originalName}`}
+                          width={1200}
+                          height={800}
+                          unoptimized
+                          loading="lazy"
+                          className="h-48 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
+                        />
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Step 3: Backgrounds */}
+          {step === "backgrounds" && hasSelections && currentPhoto && (
+            <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-white">
+                    Choose backgrounds (Photo {currentBgIndex + 1} of {selectedList.length})
+                  </p>
+                  <p className="text-xs text-slate-300/80">
+                    Add multiple backgrounds per photo; each slot sends as its own image.
+                  </p>
+                </div>
+                <button
+                  onClick={advanceBackgroundStep}
+                  disabled={
+                    !currentPhoto ||
+                    !photoHasReadySelection(selectionMap, currentPhoto.id)
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300 disabled:opacity-50"
+                >
+                  {currentBgIndex === selectedList.length - 1
+                    ? "Finish & send"
+                    : "Next photo"}
+                </button>
+              </div>
+              <article className="mt-4 grid gap-4 md:grid-cols-[1.05fr,1fr] items-start rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-white">
+                      {currentPhoto.originalName}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newId = addSlot(currentPhoto.id);
+                        setCurrentSlotId(newId);
+                      }}
+                      className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-100 ring-1 ring-white/15 hover:bg-white/15"
+                    >
+                      Add background slot
                     </button>
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectionMap[currentPhoto.id] ?? []).map((slot) => {
+                      const backgroundName = backgrounds.find(
+                        (bg) => bg.id === slot.backgroundId,
+                      )?.name;
+                      const active = slot.id === currentSlotId;
+                      return (
+                        <button
+                          key={slot.id}
+                          onClick={() => setCurrentSlotId(slot.id)}
+                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            active
+                              ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
+                              : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
+                          }`}
+                        >
+                          {backgroundName || "Slot"} {slot.preview ? "✓" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                    {(() => {
+                      const slots = selectionMap[currentPhoto.id] ?? [];
+                      const activeSlot =
+                        slots.find((s) => s.id === currentSlotId) || slots[0];
+                      if (!activeSlot) return null;
+                      return (
+                        <>
+                          <button
+                            className="rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(155,92,255,0.35)] text-[var(--color-text)]"
+                            onClick={() => duplicateSlot(currentPhoto.id, activeSlot.id)}
+                          >
+                            Duplicate slot
+                          </button>
+                          {slots.length > 1 && (
+                            <button
+                              className="rounded-full bg-[rgba(249,115,115,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]"
+                              onClick={() => removeSlot(currentPhoto.id, activeSlot.id)}
+                            >
+                              Remove slot
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {backgrounds.map((background) => {
+                      const activeSlot =
+                        selectionMap[currentPhoto.id]?.find((s) => s.id === currentSlotId) ||
+                        selectionMap[currentPhoto.id]?.[0];
+                      const isSelected =
+                        activeSlot?.backgroundId === background.id;
+                      return (
+                        <button
+                          key={background.id}
+                          onClick={() => {
+                            const slotId =
+                              currentSlotId ||
+                              selectionMap[currentPhoto.id]?.[0]?.id ||
+                              createSlotId();
+                            setCurrentSlotId(slotId);
+                            pickBackground(currentPhoto, slotId, background.id);
+                          }}
+                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            isSelected
+                              ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
+                              : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
+                          }`}
+                        >
+                          {background.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[11px] text-slate-300/80">
+                    Tip: drag sliders to move/scale; add slots to deliver multiple backgrounds for one photo.
+                  </div>
                 </div>
-              );
-            })()}
-            </article>
-          </section>
-        )}
+                {(() => {
+                  const slots = selectionMap[currentPhoto.id] ?? [];
+                  const activeSlot =
+                    slots.find((s) => s.id === currentSlotId) || slots[0];
+                  if (!activeSlot) {
+                    return (
+                      <div className="rounded-xl border border-dashed border-white/10 bg-black/30 p-4 text-sm text-slate-300">
+                        Add a background slot to start.
+                      </div>
+                    );
+                  }
+                  const transform =
+                    transforms[activeSlot.id] ||
+                    activeSlot.transform || { scale: 1, offsetX: 0, offsetY: 0 };
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs uppercase tracking-wide text-slate-300">
+                          Final preview
+                        </p>
+                        <label className="flex items-center gap-2 text-xs text-slate-200/80">
+                          <input
+                            type="checkbox"
+                            checked={activeSlot.matchBackground ?? false}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSelectionMap((prev) => {
+                                const updated = (prev[currentPhoto.id] || []).map((slot) =>
+                                  slot.id === activeSlot.id
+                                    ? { ...slot, matchBackground: checked }
+                                    : slot,
+                                );
+                                return { ...prev, [currentPhoto.id]: updated };
+                              });
+                              const next: Transform = { ...transform };
+                              if (previewTimers.current[activeSlot.id]) {
+                                clearTimeout(previewTimers.current[activeSlot.id]);
+                              }
+                              previewTimers.current[activeSlot.id] = window.setTimeout(
+                                () => refreshPreview(currentPhoto, activeSlot.id, next),
+                                60,
+                              );
+                            }}
+                          />
+                          Auto-match to background
+                        </label>
+                      </div>
+                      {activeSlot.preview && (
+                        <div className="relative overflow-hidden rounded-xl ring-1 ring-white/5">
+                          <Image
+                            src={activeSlot.preview as string}
+                            alt="Preview with background"
+                            width={1920}
+                            height={1080}
+                            unoptimized
+                            className="w-full rounded-xl"
+                            style={{ aspectRatio: "16/9", objectFit: "cover" }}
+                          />
+                          {previewLoading[activeSlot.id] && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white">
+                              Rendering…
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="grid gap-2 md:grid-cols-3">
+                        <label className="text-xs text-slate-300/80">
+                          Scale
+                          <input
+                            type="range"
+                            min="0.25"
+                            max="2.5"
+                            step="0.01"
+                            value={transform.scale}
+                            onChange={(e) => {
+                              const next: Transform = {
+                                ...transform,
+                                scale: parseFloat(e.target.value),
+                              };
+                              setTransforms((prev) => ({
+                                ...prev,
+                                [activeSlot.id]: next,
+                              }));
+                              if (previewTimers.current[activeSlot.id]) {
+                                clearTimeout(previewTimers.current[activeSlot.id]);
+                              }
+                              previewTimers.current[activeSlot.id] = window.setTimeout(
+                                () => refreshPreview(currentPhoto, activeSlot.id, next),
+                                90,
+                              );
+                            }}
+                            className="mt-1 w-full"
+                          />
+                        </label>
+                        <label className="text-xs text-slate-300/80">
+                          Offset X
+                          <input
+                            type="range"
+                            min="-1500"
+                            max="1500"
+                            step="1"
+                            value={transform.offsetX}
+                            onChange={(e) => {
+                              const next: Transform = {
+                                ...transform,
+                                offsetX: parseFloat(e.target.value),
+                              };
+                              setTransforms((prev) => ({
+                                ...prev,
+                                [activeSlot.id]: next,
+                              }));
+                              if (previewTimers.current[activeSlot.id]) {
+                                clearTimeout(previewTimers.current[activeSlot.id]);
+                              }
+                              previewTimers.current[activeSlot.id] = window.setTimeout(
+                                () => refreshPreview(currentPhoto, activeSlot.id, next),
+                                90,
+                              );
+                            }}
+                            className="mt-1 w-full"
+                          />
+                        </label>
+                        <label className="text-xs text-slate-300/80">
+                          Offset Y
+                          <input
+                            type="range"
+                            min="-1500"
+                            max="1500"
+                            step="1"
+                            value={transform.offsetY}
+                            onChange={(e) => {
+                              const next: Transform = {
+                                ...transform,
+                                offsetY: parseFloat(e.target.value),
+                              };
+                              setTransforms((prev) => ({
+                                ...prev,
+                                [activeSlot.id]: next,
+                              }));
+                              if (previewTimers.current[activeSlot.id]) {
+                                clearTimeout(previewTimers.current[activeSlot.id]);
+                              }
+                              previewTimers.current[activeSlot.id] = window.setTimeout(
+                                () => refreshPreview(currentPhoto, activeSlot.id, next),
+                                90,
+                              );
+                            }}
+                            className="mt-1 w-full"
+                          />
+                        </label>
+                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+                        onClick={() => {
+                          const reset: Transform = { scale: 1, offsetX: 0, offsetY: 0 };
+                          setTransforms((prev) => ({ ...prev, [activeSlot.id]: reset }));
+                          refreshPreview(currentPhoto, activeSlot.id, reset);
+                        }}
+                      >
+                        Reset transforms
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+              </article>
+            </section>
+          )}
 
-        {/* Step 4: Send */}
-        {step === "send" && hasSelections && readyToSend && (
-          <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">Send to guest</p>
+          {/* Step 4: Send */}
+          {step === "send" && hasSelections && readyToSend && (
+            <section className="rounded-3xl bg-white/5 p-5 ring-1 ring-white/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Send to guest</p>
+                </div>
+                <button
+                  onClick={sendEmail}
+                  disabled={sending}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
+                >
+                  {sending ? "Sending..." : "Send now"}
+                </button>
               </div>
-              <button
-                onClick={sendEmail}
-                disabled={sending}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-4 py-2 text-xs font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
-              >
-                {sending ? "Sending..." : "Send now"}
-              </button>
-            </div>
-            <div className="mt-3 grid gap-2 text-xs text-slate-300/80 md:grid-cols-3">
-              <p>Selected: {selectedPhotos.size}</p>
-              <p>
-                Ready previews:{" "}
-                {Object.values(selectionMap).reduce(
-                  (acc, slots) => acc + slots.filter((s) => s.preview).length,
-                  0,
-                )}
-              </p>
-              <p>Delivery email: {latestEmail || "—"}</p>
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+              <div className="mt-3 grid gap-2 text-xs text-slate-300/80 md:grid-cols-3">
+                <p>Selected: {selectedPhotos.size}</p>
+                <p>
+                  Ready previews:{" "}
+                  {Object.values(selectionMap).reduce(
+                    (acc, slots) => acc + slots.filter((s) => s.preview).length,
+                    0,
+                  )}
+                </p>
+                <p>Delivery email: {latestEmail || "—"}</p>
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
+    </EventAccessGate>
   );
 }

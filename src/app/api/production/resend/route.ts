@@ -5,25 +5,26 @@ import {
 } from "@/lib/production";
 import { sendMail } from "@/lib/mailer";
 import { rateLimiter, requestKey } from "@/lib/rate-limit";
+import { getEventContext, isAdminRequest } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TOKEN = "ArcticAuraDesigns";
-
-function authorized(request: NextRequest) {
-  const header = request.headers.get("x-admin-token");
-  const query = request.nextUrl.searchParams.get("token");
-  return header === TOKEN || query === TOKEN;
-}
-
 export async function POST(request: NextRequest) {
-  if (!authorized(request)) {
+  if (!isAdminRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const rate = rateLimiter(`admin-resend-${requestKey(request.headers)}`, 20, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
+  const { context, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  if (!context) {
+    return NextResponse.json(
+      { error: error ?? "Event scope is required." },
+      { status: status ?? 401 },
+    );
   }
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -39,14 +40,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-  const record = await findProductionById(body.id);
-  if (!record) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+    const record = await findProductionById(context.scope, body.id);
+    if (!record) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
     const attachments = [];
     for (const attachment of record.attachments) {
-      const file = await getProductionAttachment(record.id, attachment.filename);
+      const file = await getProductionAttachment(context.scope, record.id, attachment.filename);
       if (!file) continue;
       attachments.push({
         filename: file.filename,
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       (attachment, idx) =>
         `<li><a href="${baseUrl}/api/production/files/${record.id}/${encodeURIComponent(
           attachment.filename,
-        )}?token=${record.downloadToken}" style="color:#67e8f9;text-decoration:none;">Photo ${
+        )}?token=${record.downloadToken}&business=${context.scope.businessSlug}&event=${context.scope.eventSlug}" style="color:#67e8f9;text-decoration:none;">Photo ${
           idx + 1
         }: ${attachment.filename}</a></li>`,
     );

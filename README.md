@@ -1,6 +1,6 @@
 # Photobooth
 
-Front-desk and photographer workflow for capturing shots, removing backgrounds via the bgremover API, previewing curated backgrounds, and emailing the composed images. Canonical documentation and changelog live in `../docs/photobooth`.
+Front-desk and photographer workflow for capturing shots, removing backgrounds via the bgremover API, previewing curated backgrounds, and emailing the composed images. BoothOS now scopes data by business + event with per-event access keys. Canonical documentation and changelog live in `../docs/photobooth`.
 
 ## Quick start
 

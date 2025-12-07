@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { getMediaFile } from "@/lib/storage";
+import { getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,10 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string; variant: string }> },
 ) {
+  const { context: eventContext, error, status } = await getEventContext(request);
+  if (!eventContext) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const { id, variant } = await context.params;
   if (!id || !variant) {
     return NextResponse.json(
@@ -25,7 +30,11 @@ export async function GET(
     );
   }
 
-  const file = await getMediaFile(id, variant as "original" | "cutout" | "preview");
+  const file = await getMediaFile(
+    eventContext.scope,
+    id,
+    variant as "original" | "cutout" | "preview",
+  );
   if (!file) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

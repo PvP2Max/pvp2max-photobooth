@@ -4,17 +4,26 @@ import {
   listBackgrounds,
   removeBackground,
 } from "@/lib/backgrounds";
+import { getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET() {
-  const backgrounds = await listBackgrounds();
+export async function GET(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  const backgrounds = await listBackgrounds(context.scope);
   return NextResponse.json({ backgrounds });
 }
 
 export async function POST(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const formData = await request.formData();
   const name = (formData.get("name") || "").toString().trim();
   const description = (formData.get("description") || "").toString().trim();
@@ -35,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const background = await addBackground({ name, description, file });
+    const background = await addBackground(context.scope, { name, description, file });
     return NextResponse.json({ background });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -47,6 +56,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const body = (await request.json().catch(() => null)) as {
     id?: string;
   } | null;
@@ -59,7 +72,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await removeBackground(id);
+    await removeBackground(context.scope, id);
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

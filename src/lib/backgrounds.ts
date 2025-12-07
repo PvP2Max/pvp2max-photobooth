@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { TenantScope, scopedStorageRoot } from "./tenants";
 
 export type BackgroundOption = {
   id: string;
@@ -22,6 +23,8 @@ type BackgroundRecord = {
   previewFilename?: string;
   previewContentType?: string;
   createdAt: string;
+  businessId?: string;
+  eventId?: string;
 };
 
 type BackgroundIndex = {
@@ -31,10 +34,13 @@ type BackgroundIndex = {
 const BUILT_IN_BACKGROUNDS: BackgroundOption[] = [
 ];
 
-const STORAGE_ROOT = path.join(process.cwd(), "storage");
-const BACKGROUND_DIR = path.join(STORAGE_ROOT, "backgrounds");
-const FILE_DIR = path.join(BACKGROUND_DIR, "files");
-const INDEX_FILE = path.join(BACKGROUND_DIR, "backgrounds.json");
+function backgroundPaths(scope: TenantScope) {
+  const root = scopedStorageRoot(scope);
+  const dir = path.join(root, "backgrounds");
+  const fileDir = path.join(dir, "files");
+  const index = path.join(dir, "backgrounds.json");
+  return { dir, fileDir, index };
+}
 
 function extensionFor(contentType: string, fallback = ".png") {
   if (contentType.includes("svg")) return ".svg";
@@ -45,10 +51,11 @@ function extensionFor(contentType: string, fallback = ".png") {
   return fallback;
 }
 
-async function ensureBackgroundPreview(record: BackgroundRecord) {
+async function ensureBackgroundPreview(scope: TenantScope, record: BackgroundRecord) {
+  const { fileDir, index } = backgroundPaths(scope);
   if (record.previewFilename) {
     try {
-      await stat(path.join(FILE_DIR, record.previewFilename));
+      await stat(path.join(fileDir, record.previewFilename));
       return record;
     } catch {
       // fall through and regenerate
@@ -56,19 +63,19 @@ async function ensureBackgroundPreview(record: BackgroundRecord) {
   }
   try {
     const previewFilename = `preview-${record.id}.webp`;
-    const target = path.join(FILE_DIR, previewFilename);
-    await sharp(path.join(FILE_DIR, record.filename))
+    const target = path.join(fileDir, previewFilename);
+    await sharp(path.join(fileDir, record.filename))
       .resize({ width: 1600, withoutEnlargement: true })
       .webp({ quality: 80 })
       .toFile(target);
     record.previewFilename = previewFilename;
     record.previewContentType = "image/webp";
-    const index = await readIndex();
+    const currentIndex = await readIndex(scope);
     const idx = index.backgrounds.findIndex((bg) => bg.id === record.id);
     if (idx >= 0) {
-      index.backgrounds[idx].previewFilename = previewFilename;
-      index.backgrounds[idx].previewContentType = "image/webp";
-      await writeIndex(index);
+      currentIndex.backgrounds[idx].previewFilename = previewFilename;
+      currentIndex.backgrounds[idx].previewContentType = "image/webp";
+      await writeIndex(currentIndex, scope);
     }
   } catch (error) {
     console.error("Failed to generate background preview", { id: record.id, error });
@@ -76,20 +83,22 @@ async function ensureBackgroundPreview(record: BackgroundRecord) {
   return record;
 }
 
-async function ensureBackgroundStorage() {
-  await mkdir(FILE_DIR, { recursive: true });
+async function ensureBackgroundStorage(scope: TenantScope) {
+  const { fileDir, index } = backgroundPaths(scope);
+  await mkdir(fileDir, { recursive: true });
   try {
-    await readFile(INDEX_FILE, "utf8");
+    await readFile(index, "utf8");
   } catch {
     const seed: BackgroundIndex = { backgrounds: [] };
-    await writeFile(INDEX_FILE, JSON.stringify(seed, null, 2), "utf8");
+    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
   }
 }
 
-async function readIndex(): Promise<BackgroundIndex> {
-  await ensureBackgroundStorage();
+async function readIndex(scope: TenantScope): Promise<BackgroundIndex> {
+  await ensureBackgroundStorage(scope);
+  const { index } = backgroundPaths(scope);
   try {
-    const raw = await readFile(INDEX_FILE, "utf8");
+    const raw = await readFile(index, "utf8");
     return JSON.parse(raw) as BackgroundIndex;
   } catch (error) {
     console.error("Failed to read background index", error);
@@ -97,15 +106,16 @@ async function readIndex(): Promise<BackgroundIndex> {
   }
 }
 
-async function writeIndex(index: BackgroundIndex) {
-  await writeFile(INDEX_FILE, JSON.stringify(index, null, 2), "utf8");
+async function writeIndex(index: BackgroundIndex, scope: TenantScope) {
+  const { index: indexFile } = backgroundPaths(scope);
+  await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
 }
 
-export async function listBackgrounds(): Promise<BackgroundOption[]> {
-  const index = await readIndex();
+export async function listBackgrounds(scope: TenantScope): Promise<BackgroundOption[]> {
+  const index = await readIndex(scope);
   const custom: BackgroundOption[] = await Promise.all(
     index.backgrounds.map(async (bg) => {
-      const ensured = await ensureBackgroundPreview(bg);
+      const ensured = await ensureBackgroundPreview(scope, bg);
       return {
         id: ensured.id,
         name: ensured.name,
@@ -121,21 +131,25 @@ export async function listBackgrounds(): Promise<BackgroundOption[]> {
   return [...BUILT_IN_BACKGROUNDS, ...custom];
 }
 
-export async function addBackground({
-  name,
-  description,
-  file,
-}: {
-  name: string;
-  description: string;
-  file: File;
-}): Promise<BackgroundOption> {
-  const index = await readIndex();
+export async function addBackground(
+  scope: TenantScope,
+  {
+    name,
+    description,
+    file,
+  }: {
+    name: string;
+    description: string;
+    file: File;
+  },
+): Promise<BackgroundOption> {
+  const index = await readIndex(scope);
+  const { fileDir } = backgroundPaths(scope);
   const id = randomUUID();
   const contentType = (file as Blob).type || "application/octet-stream";
   const ext = extensionFor(contentType);
   const filename = `${id}${ext}`;
-  const target = path.join(FILE_DIR, filename);
+  const target = path.join(fileDir, filename);
 
   const arrayBuffer = await file.arrayBuffer();
   await writeFile(target, Buffer.from(arrayBuffer));
@@ -143,7 +157,7 @@ export async function addBackground({
   let previewContentType: string | undefined;
   try {
     previewFilename = `preview-${id}.webp`;
-    const previewTarget = path.join(FILE_DIR, previewFilename);
+    const previewTarget = path.join(fileDir, previewFilename);
     await sharp(target)
       .resize({ width: 1600, withoutEnlargement: true })
       .webp({ quality: 80 })
@@ -162,10 +176,12 @@ export async function addBackground({
     previewFilename,
     previewContentType,
     createdAt: new Date().toISOString(),
+    businessId: scope.businessId,
+    eventId: scope.eventId,
   };
 
   index.backgrounds.push(record);
-  await writeIndex(index);
+  await writeIndex(index, scope);
 
   return {
     id,
@@ -178,28 +194,30 @@ export async function addBackground({
   };
 }
 
-export async function removeBackground(id: string) {
-  const index = await readIndex();
+export async function removeBackground(scope: TenantScope, id: string) {
+  const index = await readIndex(scope);
+  const { fileDir } = backgroundPaths(scope);
   const record = index.backgrounds.find((bg) => bg.id === id);
   if (!record) {
     throw new Error("Background not found or not removable");
   }
 
-  const filePath = path.join(FILE_DIR, record.filename);
+  const filePath = path.join(fileDir, record.filename);
   await rm(filePath, { force: true });
   const remaining = index.backgrounds.filter((bg) => bg.id !== id);
-  await writeIndex({ backgrounds: remaining });
+  await writeIndex({ backgrounds: remaining }, scope);
 }
 
-export async function findBackgroundAsset(id: string) {
-  const index = await readIndex();
+export async function findBackgroundAsset(scope: TenantScope, id: string) {
+  const index = await readIndex(scope);
+  const { fileDir } = backgroundPaths(scope);
   const record = index.backgrounds.find((bg) => bg.id === id);
   if (!record) return null;
   return {
-    path: path.join(FILE_DIR, record.filename),
+    path: path.join(fileDir, record.filename),
     contentType: record.contentType,
     previewPath: record.previewFilename
-      ? path.join(FILE_DIR, record.previewFilename)
+      ? path.join(fileDir, record.previewFilename)
       : undefined,
     previewContentType: record.previewContentType,
   };
@@ -209,7 +227,7 @@ export function builtInBackgrounds() {
   return BUILT_IN_BACKGROUNDS;
 }
 
-export async function getBackgroundName(id: string) {
-  const all = await listBackgrounds();
+export async function getBackgroundName(scope: TenantScope, id: string) {
+  const all = await listBackgrounds(scope);
   return all.find((bg) => bg.id === id)?.name ?? id;
 }

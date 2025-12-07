@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { findBackgroundAsset } from "@/lib/backgrounds";
+import { getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,6 +11,10 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  const { context: eventContext, error, status } = await getEventContext(request);
+  if (!eventContext) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const { id } = await context.params;
   if (!id) {
     return NextResponse.json(
@@ -18,7 +23,7 @@ export async function GET(
     );
   }
 
-  const asset = await findBackgroundAsset(id);
+  const asset = await findBackgroundAsset(eventContext.scope, id);
   if (!asset) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addCheckin, listCheckins } from "@/lib/checkins";
+import { getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const checkins = await listCheckins();
+export async function GET(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  const checkins = await listCheckins(context.scope);
   return NextResponse.json({ checkins });
 }
 
 export async function POST(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const body = (await request.json().catch(() => null)) as
     | { name?: string; email?: string }
     | null;
@@ -31,7 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const checkin = await addCheckin({ name, email });
+    const checkin = await addCheckin(context.scope, { name, email });
     return NextResponse.json({ checkin });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

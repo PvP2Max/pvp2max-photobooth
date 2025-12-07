@@ -9,6 +9,7 @@ import {
   removePhotos,
 } from "@/lib/storage";
 import { saveProduction } from "@/lib/production";
+import { getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,6 +31,10 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export async function POST(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   try {
     const body = (await request.json()) as {
       clientEmail?: string;
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     for (const selection of body.selections) {
       try {
-        const record = await findPhotoById(selection.photoId);
+        const record = await findPhotoById(context.scope, selection.photoId);
         if (!record) {
           return NextResponse.json(
             { error: `Photo ${selection.photoId} was not found.` },
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const cutoutFile = await getMediaFile(selection.photoId, "cutout");
+        const cutoutFile = await getMediaFile(context.scope, selection.photoId, "cutout");
         if (!cutoutFile) {
           return NextResponse.json(
             { error: `Cutout for photo ${selection.photoId} not found.` },
@@ -71,7 +76,10 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const backgroundAsset = await findBackgroundAsset(selection.backgroundId);
+        const backgroundAsset = await findBackgroundAsset(
+          context.scope,
+          selection.backgroundId,
+        );
         if (!backgroundAsset) {
           return NextResponse.json(
             { error: `Background ${selection.backgroundId} not found.` },
@@ -182,7 +190,7 @@ export async function POST(request: NextRequest) {
           .png()
           .toBuffer();
 
-        const backgroundName = await getBackgroundName(selection.backgroundId);
+        const backgroundName = await getBackgroundName(context.scope, selection.backgroundId);
 
         attachments.push({
           filename: `${
@@ -213,7 +221,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save production copies for potential resend and downloads
-    const production = await saveProduction(body.clientEmail, attachments);
+    const production = await saveProduction(context.scope, body.clientEmail, attachments);
     productionId = production.id;
 
     const origin =
@@ -223,7 +231,7 @@ export async function POST(request: NextRequest) {
       (attachment, idx) =>
         `<li><a href="${baseUrl}/api/production/files/${productionId}/${encodeURIComponent(
           attachment.filename,
-        )}?token=${production.downloadToken}" style="color:#67e8f9;text-decoration:none;">Photo ${
+        )}?token=${production.downloadToken}&business=${context.scope.businessSlug}&event=${context.scope.eventSlug}" style="color:#67e8f9;text-decoration:none;">Photo ${
           idx + 1
         }: ${attachment.filename}</a></li>`,
     );
@@ -274,8 +282,8 @@ export async function POST(request: NextRequest) {
       });
 
       // Clean up all stored photo artifacts for this client once email is dispatched.
-      const idsForEmail = await listPhotoIdsByEmail(body.clientEmail);
-      await removePhotos(idsForEmail);
+      const idsForEmail = await listPhotoIdsByEmail(context.scope, body.clientEmail);
+      await removePhotos(context.scope, idsForEmail);
 
       return NextResponse.json({ status: "ok", delivery: result });
     } catch (error) {

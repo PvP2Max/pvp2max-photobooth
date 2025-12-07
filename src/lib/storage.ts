@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { TenantScope, scopedStorageRoot } from "./tenants";
 
 export type PhotoRecord = {
   id: string;
@@ -14,6 +15,8 @@ export type PhotoRecord = {
   previewPath?: string;
   previewContentType?: string;
   createdAt: string;
+  businessId?: string;
+  eventId?: string;
 };
 
 export type PublicPhoto = {
@@ -25,10 +28,6 @@ export type PublicPhoto = {
   cutoutUrl: string;
   previewUrl?: string;
 };
-
-const STORAGE_ROOT = path.join(process.cwd(), "storage");
-const PHOTO_DIR = path.join(STORAGE_ROOT, "photos");
-const INDEX_FILE = path.join(STORAGE_ROOT, "photos.json");
 
 type IndexFile = {
   photos: PhotoRecord[];
@@ -45,20 +44,29 @@ export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-async function ensureStorage() {
-  await mkdir(PHOTO_DIR, { recursive: true });
+function photoPaths(scope: TenantScope) {
+  const root = scopedStorageRoot(scope);
+  const photoDir = path.join(root, "photos");
+  const index = path.join(root, "photos.json");
+  return { root, photoDir, index };
+}
+
+async function ensureStorage(scope: TenantScope) {
+  const { photoDir, index } = photoPaths(scope);
+  await mkdir(photoDir, { recursive: true });
   try {
-    await readFile(INDEX_FILE, "utf8");
+    await readFile(index, "utf8");
   } catch {
     const seed: IndexFile = { photos: [] };
-    await writeFile(INDEX_FILE, JSON.stringify(seed, null, 2), "utf8");
+    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
   }
 }
 
-async function readIndex(): Promise<IndexFile> {
-  await ensureStorage();
+async function readIndex(scope: TenantScope): Promise<IndexFile> {
+  await ensureStorage(scope);
+  const { index } = photoPaths(scope);
   try {
-    const raw = await readFile(INDEX_FILE, "utf8");
+    const raw = await readFile(index, "utf8");
     return JSON.parse(raw) as IndexFile;
   } catch (error) {
     console.error("Failed to read storage index", error);
@@ -66,16 +74,18 @@ async function readIndex(): Promise<IndexFile> {
   }
 }
 
-async function writeIndex(index: IndexFile) {
-  await writeFile(INDEX_FILE, JSON.stringify(index, null, 2), "utf8");
+async function writeIndex(index: IndexFile, scope: TenantScope) {
+  const { index: indexFile } = photoPaths(scope);
+  await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
 }
 
 function resolveExtension(contentType: string, fallback = ".png") {
   return EXTENSION_BY_TYPE[contentType] ?? fallback;
 }
 
-function photoDir(id: string) {
-  return path.join(PHOTO_DIR, id);
+function photoDir(scope: TenantScope, id: string) {
+  const { photoDir } = photoPaths(scope);
+  return path.join(photoDir, id);
 }
 
 function toPublicPhoto(record: PhotoRecord): PublicPhoto {
@@ -90,7 +100,7 @@ function toPublicPhoto(record: PhotoRecord): PublicPhoto {
   };
 }
 
-async function ensureCutoutPreview(record: PhotoRecord) {
+async function ensureCutoutPreview(scope: TenantScope, record: PhotoRecord) {
   if (record.previewPath) {
     try {
       await stat(record.previewPath);
@@ -100,19 +110,19 @@ async function ensureCutoutPreview(record: PhotoRecord) {
     }
   }
   try {
-    const previewPath = path.join(photoDir(record.id), "cutout-preview.webp");
+    const previewPath = path.join(photoDir(scope, record.id), "cutout-preview.webp");
     await sharp(record.cutoutPath)
       .resize({ width: 1200, withoutEnlargement: true })
       .webp({ quality: 80 })
       .toFile(previewPath);
     record.previewPath = previewPath;
     record.previewContentType = "image/webp";
-    const index = await readIndex();
+    const index = await readIndex(scope);
     const idx = index.photos.findIndex((p) => p.id === record.id);
     if (idx >= 0) {
       index.photos[idx].previewPath = previewPath;
       index.photos[idx].previewContentType = "image/webp";
-      await writeIndex(index);
+      await writeIndex(index, scope);
     }
   } catch (error) {
     console.error("Failed to generate cutout preview", { id: record.id, error });
@@ -125,17 +135,19 @@ export async function savePhoto({
   file,
   cutout,
   cutoutContentType,
+  scope,
 }: {
   email: string;
   file: File;
   cutout: Buffer;
   cutoutContentType: string;
+  scope: TenantScope;
 }) {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex();
+  const index = await readIndex(scope);
 
   const id = randomUUID();
-  const dir = photoDir(id);
+  const dir = photoDir(scope, id);
   await mkdir(dir, { recursive: true });
 
   const fileArrayBuffer = await file.arrayBuffer();
@@ -171,39 +183,45 @@ export async function savePhoto({
     previewPath: previewContentType ? previewPath : undefined,
     previewContentType,
     createdAt: new Date().toISOString(),
+    businessId: scope.businessId,
+    eventId: scope.eventId,
   };
 
   index.photos.push(record);
-  await writeIndex(index);
+  await writeIndex(index, scope);
 
   return toPublicPhoto(record);
 }
 
-export async function listPhotosByEmail(email: string): Promise<PublicPhoto[]> {
+export async function listPhotosByEmail(
+  scope: TenantScope,
+  email: string,
+): Promise<PublicPhoto[]> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex();
+  const index = await readIndex(scope);
   const filtered = index.photos.filter((photo) => photo.email === normalizedEmail);
   return Promise.all(
-    filtered.map(async (photo) => toPublicPhoto(await ensureCutoutPreview(photo))),
+    filtered.map(async (photo) => toPublicPhoto(await ensureCutoutPreview(scope, photo))),
   );
 }
 
-export async function listPhotoIdsByEmail(email: string): Promise<string[]> {
+export async function listPhotoIdsByEmail(scope: TenantScope, email: string): Promise<string[]> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex();
+  const index = await readIndex(scope);
   return index.photos.filter((p) => p.email === normalizedEmail).map((p) => p.id);
 }
 
-export async function findPhotoById(id: string) {
-  const index = await readIndex();
+export async function findPhotoById(scope: TenantScope, id: string) {
+  const index = await readIndex(scope);
   return index.photos.find((photo) => photo.id === id);
 }
 
 export async function getMediaFile(
+  scope: TenantScope,
   id: string,
   variant: "original" | "cutout" | "preview",
 ) {
-  const record = await findPhotoById(id);
+  const record = await findPhotoById(scope, id);
   if (!record) return null;
 
   if (variant === "original") {
@@ -214,7 +232,7 @@ export async function getMediaFile(
   }
 
   if (variant === "preview") {
-    const ensured = await ensureCutoutPreview(record);
+    const ensured = await ensureCutoutPreview(scope, record);
     if (ensured.previewPath && ensured.previewContentType) {
       return {
         path: ensured.previewPath,
@@ -229,23 +247,23 @@ export async function getMediaFile(
   };
 }
 
-export async function removePhotos(ids: string[]) {
+export async function removePhotos(scope: TenantScope, ids: string[]) {
   if (ids.length === 0) return;
-  const index = await readIndex();
+  const index = await readIndex(scope);
   const remaining = index.photos.filter((photo) => !ids.includes(photo.id));
   const removed = index.photos.filter((photo) => ids.includes(photo.id));
 
   for (const photo of removed) {
-    const dir = photoDir(photo.id);
+    const dir = photoDir(scope, photo.id);
     await rm(dir, { recursive: true, force: true });
   }
 
-  await writeIndex({ photos: remaining });
+  await writeIndex({ photos: remaining }, scope);
 }
 
-export async function resetAllForEmail(email: string) {
+export async function resetAllForEmail(scope: TenantScope, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex();
+  const index = await readIndex(scope);
   const remaining = index.photos.filter(
     (photo) => photo.email !== normalizedEmail,
   );
@@ -254,9 +272,9 @@ export async function resetAllForEmail(email: string) {
   );
 
   for (const photo of removed) {
-    const dir = photoDir(photo.id);
+    const dir = photoDir(scope, photo.id);
     await rm(dir, { recursive: true, force: true });
   }
 
-  await writeIndex({ photos: remaining });
+  await writeIndex({ photos: remaining }, scope);
 }

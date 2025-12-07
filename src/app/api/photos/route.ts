@@ -3,12 +3,17 @@ import { removeBackground } from "@/lib/bgremover";
 import { savePhoto, listPhotosByEmail } from "@/lib/storage";
 import { addNotification } from "@/lib/notifications";
 import { removeCheckinByEmail } from "@/lib/checkins";
+import { getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const email = request.nextUrl.searchParams.get("email");
   if (!email) {
     return NextResponse.json(
@@ -17,11 +22,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const photos = await listPhotosByEmail(email);
+  const photos = await listPhotosByEmail(context.scope, email);
   return NextResponse.json({ photos });
 }
 
 export async function POST(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
   const formData = await request.formData();
   const email = formData.get("email");
   const uploaded = formData.getAll("file");
@@ -56,6 +65,7 @@ export async function POST(request: NextRequest) {
           file,
           cutout: cutout.buffer,
           cutoutContentType: cutout.contentType,
+          scope: context.scope,
         });
         results.push({ photo });
       } catch (error) {
@@ -75,8 +85,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await addNotification(email, photos.length);
-    await removeCheckinByEmail(email);
+    await addNotification(context.scope, email, photos.length);
+    await removeCheckinByEmail(context.scope, email);
 
     return NextResponse.json({ photos, failures });
   } catch (error) {
