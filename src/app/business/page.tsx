@@ -99,7 +99,6 @@ export default function BusinessPage() {
   const [newBusinessName, setNewBusinessName] = useState("");
   const [newBusinessSlug, setNewBusinessSlug] = useState("");
   const [newEventName, setNewEventName] = useState("");
-  const [newEventSlug, setNewEventSlug] = useState("");
   const [newEventKey, setNewEventKey] = useState("");
   const [newPlan, setNewPlan] = useState("event-basic");
   const [newMode, setNewMode] = useState<"self-serve" | "photographer">("self-serve");
@@ -252,7 +251,6 @@ export default function BusinessPage() {
         credentials: "include",
         body: JSON.stringify({
           name: newEventName,
-          slug: newEventSlug || undefined,
           accessCode: newEventKey || undefined,
           plan: newPlan,
           mode: newMode,
@@ -283,7 +281,6 @@ export default function BusinessPage() {
       });
       setMessage(`Created event "${data.event.name}". Save this key: ${data.accessCode}`);
       setNewEventName("");
-      setNewEventSlug("");
       setNewEventKey("");
       setNewPlan("event-basic");
       setNewMode("self-serve");
@@ -904,12 +901,6 @@ export default function BusinessPage() {
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
           />
           <input
-            value={newEventSlug}
-            onChange={(e) => setNewEventSlug(e.target.value)}
-            placeholder="Slug (optional)"
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          />
-          <input
             value={newEventKey}
             onChange={(e) => setNewEventKey(e.target.value)}
             placeholder="Event access key (optional)"
@@ -1029,6 +1020,16 @@ export default function BusinessPage() {
             >
               Create event
             </button>
+          </div>
+          <div className="md:col-span-3 rounded-xl bg-[var(--color-surface-elevated)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)]">
+            Want a custom frame or background? Contact Arctic Aura Designs and mention you came from BoothOS for a discounted design:
+            {" "}
+            <a
+              className="text-[var(--color-primary)] underline"
+              href="mailto:info@arcticauradesigns.com?subject=%5BInquiry%5D%20Custom%20Background/Frame%20for%20BoothOS"
+            >
+              info@arcticauradesigns.com
+            </a>
           </div>
         </form>
       </section>
