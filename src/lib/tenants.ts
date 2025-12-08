@@ -58,6 +58,9 @@ export type BoothBusiness = {
   apiKeyHint: string;
   createdAt: string;
   events: BoothEvent[];
+  subscriptionId?: string;
+  subscriptionStatus?: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
+  subscriptionPlan?: BoothEventPlan;
 };
 
 export type TenantScope = {
@@ -163,6 +166,26 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         allowAiBackgrounds: false,
       };
   }
+}
+
+export function applyPlanDefaults(plan: BoothEventPlan) {
+  const defaults = planDefaults(plan);
+  return {
+    plan,
+    photoCap: defaults.photoCap ?? null,
+    photoUsed: 0,
+    aiCredits: defaults.aiCredits ?? 0,
+    aiUsed: 0,
+    overlaysAll: defaults.overlaysAll ?? false,
+    premiumFilters: defaults.premiumFilters ?? false,
+    watermarkEnabled: defaults.watermarkEnabled ?? true,
+    brandingRemoval: defaults.watermarkEnabled === false,
+    smsEnabled: defaults.smsEnabled ?? false,
+    allowBackgroundRemoval: true,
+    allowAiBackgrounds: defaults.allowAiBackgrounds ?? false,
+    allowAiFilters: defaults.allowAiBackgrounds ?? false,
+    galleryZipEnabled: plan !== "free",
+  };
 }
 
 function slugify(input: string, fallback: string) {
@@ -321,6 +344,7 @@ async function readTenantIndex(): Promise<TenantIndex> {
   const parsed = JSON.parse(raw) as TenantIndex;
   parsed.businesses = parsed.businesses.map((business) => ({
     ...business,
+    subscriptionStatus: business.subscriptionStatus ?? "canceled",
     events: business.events.map((event) => withEventDefaults(event)),
   }));
   return parsed;
@@ -348,6 +372,7 @@ async function writeUsers(users: BoothUser[]) {
 async function writeTenantIndex(index: TenantIndex) {
   await writeFile(TENANT_FILE, JSON.stringify(index, null, 2), "utf8");
 }
+export { writeTenantIndex };
 
 export async function listBusinesses(): Promise<BoothBusiness[]> {
   const index = await readTenantIndex();
@@ -598,6 +623,8 @@ export function sanitizeBusiness(business: BoothBusiness) {
     slug: business.slug,
     apiKeyHint: business.apiKeyHint,
     createdAt: business.createdAt,
+    subscriptionStatus: business.subscriptionStatus,
+    subscriptionPlan: business.subscriptionPlan,
   };
 }
 
@@ -662,10 +689,15 @@ export function isPhotographerPlan(plan?: BoothEventPlan) {
   return plan === "photographer-single" || plan === "photographer-monthly";
 }
 
-export function eventRequiresPayment(event: BoothEvent) {
+export function eventRequiresPayment(event: BoothEvent, business?: BoothBusiness) {
   if (event.mode === "photographer") {
-    if (!isPhotographerPlan(event.plan)) return true;
-    return event.paymentStatus !== "paid";
+    if (isPhotographerPlan(event.plan)) {
+      if (event.plan === "photographer-monthly" && business?.subscriptionStatus === "active") {
+        return false;
+      }
+      return event.paymentStatus !== "paid";
+    }
+    return true;
   }
   return false;
 }
@@ -949,6 +981,24 @@ export async function updateEventConfig(
   );
   await writeTenantIndex(index);
   return business.events.find((ev) => ev.id === eventId)!;
+}
+
+export async function updateBusinessSubscription(
+  businessId: string,
+  {
+    subscriptionId,
+    subscriptionStatus,
+    subscriptionPlan,
+  }: { subscriptionId?: string; subscriptionStatus?: BoothBusiness["subscriptionStatus"]; subscriptionPlan?: BoothEventPlan },
+) {
+  const index = await readTenantIndex();
+  const business = index.businesses.find((b) => b.id === businessId);
+  if (!business) throw new Error("Business not found");
+  business.subscriptionId = subscriptionId ?? business.subscriptionId;
+  business.subscriptionStatus = subscriptionStatus ?? business.subscriptionStatus ?? "canceled";
+  business.subscriptionPlan = subscriptionPlan ?? business.subscriptionPlan;
+  await writeTenantIndex(index);
+  return business;
 }
 
 export async function incrementEventUsage(

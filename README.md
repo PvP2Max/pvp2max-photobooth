@@ -6,6 +6,7 @@ Front-desk and photographer workflow for capturing shots, removing backgrounds v
 
 - Copy `.env.example` to `.env` and update SMTP settings if you want live delivery. The provided `BGREMOVER_SERVICE_TOKEN` matches the bgremover project.
 - For Brevo: `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, set `SMTP_USER` to your Brevo login and `SMTP_PASSWORD` to the SMTP key; `EMAIL_FROM` must be a verified sender.
+- Stripe: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and price IDs for event/photographer plans (`STRIPE_PRICE_EVENT_BASIC`, `STRIPE_PRICE_EVENT_UNLIMITED`, `STRIPE_PRICE_EVENT_AI`, `STRIPE_PRICE_PHOTOG_EVENT`, `STRIPE_PRICE_PHOTOG_MONTHLY`, optional `STRIPE_PRICE_AI_TOPUP`). Webhook endpoint: `/api/stripe/webhook`.
 - Install deps with `bun install`.
 - Run quality gate: `bun run lint`.
 - Build for production: `bun run build`.

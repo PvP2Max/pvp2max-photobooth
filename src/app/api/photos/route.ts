@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
   const currentUsage = eventUsage(context.event);
-  if (eventRequiresPayment(context.event)) {
+  if (eventRequiresPayment(context.event, context.business)) {
     return NextResponse.json(
       { error: "Event requires payment before uploads. Complete checkout to continue." },
       { status: 402 },
