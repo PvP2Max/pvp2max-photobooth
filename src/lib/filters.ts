@@ -29,9 +29,9 @@ export async function applyFilterToBuffer(buffer: Buffer, filterId?: string) {
         [0.02, 0.05, 0.93],
       ]).toBuffer();
     case "matte":
-      return image.modulate({ saturation: 0.9, brightness: 0.97, contrast: 0.96 }).toBuffer();
+      return image.modulate({ saturation: 0.9, brightness: 0.97 }).toBuffer();
     case "soft":
-      return image.modulate({ brightness: 1.04, contrast: 0.98, saturation: 1.02 }).toBuffer();
+      return image.modulate({ brightness: 1.04, saturation: 1.02 }).toBuffer();
     case "vintage":
       return image
         .modulate({ saturation: 0.9, brightness: 1.02 })
