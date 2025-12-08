@@ -728,7 +728,7 @@ export default function BusinessPage() {
           <button
             onClick={() => startCheckout("photographer-monthly")}
             disabled={checkoutLoading === "photographer-monthly"}
-            className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-60"
+            className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 font-semibold text-white shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-60"
           >
             {checkoutLoading === "photographer-monthly" ? "Loading..." : "Start $250/mo subscription"}
           </button>
