@@ -68,8 +68,9 @@ export default function SelectionPage() {
   function toggleSelect(photoId: string) {
     setSelection((prev) => {
       if (prev[photoId]) {
-        const { [photoId]: _, ...rest } = prev;
-        return rest;
+        const clone = { ...prev };
+        delete clone[photoId];
+        return clone;
       }
       if (Object.keys(prev).length >= allowed) return prev;
       const firstBg = backgrounds[0]?.id;

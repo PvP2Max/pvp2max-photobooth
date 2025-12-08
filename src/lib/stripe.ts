@@ -5,7 +5,7 @@ export function getStripeClient() {
   if (!key) {
     throw new Error("STRIPE_SECRET_KEY is not set");
   }
-  return new Stripe(key, { apiVersion: "2024-11-20.acacia" as any });
+  return new Stripe(key);
 }
 
 export const stripePrices = {
