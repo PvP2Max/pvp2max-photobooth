@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
+  if (context.event.mode !== "photographer") {
+    return NextResponse.json(
+      { error: "Background uploads are limited to photographer events." },
+      { status: 403 },
+    );
+  }
   const formData = await request.formData();
   const name = (formData.get("name") || "").toString().trim();
   const description = (formData.get("description") || "").toString().trim();

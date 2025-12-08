@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  const body = (await request.json().catch(() => ({}))) as { prompt?: string };
+  const body = (await request.json().catch(() => ({}))) as { prompt?: string; kind?: "background" | "frame" };
   const prompt = body.prompt?.toString().trim();
   if (!prompt) {
     return NextResponse.json({ error: "Prompt is required." }, { status: 400 });
@@ -19,12 +19,13 @@ export async function POST(request: NextRequest) {
   if (!context.event.allowAiBackgrounds) {
     return NextResponse.json({ error: "AI backgrounds not enabled for this event." }, { status: 403 });
   }
+  const kind = body.kind === "frame" ? "frame" : "background";
   const usage = await incrementEventUsage(context.scope, { aiCredits: 1 });
   if (usage.usage.remainingAi < 0) {
     return NextResponse.json({ error: "AI credits exhausted." }, { status: 402 });
   }
   try {
-    const file = await generateAiBackground(context.scope, prompt);
+    const file = await generateAiBackground(context.scope, prompt, kind);
     const fs = await import("node:fs/promises");
     const buffer = await fs.readFile(file.path);
     const background = await addBackground(context.scope, {
