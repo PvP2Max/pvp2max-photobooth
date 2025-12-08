@@ -626,9 +626,6 @@ export default function BusinessPage() {
             <h1 className="text-3xl font-semibold text-[var(--color-text)]">
               {session.business.name}
             </h1>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Slug: {session.business.slug} • Signed in as {session.user?.email ?? "user"}
-            </p>
           </div>
           <div className="flex items-center gap-2 lg:hidden">
             {[
