@@ -316,13 +316,21 @@ export default function BackgroundsPage() {
             {backgrounds.map((bg) => (
               <div
                 key={bg.id}
-                className="flex items-center justify-between rounded-xl bg-[var(--color-surface)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
+                className="flex items-center justify-between gap-3 rounded-xl bg-[var(--color-surface)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-[var(--color-text)]">{bg.name}</p>
                   <p className="text-xs text-[var(--color-text-soft)]">
                     {bg.description || "—"} {bg.isCustom ? "(custom)" : ""} {bg.category === "frame" ? "• Frame" : ""}
                   </p>
+                  <div className="mt-2 h-24 w-full overflow-hidden rounded-lg bg-black/10 ring-1 ring-[var(--color-border-subtle)]">
+                    <img
+                      src={bg.previewAsset ?? bg.asset}
+                      alt={bg.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
