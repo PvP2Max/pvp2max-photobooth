@@ -933,19 +933,6 @@ export default function BusinessPage() {
               </>
             )}
           </select>
-          <div className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text)]">
-            <p className="font-semibold text-[var(--color-text)]">Custom frames/overlays</p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Want a bespoke frame or background? Contact Arctic Aura Designs and mention you came from BoothOS for a discounted design.
-              <br />
-              <a
-                className="text-[var(--color-primary)] underline"
-                href="mailto:info@arcticauradesigns.com?subject=%5BInquiry%5D%20Custom%20Background/Frame%20for%20BoothOS"
-              >
-                info@arcticauradesigns.com
-              </a>
-            </p>
-          </div>
           <input
             value={newEventDate}
             onChange={(e) => setNewEventDate(e.target.value)}
