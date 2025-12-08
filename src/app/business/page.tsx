@@ -1160,36 +1160,16 @@ export default function BusinessPage() {
                             </span>
                           )}
                         </div>
-                        <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
-                          <label className="text-[11px] text-[var(--color-text-muted)]">
-                            Prompt (1:1 photobooth style)
-                            <input
-                              value={aiPrompts[event.id] ?? ""}
-                              onChange={(e) =>
-                                setAiPrompts((prev) => ({ ...prev, [event.id]: e.target.value }))
-                              }
-                              placeholder="snowy mountaintop cabin, golden hour"
-                              className="mt-1 w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                            />
-                          </label>
-                          <p className="text-[10px] text-[var(--color-text-soft)] md:self-end">
-                            AI generation creates backgrounds only. Upload frames separately (AI plan).
-                          </p>
-                          <div className="flex flex-wrap gap-2 md:col-span-2">
-                            <button
-                              onClick={() => generateAiBackgroundForEvent(event)}
-                              disabled={aiLoading[event.id] || eventNeedsPayment(event)}
-                              className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)] disabled:opacity-60"
-                            >
-                              {aiLoading[event.id] ? "Generating..." : "Generate AI asset"}
-                            </button>
-                            <button
-                              onClick={() => openBackgroundManager(event)}
-                              className="rounded-lg bg-[var(--color-surface)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                            >
-                              Manage backgrounds
-                            </button>
-                          </div>
+                        <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
+                          Generate AI backgrounds and upload frames inside the Backgrounds manager. Frames are upload-only on the AI plan.
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => openBackgroundManager(event)}
+                            className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                          >
+                            Open backgrounds manager
+                          </button>
                         </div>
                       </div>
                     )}

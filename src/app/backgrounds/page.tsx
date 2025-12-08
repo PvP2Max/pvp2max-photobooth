@@ -9,11 +9,14 @@ type BackgroundState = BackgroundOption & { isCustom?: boolean };
 export default function BackgroundsPage() {
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [eventPlan, setEventPlan] = useState<string | undefined>(undefined);
+  const [allowAiBackgrounds, setAllowAiBackgrounds] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [savingAllowed, setSavingAllowed] = useState(false);
   const [category, setCategory] = useState<"background" | "frame">("background");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   async function loadBackgrounds() {
     try {
@@ -37,11 +40,43 @@ export default function BackgroundsPage() {
     loadBackgrounds();
     fetch("/api/auth/event", { credentials: "include" })
       .then((res) => res.json())
-      .then((data: { event?: { plan?: string } }) => {
+      .then((data: { event?: { plan?: string; allowAiBackgrounds?: boolean } }) => {
         if (data?.event?.plan) setEventPlan(data.event.plan);
+        if (data?.event?.allowAiBackgrounds) setAllowAiBackgrounds(true);
       })
       .catch(() => {});
   }, []);
+
+  async function generateAiBackground(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    const prompt = aiPrompt.trim();
+    if (!prompt) {
+      setError("Enter a prompt to generate a background.");
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai/background", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, kind: "background" }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error || "Generation failed.");
+      }
+      setMessage("AI background generated and added.");
+      setAiPrompt("");
+      await loadBackgrounds();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Generation failed.";
+      setError(msg);
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   async function uploadBackground(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,6 +203,36 @@ export default function BackgroundsPage() {
               Toggle which backgrounds/frames are available in the booth. AI-generated frames may misplace text—review before enabling.
             </p>
           </div>
+
+          {allowAiBackgrounds && (
+            <form
+              onSubmit={generateAiBackground}
+              className="grid gap-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-[var(--color-text)]">Generate AI background</p>
+                <span className="text-[11px] text-[var(--color-text-soft)]">Backgrounds only; upload frames separately.</span>
+              </div>
+              <label className="text-sm text-[var(--color-text-muted)]">
+                Prompt (1:1 photobooth style)
+                <input
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="e.g., snowy mountain cabin at sunset"
+                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={aiLoading}
+                  className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-50"
+                >
+                  {aiLoading ? "Generating..." : "Generate background"}
+                </button>
+              </div>
+            </form>
+          )}
 
           {(message || error) && (
             <div
