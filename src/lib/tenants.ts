@@ -1,5 +1,5 @@
 import { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
 
@@ -346,10 +346,45 @@ async function ensureUserStorage(defaultBusinessId: string) {
   }
 }
 
+function isExpiredEvent(event: BoothEvent) {
+  if (!event.eventDate) return false;
+  const parsed = new Date(event.eventDate);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const expire = new Date(parsed.getTime());
+  expire.setHours(23, 59, 59, 999);
+  expire.setDate(expire.getDate() + 7);
+  return Date.now() > expire.getTime();
+}
+
+async function removeEventStorage(businessSlug: string, eventSlug: string) {
+  const dir = path.join(STORAGE_ROOT, "tenants", businessSlug, eventSlug);
+  await rm(dir, { recursive: true, force: true });
+}
+
+async function pruneExpiredEvents(index: TenantIndex) {
+  let changed = false;
+  for (const business of index.businesses) {
+    const keep: BoothEvent[] = [];
+    for (const event of business.events) {
+      if (isExpiredEvent(event)) {
+        changed = true;
+        await removeEventStorage(business.slug, event.slug);
+      } else {
+        keep.push(event);
+      }
+    }
+    business.events = keep;
+  }
+  if (changed) {
+    await writeTenantIndex(index);
+  }
+}
+
 async function readTenantIndex(): Promise<TenantIndex> {
   await ensureTenantStorage();
   const raw = await readFile(TENANT_FILE, "utf8");
   const parsed = JSON.parse(raw) as TenantIndex;
+  await pruneExpiredEvents(parsed);
   parsed.businesses = parsed.businesses.map((business) => ({
     ...business,
     subscriptionStatus: business.subscriptionStatus ?? "canceled",
@@ -434,6 +469,19 @@ export async function findBusinessBySlug(slug: string) {
 export async function findBusinessById(id: string) {
   const index = await readTenantIndex();
   return index.businesses.find((b) => b.id === id);
+}
+
+export async function deleteEventById(businessId: string, eventId: string) {
+  const index = await readTenantIndex();
+  const biz = index.businesses.find((b) => b.id === businessId);
+  if (!biz) return false;
+  const target = biz.events.find((e) => e.id === eventId);
+  biz.events = biz.events.filter((e) => e.id !== eventId);
+  if (target) {
+    await removeEventStorage(biz.slug, target.slug);
+  }
+  await writeTenantIndex(index);
+  return Boolean(target);
 }
 
 export async function createBusiness({

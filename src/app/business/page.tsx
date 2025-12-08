@@ -356,6 +356,38 @@ export default function BusinessPage() {
     }
   }
 
+  async function deleteEvent(event: EventItem) {
+    if (!session) return;
+    const confirmDelete = window.confirm(
+      `Delete event "${event.name}"? All photos, backgrounds, and data for this event will be removed.`,
+    );
+    if (!confirmDelete) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/business/events/${event.id}/delete`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; status?: string };
+      if (!res.ok) {
+        setError(data.error || "Failed to delete event.");
+        return;
+      }
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              events: prev.events.filter((ev) => ev.id !== event.id),
+            }
+          : prev,
+      );
+      setMessage(`Deleted event "${event.name}".`);
+    } catch {
+      setError("Failed to delete event.");
+    }
+  }
+
   async function loadProductions(eventSlug: string) {
     if (!session) return;
     setLoadingProductions(true);
@@ -1259,6 +1291,12 @@ export default function BusinessPage() {
                         Close event
                       </button>
                     )}
+                    <button
+                      onClick={() => deleteEvent(event)}
+                      className="rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                    >
+                      Delete event
+                    </button>
                     <button
                       onClick={() => loadProductions(event.slug)}
                       className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
