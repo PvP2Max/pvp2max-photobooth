@@ -1260,7 +1260,7 @@ export default function BusinessPage() {
       </section>
       )}
 
-      {view === "staff" && qrData && qrLink && (
+      {qrData && qrLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4">
           <div className="w-full max-w-sm rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
             <div className="flex items-start justify-between gap-3">
