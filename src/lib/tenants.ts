@@ -48,6 +48,8 @@ export type BoothEvent = {
   eventTime?: string;
   allowedSelections?: number;
   paymentStatus?: "unpaid" | "pending" | "paid";
+  allowedBackgroundIds?: string[];
+  allowedFrameIds?: string[];
 };
 
 export type BoothBusiness = {
@@ -666,6 +668,8 @@ export function sanitizeEvent(event: BoothEvent) {
     eventTime: event.eventTime,
     allowedSelections: event.allowedSelections,
     paymentStatus: event.paymentStatus,
+    allowedBackgroundIds: event.allowedBackgroundIds,
+    allowedFrameIds: event.allowedFrameIds,
   };
 }
 

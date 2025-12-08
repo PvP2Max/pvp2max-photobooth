@@ -12,6 +12,8 @@ export type BackgroundOption = {
   previewAsset?: string;
   isCustom?: boolean;
   createdAt?: string;
+  allowed?: boolean;
+  category?: "background" | "frame";
 };
 
 type BackgroundRecord = {
@@ -25,14 +27,42 @@ type BackgroundRecord = {
   createdAt: string;
   businessId?: string;
   eventId?: string;
+  category?: "background" | "frame";
 };
 
 type BackgroundIndex = {
   backgrounds: BackgroundRecord[];
 };
 
-const BUILT_IN_BACKGROUNDS: BackgroundOption[] = [
-];
+async function loadBuiltInAssets(): Promise<BackgroundOption[]> {
+  const assetsRoot = path.join(process.cwd(), "public", "assets");
+  const groups: { dir: string; category: "background" | "frame" }[] = [
+    { dir: path.join(assetsRoot, "default-backgrounds"), category: "background" },
+    { dir: path.join(assetsRoot, "default-frames"), category: "frame" },
+  ];
+  const options: BackgroundOption[] = [];
+  for (const group of groups) {
+    try {
+      const files = await (await import("node:fs/promises")).readdir(group.dir);
+      for (const file of files) {
+        if (!/\.(png|jpg|jpeg|webp|svg)$/i.test(file)) continue;
+        const id = `${group.category}-${file}`;
+        options.push({
+          id,
+          name: file.replace(/\.[^.]+$/, ""),
+          description: `Default ${group.category}`,
+          asset: `/assets/${path.basename(group.dir)}/${file}`,
+          previewAsset: `/assets/${path.basename(group.dir)}/${file}`,
+          isCustom: false,
+          category: group.category,
+        });
+      }
+    } catch {
+      // directory may not exist; ignore
+    }
+  }
+  return options;
+}
 
 function backgroundPaths(scope: TenantScope) {
   const root = scopedStorageRoot(scope);
@@ -111,8 +141,12 @@ async function writeIndex(index: BackgroundIndex, scope: TenantScope) {
   await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
 }
 
-export async function listBackgrounds(scope: TenantScope): Promise<BackgroundOption[]> {
+export async function listBackgrounds(
+  scope: TenantScope,
+  allowedIds?: string[] | null,
+): Promise<BackgroundOption[]> {
   const index = await readIndex(scope);
+  const builtIns = await loadBuiltInAssets();
   const custom: BackgroundOption[] = await Promise.all(
     index.backgrounds.map(async (bg) => {
       const ensured = await ensureBackgroundPreview(scope, bg);
@@ -124,11 +158,19 @@ export async function listBackgrounds(scope: TenantScope): Promise<BackgroundOpt
         previewAsset: `/api/backgrounds/files/${ensured.id}?preview=1`,
         isCustom: true,
         createdAt: ensured.createdAt,
+        category: ensured.category ?? "background",
       };
     }),
   );
 
-  return [...BUILT_IN_BACKGROUNDS, ...custom];
+  const combined = [...builtIns, ...custom];
+  if (Array.isArray(allowedIds)) {
+    const allowedSet = new Set(allowedIds);
+    return combined
+      .filter((bg) => allowedSet.has(bg.id))
+      .map((bg) => ({ ...bg, allowed: true }));
+  }
+  return combined.map((bg) => ({ ...bg, allowed: true }));
 }
 
 export async function addBackground(
@@ -137,10 +179,12 @@ export async function addBackground(
     name,
     description,
     file,
+    category = "background",
   }: {
     name: string;
     description: string;
     file: File;
+    category?: "background" | "frame";
   },
 ): Promise<BackgroundOption> {
   const index = await readIndex(scope);
@@ -178,6 +222,7 @@ export async function addBackground(
     createdAt: new Date().toISOString(),
     businessId: scope.businessId,
     eventId: scope.eventId,
+    category,
   };
 
   index.backgrounds.push(record);
@@ -191,6 +236,7 @@ export async function addBackground(
     previewAsset: `/api/backgrounds/files/${id}?preview=1`,
     isCustom: true,
     createdAt: record.createdAt,
+    category,
   };
 }
 

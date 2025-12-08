@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  const backgrounds = await listBackgrounds(context.scope);
+  const allowedIds = context.event.allowedBackgroundIds ?? null;
+  const backgrounds = await listBackgrounds(context.scope, allowedIds);
   return NextResponse.json({ backgrounds });
 }
 
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
   const name = (formData.get("name") || "").toString().trim();
   const description = (formData.get("description") || "").toString().trim();
   const file = formData.get("file");
+  const categoryRaw = formData.get("category");
+  const category = categoryRaw === "frame" ? "frame" : "background";
 
   if (!name) {
     return NextResponse.json(
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const background = await addBackground(context.scope, { name, description, file });
+    const background = await addBackground(context.scope, { name, description, file, category });
     return NextResponse.json({ background });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -59,6 +62,25 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+export async function PUT(request: NextRequest) {
+  const { context, error, status } = await getEventContext(request);
+  if (!context) {
+    return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  const body = (await request.json().catch(() => null)) as { allowedIds?: string[] } | null;
+  if (!body?.allowedIds || !Array.isArray(body.allowedIds)) {
+    return NextResponse.json({ error: "allowedIds array is required." }, { status: 400 });
+  }
+  await (await import("@/lib/tenants")).updateEventConfig(
+    context.scope.businessId,
+    context.scope.eventId,
+    {
+      allowedBackgroundIds: body.allowedIds,
+    },
+  );
+  return NextResponse.json({ status: "ok" });
 }
 
 export async function DELETE(request: NextRequest) {

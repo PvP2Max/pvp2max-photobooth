@@ -11,6 +11,7 @@ export default function BackgroundsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backgroundUploading, setBackgroundUploading] = useState(false);
+  const [savingAllowed, setSavingAllowed] = useState(false);
 
   async function loadBackgrounds() {
     try {
@@ -109,6 +110,30 @@ export default function BackgroundsPage() {
     }
   }
 
+  async function saveAllowed() {
+    setSavingAllowed(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const allowedIds = backgrounds.filter((b) => b.allowed !== false).map((b) => b.id);
+      const res = await fetch("/api/backgrounds", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allowedIds }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to save selection.");
+      }
+      setMessage("Background/frame availability saved.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not save selection.";
+      setError(msg);
+    } finally {
+      setSavingAllowed(false);
+    }
+  }
+
   return (
     <EventAccessGate>
       <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
@@ -124,6 +149,9 @@ export default function BackgroundsPage() {
             <p className="text-sm text-[var(--color-text-muted)]">
               Manage built-ins and your own uploads. Custom backgrounds can be removed;
               built-ins stay fixed.
+            </p>
+            <p className="text-xs text-[var(--color-text-soft)]">
+              Toggle which backgrounds/frames are available in the booth. AI-generated frames may misplace text—review before enabling.
             </p>
           </div>
 
@@ -181,26 +209,50 @@ export default function BackgroundsPage() {
             </button>
           </form>
 
+          <div className="flex justify-end">
+            <button
+              onClick={saveAllowed}
+              disabled={savingAllowed}
+              className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] disabled:opacity-60"
+            >
+              {savingAllowed ? "Saving..." : "Save availability"}
+            </button>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             {backgrounds.map((bg) => (
               <div
                 key={bg.id}
                 className="flex items-center justify-between rounded-xl bg-[var(--color-surface)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="font-semibold text-[var(--color-text)]">{bg.name}</p>
                   <p className="text-xs text-[var(--color-text-soft)]">
-                    {bg.description || "—"} {bg.isCustom ? "(custom)" : ""}
+                    {bg.description || "—"} {bg.isCustom ? "(custom)" : ""} {bg.category === "frame" ? "• Frame" : ""}
                   </p>
                 </div>
-                {bg.isCustom && (
-                  <button
-                    onClick={() => deleteBackground(bg.id)}
-                    className="text-xs font-semibold text-[var(--color-danger)] hover:text-[var(--color-text)]"
-                  >
-                    Delete
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
+                    <input
+                      type="checkbox"
+                      checked={bg.allowed !== false}
+                      onChange={(e) =>
+                        setBackgrounds((prev) =>
+                          prev.map((b) => (b.id === bg.id ? { ...b, allowed: e.target.checked } : b)),
+                        )
+                      }
+                    />
+                    Show
+                  </label>
+                  {bg.isCustom && (
+                    <button
+                      onClick={() => deleteBackground(bg.id)}
+                      className="text-xs font-semibold text-[var(--color-danger)] hover:text-[var(--color-text)]"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {backgrounds.length === 0 && (
