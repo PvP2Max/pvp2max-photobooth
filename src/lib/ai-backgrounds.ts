@@ -9,7 +9,7 @@ type GenerationKind = "background" | "frame";
 function buildPrompt(kind: GenerationKind, userPrompt: string) {
   const base =
     kind === "frame"
-      ? "Design a 1:1 photobooth overlay frame. Keep the center transparent/empty for subjects. Use clean edges, no text, no watermarks. High-resolution PNG/WebP style."
+      ? "Design a 1:1 photobooth overlay frame. Keep the center transparent/empty for subjects. Use clean edges. If text is requested, place it along the top/bottom without covering the center. High-resolution PNG/WebP style."
       : "Design a 1:1 photobooth background. Leave a clear central band for people. No text, no watermarks, high-resolution, photo-friendly lighting.";
   return `${base} Style request: ${userPrompt}`;
 }

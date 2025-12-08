@@ -392,6 +392,9 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                   placeholder="e.g., snowy mountain at night"
                   className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
                 />
+                <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
+                  Tip: Ask for 1:1 photobooth backgrounds. If you request text on frames, AI may mis-spell—review before use.
+                </p>
               </label>
             )}
             <button
