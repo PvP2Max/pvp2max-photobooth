@@ -1240,11 +1240,11 @@ export default function BusinessPage() {
                     ).map((link) => (
                       <div
                         key={link.label}
-                        className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
                       >
                         <div className="min-w-0 sm:max-w-[360px]">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
-                          <p className="break-all font-mono text-[11px] text-[var(--color-text)] sm:truncate">
+                          <p className="break-words font-mono text-[11px] text-[var(--color-text)] sm:truncate">
                             {absoluteLink(link.href)}
                           </p>
                         </div>
