@@ -429,6 +429,11 @@ export async function findBusinessBySlug(slug: string) {
   return index.businesses.find((b) => b.slug === slugify(slug, slug));
 }
 
+export async function findBusinessById(id: string) {
+  const index = await readTenantIndex();
+  return index.businesses.find((b) => b.id === id);
+}
+
 export async function createBusiness({
   name,
   slug,

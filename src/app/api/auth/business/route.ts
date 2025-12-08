@@ -53,23 +53,31 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
     }
+    const businessFromSlug =
+      body.businessSlug && (await findBusinessBySlug(body.businessSlug.toString().trim()));
     const business =
-      (body.businessSlug && (await findBusinessBySlug(body.businessSlug))) || (await getBusinessContext(request))?.business;
+      businessFromSlug ||
+      (await findBusinessById(user.businessId)) ||
+      (await getBusinessContext(request))?.business;
+    if (!business) {
+      return NextResponse.json(
+        { error: "No business found for this user. Provide a businessSlug or create one." },
+        { status: 400 },
+      );
+    }
     const response = NextResponse.json({
-      business: business ? sanitizeBusiness(business) : undefined,
-      events: business ? business.events.map(sanitizeEvent) : [],
+      business: sanitizeBusiness(business),
+      events: business.events.map(sanitizeEvent),
       user: { id: user.id, email: user.email },
     });
     const userSession = createUserSessionToken(user);
     response.cookies.set("boothos_user", userSession.token, cookieOptions(userSession.expiresAt));
-    if (business) {
-      const bizSession = createBusinessSessionToken(business);
-      response.cookies.set(
-        businessSessionCookieName,
-        bizSession.token,
-        cookieOptions(bizSession.expiresAt),
-      );
-    }
+    const bizSession = createBusinessSessionToken(business);
+    response.cookies.set(
+      businessSessionCookieName,
+      bizSession.token,
+      cookieOptions(bizSession.expiresAt),
+    );
     return response;
   }
 
