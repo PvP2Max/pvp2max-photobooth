@@ -5,6 +5,7 @@ import {
   applyPlanDefaults,
   updateEventConfig,
   updateBusinessSubscription,
+  createEvent,
 } from "@/lib/tenants";
 
 export const runtime = "nodejs";
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest) {
         const eventId = session.metadata?.eventId as string | undefined;
         if (plan && businessId && eventId) {
           await markEventPaid(businessId, eventId, plan);
+        } else if (plan && businessId && session.metadata?.eventPayload) {
+          await createPaidEventFromMetadata(businessId, plan, session.metadata.eventPayload);
         }
         if (plan === "photographer-monthly" && businessId) {
           await markSubscription(businessId, session.subscription as string, "active", plan);
@@ -81,6 +84,44 @@ export async function POST(request: NextRequest) {
 async function markEventPaid(businessId: string, eventId: string, plan: BoothEventPlan) {
   const defaults = applyPlanDefaults(plan);
   await updateEventConfig(businessId, eventId, { ...defaults, paymentStatus: "paid" });
+}
+
+async function createPaidEventFromMetadata(businessId: string, plan: BoothEventPlan, payload: string) {
+  try {
+    const parsed = JSON.parse(payload) as {
+      name?: string;
+      status?: string;
+      mode?: "self-serve" | "photographer";
+      allowBackgroundRemoval?: boolean;
+      allowAiBackgrounds?: boolean;
+      allowAiFilters?: boolean;
+      deliveryEmail?: boolean;
+      deliverySms?: boolean;
+      galleryPublic?: boolean;
+      eventDate?: string;
+      eventTime?: string;
+    };
+    if (!parsed?.name) return;
+    const defaults = applyPlanDefaults(plan);
+    const { event } = await createEvent(businessId, {
+      name: parsed.name,
+      status: (parsed.status as any) ?? "live",
+      mode: parsed.mode ?? "self-serve",
+      plan,
+      allowBackgroundRemoval: parsed.allowBackgroundRemoval ?? true,
+      allowAiBackgrounds: parsed.allowAiBackgrounds ?? defaults.allowAiBackgrounds ?? false,
+      allowAiFilters: parsed.allowAiFilters ?? defaults.allowAiBackgrounds ?? false,
+      deliveryEmail: parsed.deliveryEmail ?? true,
+      deliverySms: parsed.deliverySms ?? defaults.smsEnabled ?? false,
+      galleryPublic: parsed.galleryPublic ?? false,
+      eventDate: parsed.eventDate,
+      eventTime: parsed.eventTime,
+      overlayTheme: "none",
+    });
+    await updateEventConfig(businessId, event.id, { ...defaults, paymentStatus: "paid" });
+  } catch {
+    // swallow malformed payloads; we don't fail the webhook
+  }
 }
 
 async function markSubscription(

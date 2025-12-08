@@ -10,6 +10,7 @@ export default function BackgroundsPage() {
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [eventPlan, setEventPlan] = useState<string | undefined>(undefined);
   const [allowAiBackgrounds, setAllowAiBackgrounds] = useState(false);
+  const [eventId, setEventId] = useState<string | undefined>(undefined);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backgroundUploading, setBackgroundUploading] = useState(false);
@@ -40,9 +41,10 @@ export default function BackgroundsPage() {
     loadBackgrounds();
     fetch("/api/auth/event", { credentials: "include" })
       .then((res) => res.json())
-      .then((data: { business?: { slug?: string }; event?: { slug?: string; plan?: string; allowAiBackgrounds?: boolean } }) => {
+      .then((data: { business?: { slug?: string }; event?: { id?: string; slug?: string; plan?: string; allowAiBackgrounds?: boolean } }) => {
         if (data?.event?.plan) setEventPlan(data.event.plan);
         if (data?.event?.allowAiBackgrounds) setAllowAiBackgrounds(true);
+        if (data?.event?.id) setEventId(data.event.id);
       })
       .catch(() => {});
   }, []);
@@ -75,6 +77,31 @@ export default function BackgroundsPage() {
       setError(msg);
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  async function upgradeToAi() {
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan: "event-ai",
+          eventId,
+          successUrl: window.location.origin + "/backgrounds",
+          cancelUrl: window.location.href,
+        }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !payload.url) {
+        throw new Error(payload.error || "Upgrade failed.");
+      }
+      window.location.href = payload.url;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upgrade failed.";
+      setError(msg);
     }
   }
 
@@ -203,6 +230,23 @@ export default function BackgroundsPage() {
               Toggle which backgrounds/frames are available in the booth. AI-generated frames may misplace text—review before enabling.
             </p>
           </div>
+
+          {!allowAiBackgrounds && (
+            <div className="rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+              <p className="text-sm font-semibold text-[var(--color-text)]">Want AI backgrounds?</p>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Upgrade this event to the AI plan to generate backgrounds here. Frames remain upload-only.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={upgradeToAi}
+                  className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
+                >
+                  Upgrade to AI plan
+                </button>
+              </div>
+            </div>
+          )}
 
           {allowAiBackgrounds && (
             <form

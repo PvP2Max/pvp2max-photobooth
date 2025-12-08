@@ -274,9 +274,19 @@ export default function BusinessPage() {
       const data = (await res.json().catch(() => ({}))) as {
         event?: EventItem;
         accessCode?: string;
+        checkoutUrl?: string;
         error?: string;
       };
-      if (!res.ok || !data.event) {
+      if (!res.ok) {
+        setError(data.error || "Could not create event.");
+        return;
+      }
+      if (data.checkoutUrl) {
+        setMessage("Redirecting to checkout to finish creating your event…");
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      if (!data.event) {
         setError(data.error || "Could not create event.");
         return;
       }
