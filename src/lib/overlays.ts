@@ -96,8 +96,9 @@ export async function renderOverlay(width: number, height: number, theme: string
 }
 
 export function allowedOverlayTheme(overlaysAll: boolean, theme?: string) {
-  if (!overlaysAll) {
-    return "default";
-  }
-  return theme && themeColors[theme] ? theme : "default";
+  // Overlays are now a custom-only upsell handled off-platform; skip built-in frames.
+  if (!overlaysAll) return null;
+  if (!theme || theme === "none" || theme === "custom-request") return null;
+  // When a bespoke overlay is provided later, map it here; for now disable built-ins.
+  return null;
 }

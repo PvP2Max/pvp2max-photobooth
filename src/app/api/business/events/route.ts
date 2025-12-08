@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       allowAiFilters: body.allowAiFilters ?? false,
       deliveryEmail: body.deliveryEmail ?? true,
       deliverySms: body.deliverySms ?? false,
-      overlayTheme: body.overlayTheme ?? "default",
+      overlayTheme: body.overlayTheme ?? "none",
       overlayLogo: body.overlayLogo,
       galleryPublic: body.galleryPublic ?? false,
       eventDate: body.eventDate,

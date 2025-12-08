@@ -212,16 +212,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const composedBase = await background
-          .composite([{ input: cutoutComposite, left, top }])
-          .png()
-          .toBuffer();
-
-        // Overlay frame (honors plan limits)
+        const layers: sharp.OverlayOptions[] = [{ input: cutoutComposite, left, top }];
         const overlayTheme = allowedOverlayTheme(usage.overlaysAll === true, context.event.overlayTheme);
-        const overlayFrame = await renderOverlay(bgWidth, bgHeight, overlayTheme);
-        const composed = await sharp(composedBase)
-          .composite([{ input: overlayFrame }])
+        if (overlayTheme) {
+          const overlayFrame = await renderOverlay(bgWidth, bgHeight, overlayTheme);
+          layers.push({ input: overlayFrame });
+        }
+        const composed = await background
+          .composite(layers)
           .png()
           .toBuffer();
 

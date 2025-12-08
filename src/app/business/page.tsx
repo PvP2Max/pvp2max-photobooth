@@ -76,6 +76,18 @@ function usageFor(event: EventItem) {
   };
 }
 
+function overlayLabel(theme?: string) {
+  switch (theme) {
+    case "none":
+    case undefined:
+      return "None";
+    case "custom-request":
+      return "Custom overlay by Arctic Aura Designs";
+    default:
+      return "Custom";
+  }
+}
+
 export default function BusinessPage() {
   const [session, setSession] = useState<BusinessSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,7 +109,7 @@ export default function BusinessPage() {
   const [newAllowAiFilters, setNewAllowAiFilters] = useState(false);
   const [newDeliverySms, setNewDeliverySms] = useState(false);
   const [newGalleryPublic, setNewGalleryPublic] = useState(false);
-  const [newOverlayTheme, setNewOverlayTheme] = useState("default");
+  const [newOverlayTheme, setNewOverlayTheme] = useState("none");
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventTime, setNewEventTime] = useState("");
   const [issuingKey, setIssuingKey] = useState<Record<string, string>>({});
@@ -281,7 +293,7 @@ export default function BusinessPage() {
       setNewAllowAiFilters(false);
       setNewDeliverySms(false);
       setNewGalleryPublic(false);
-      setNewOverlayTheme("default");
+      setNewOverlayTheme("none");
       setNewEventDate("");
       setNewEventTime("");
     } catch {
@@ -905,13 +917,16 @@ export default function BusinessPage() {
             onChange={(e) => setNewOverlayTheme(e.target.value)}
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
           >
-            <option value="default">Overlay: Default</option>
-            <option value="wedding">Overlay: Wedding</option>
-            <option value="birthday">Overlay: Birthday</option>
-            <option value="military">Overlay: Military Ball</option>
-            <option value="christmas">Overlay: Christmas</option>
-            <option value="valentines">Overlay: Valentines</option>
+            <option value="none">No overlay (use backgrounds/frames only)</option>
+            <option value="custom-request">Custom overlay by Arctic Aura Designs (we’ll reach out)</option>
           </select>
+          <p className="text-[11px] text-[var(--color-text-soft)]">
+            Overlays are bespoke graphics. We design and upload them for you—reach out at{" "}
+            <a className="underline" href="mailto:info@arcticauradesigns.com">
+              info@arcticauradesigns.com
+            </a>{" "}
+            to commission an overlay for this event.
+          </p>
           <input
             value={newEventDate}
             onChange={(e) => setNewEventDate(e.target.value)}
@@ -1020,7 +1035,7 @@ export default function BusinessPage() {
                       </p>
                       <p className="text-xs text-[var(--color-text-muted)]">
                         Mode: {event.mode ?? "self-serve"} • Plan: {event.plan ?? "event-basic"} • Overlay:{" "}
-                        {event.overlayTheme ?? "default"}
+                        {overlayLabel(event.overlayTheme)}
                       </p>
                       <p className="text-[11px] text-[var(--color-text-soft)]">
                         Access key hint: {event.accessHint ?? "—"}
