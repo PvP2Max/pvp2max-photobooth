@@ -10,6 +10,7 @@ import {
 } from "@/lib/storage";
 import { saveProduction } from "@/lib/production";
 import { eventUsage, getEventContext } from "@/lib/tenants";
+import { allowedOverlayTheme, loadWatermark, renderOverlay } from "@/lib/overlays";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,16 +33,11 @@ function clamp(value: number, min: number, max: number) {
 
 async function applyWatermark(buffer: Buffer, watermarkEnabled: boolean) {
   if (!watermarkEnabled) return buffer;
-  const svg = `<svg width="1200" height="200" xmlns="http://www.w3.org/2000/svg">
-    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="48" font-family="Arial" fill="rgba(255,255,255,0.75)" stroke="rgba(0,0,0,0.4)" stroke-width="1">
-      Powered by BoothOS
-    </text>
-  </svg>`;
-  const overlay = Buffer.from(svg);
+  const watermark = await loadWatermark();
   const composed = await sharp(buffer)
     .composite([
       {
-        input: overlay,
+        input: watermark,
         gravity: "south",
       },
     ])
@@ -206,8 +202,16 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const composed = await background
+        const composedBase = await background
           .composite([{ input: cutoutComposite, left, top }])
+          .png()
+          .toBuffer();
+
+        // Overlay frame (honors plan limits)
+        const overlayTheme = allowedOverlayTheme(usage.overlaysAll === true, context.event.overlayTheme);
+        const overlayFrame = await renderOverlay(bgWidth, bgHeight, overlayTheme);
+        const composed = await sharp(composedBase)
+          .composite([{ input: overlayFrame }])
           .png()
           .toBuffer();
 

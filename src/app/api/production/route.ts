@@ -35,6 +35,8 @@ export async function GET(request: NextRequest) {
     createdAt: item.createdAt,
     downloadToken: item.downloadToken,
     tokenExpiresAt: item.tokenExpiresAt,
+    downloadCount: item.downloadCount ?? 0,
+    lastDownloadedAt: item.lastDownloadedAt,
     attachments: item.attachments.map((a) => ({
       filename: a.filename,
       contentType: a.contentType,

@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type BusinessSession = {
-  business: { id: string; name: string; slug: string; apiKeyHint?: string };
+  business: {
+    id: string;
+    name: string;
+    slug: string;
+    apiKeyHint?: string;
+    subscriptionStatus?: string;
+    subscriptionPlan?: string;
+  };
   events: EventItem[];
   expiresAt?: string;
   user?: { id: string; email: string };
@@ -42,6 +49,8 @@ type ProductionItem = {
   createdAt: string;
   downloadToken?: string;
   tokenExpiresAt?: string;
+  downloadCount?: number;
+  lastDownloadedAt?: string;
   attachments: { filename: string; contentType: string; size: number }[];
 };
 
@@ -95,6 +104,10 @@ export default function BusinessPage() {
   const [productionEvent, setProductionEvent] = useState<string>("");
   const [productions, setProductions] = useState<Record<string, ProductionItem[]>>({});
   const [loadingProductions, setLoadingProductions] = useState(false);
+  const [selectionEmails, setSelectionEmails] = useState<Record<string, string>>({});
+  const [selectionLinks, setSelectionLinks] = useState<Record<string, string>>({});
+  const [selectionStatus, setSelectionStatus] = useState<Record<string, string>>({});
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -356,6 +369,74 @@ export default function BusinessPage() {
     setMessage("Copied to clipboard.");
   }
 
+  async function startCheckout(plan: string, eventId?: string) {
+    if (!session) return;
+    setError(null);
+    setMessage(null);
+    setCheckoutLoading(plan + (eventId ?? ""));
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          plan,
+          eventId,
+          successUrl: window.location.origin + "/business",
+          cancelUrl: window.location.href,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string; message?: string };
+      if (!res.ok || !data.url) {
+        setError(data.error || data.message || "Unable to start checkout.");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setError("Failed to start checkout.");
+    } finally {
+      setCheckoutLoading(null);
+    }
+  }
+
+  async function sendSelectionLink(event: EventItem) {
+    if (!session) return;
+    const email = selectionEmails[event.id];
+    if (!email) {
+      setError("Enter a guest email first.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    setSelectionStatus((prev) => ({ ...prev, [event.id]: "Sending..." }));
+    try {
+      const res = await fetch(
+        `/api/selections/start?business=${session.business.slug}&event=${event.slug}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, sendEmail: true }),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as { shareUrl?: string; error?: string; emailed?: boolean };
+      if (!res.ok || !data.shareUrl) {
+        setError(data.error || "Failed to create selection link.");
+        setSelectionStatus((prev) => ({ ...prev, [event.id]: "Failed" }));
+        return;
+      }
+      setSelectionLinks((prev) => ({ ...prev, [event.id]: data.shareUrl! }));
+      setSelectionStatus((prev) => ({
+        ...prev,
+        [event.id]: data.emailed === false ? "Link created (not emailed)" : "Link emailed",
+      }));
+      setMessage("Selection link ready.");
+    } catch {
+      setError("Failed to create selection link.");
+      setSelectionStatus((prev) => ({ ...prev, [event.id]: "Failed" }));
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-12 text-[var(--color-text-muted)]">
@@ -489,6 +570,44 @@ export default function BusinessPage() {
           {error || message}
         </div>
       )}
+
+      <section className="mt-6 grid gap-3 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Billing</p>
+            <h2 className="text-xl font-semibold text-[var(--color-text)]">Photographer subscription</h2>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              $250/mo subscription unlocks all photographer events. You can still pay $100 per event if you prefer.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+              Status: {session.business.subscriptionStatus ?? "none"}
+            </span>
+            {session.business.subscriptionPlan && (
+              <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+                Plan: {session.business.subscriptionPlan}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <button
+            onClick={() => startCheckout("photographer-monthly")}
+            disabled={checkoutLoading === "photographer-monthly"}
+            className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-60"
+          >
+            {checkoutLoading === "photographer-monthly" ? "Loading..." : "Start $250/mo subscription"}
+          </button>
+          <button
+            onClick={() => startCheckout("photographer-single")}
+            disabled={checkoutLoading === "photographer-single"}
+            className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] disabled:opacity-60"
+          >
+            {checkoutLoading === "photographer-single" ? "Loading..." : "Pay $100 single event"}
+          </button>
+        </div>
+      </section>
 
       <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -704,6 +823,57 @@ export default function BusinessPage() {
                         AI credits: {usage.aiUsed} / {usage.aiCredits} (remaining {usage.remainingAi})
                       </span>
                     </div>
+                    {event.mode === "photographer" && event.paymentStatus !== "paid" && (
+                      <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                        <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]">
+                          Payment required to unlock photographer mode.
+                        </span>
+                        <button
+                          onClick={() => startCheckout("photographer-single", event.id)}
+                          disabled={checkoutLoading === "photographer-single" + event.id}
+                          className="rounded-full bg-[var(--color-primary)] px-3 py-1 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                        >
+                          {checkoutLoading === "photographer-single" + event.id
+                            ? "Loading..."
+                            : "Pay $100 event"}
+                        </button>
+                        <button
+                          onClick={() => startCheckout("photographer-monthly")}
+                          disabled={checkoutLoading === "photographer-monthly"}
+                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        >
+                          {checkoutLoading === "photographer-monthly" ? "Loading..." : "Start $250/mo"}
+                        </button>
+                      </div>
+                    )}
+                    {event.plan === "free" && (
+                      <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                        <span className="rounded-full bg-[rgba(103,232,249,0.12)] px-3 py-1 ring-1 ring-[rgba(103,232,249,0.35)] text-[var(--color-text)]">
+                          Free tier: watermark + 50 photo cap.
+                        </span>
+                        <button
+                          onClick={() => startCheckout("event-basic", event.id)}
+                          disabled={checkoutLoading === "event-basic" + event.id}
+                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        >
+                          Upgrade to Basic
+                        </button>
+                        <button
+                          onClick={() => startCheckout("event-unlimited", event.id)}
+                          disabled={checkoutLoading === "event-unlimited" + event.id}
+                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        >
+                          Unlimited
+                        </button>
+                        <button
+                          onClick={() => startCheckout("event-ai", event.id)}
+                          disabled={checkoutLoading === "event-ai" + event.id}
+                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        >
+                          AI backgrounds
+                        </button>
+                      </div>
+                    )}
                     {[
                       { label: "Check-in link", href: checkin },
                       { label: "Photographer link", href: photographer },
@@ -751,6 +921,43 @@ export default function BusinessPage() {
                     >
                       View deliveries
                     </button>
+                    {event.mode === "photographer" && (
+                      <div className="w-full rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
+                        <p className="text-[11px] font-semibold text-[var(--color-text)]">
+                          Send selection link
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <input
+                            type="email"
+                            placeholder="guest@example.com"
+                            value={selectionEmails[event.id] ?? ""}
+                            onChange={(e) =>
+                              setSelectionEmails((prev) => ({ ...prev, [event.id]: e.target.value }))
+                            }
+                            className="min-w-[220px] flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)]"
+                          />
+                          <button
+                            onClick={() => sendSelectionLink(event)}
+                            className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                          >
+                            Send link
+                          </button>
+                        </div>
+                        {selectionStatus[event.id] && (
+                          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                            {selectionStatus[event.id]}{" "}
+                            {selectionLinks[event.id] && (
+                              <button
+                                onClick={() => copy(selectionLinks[event.id])}
+                                className="ml-2 text-[11px] font-semibold text-[var(--color-primary)] underline"
+                              >
+                                Copy link
+                              </button>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -765,6 +972,9 @@ export default function BusinessPage() {
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Deliveries</p>
             <h2 className="text-xl font-semibold text-[var(--color-text)]">Resend & manage</h2>
           </div>
+          <p className="text-[11px] text-[var(--color-text-muted)]">
+            Archive downloads are available on paid plans; free tier uses individual links with watermarks.
+          </p>
           <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
             {session.events.map((ev) => (
               <button
@@ -822,7 +1032,11 @@ export default function BusinessPage() {
                 </div>
                 <div className="mt-2 text-[11px] text-[var(--color-text-muted)]">
                   {item.attachments.length} file(s) •{" "}
-                  {item.downloadToken ? "Tokenized download ready" : "No download token"}
+                  {item.downloadToken ? "Tokenized download ready" : "No download token"} • Downloads:{" "}
+                  {item.downloadCount ?? 0}
+                  {item.lastDownloadedAt
+                    ? ` (last ${new Date(item.lastDownloadedAt).toLocaleString()})`
+                    : ""}
                 </div>
               </div>
             ))}

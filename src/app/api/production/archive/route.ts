@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { productionRoot } from "@/lib/production";
-import { getEventContext, isAdminRequest } from "@/lib/tenants";
+import { productionRoot, purgeExpiredProduction } from "@/lib/production";
+import { eventUsage, getEventContext, isAdminRequest } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +19,15 @@ export async function GET(request: NextRequest) {
       { status: status ?? 401 },
     );
   }
+  const usage = eventUsage(context.event);
+  if (!usage.galleryZipEnabled && !isAdminRequest(request)) {
+    return NextResponse.json(
+      { error: "Archive download is only available on paid plans. Upgrade to enable." },
+      { status: 403 },
+    );
+  }
+
+  await purgeExpiredProduction(context.scope);
 
   const id = request.nextUrl.searchParams.get("id");
   const root = productionRoot(context.scope);

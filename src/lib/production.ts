@@ -19,6 +19,9 @@ export type ProductionSet = {
   attachments: ProductionAttachment[];
   businessId?: string;
   eventId?: string;
+  downloadCount?: number;
+  lastDownloadedAt?: string;
+  downloadEvents?: { at: string; ip?: string }[];
 };
 
 type ProductionIndex = {
@@ -97,6 +100,8 @@ export async function saveProduction(
     attachments: savedAttachments,
     businessId: scope.businessId,
     eventId: scope.eventId,
+    downloadCount: 0,
+    downloadEvents: [],
   };
   index.items.unshift(record);
   await writeIndex(index, scope);
@@ -104,6 +109,7 @@ export async function saveProduction(
 }
 
 export async function listProduction(scope: TenantScope): Promise<ProductionSet[]> {
+  await purgeExpiredProduction(scope);
   const index = await readIndex(scope);
   return index.items;
 }
@@ -153,12 +159,51 @@ export async function verifyProductionToken(scope: TenantScope, id: string, toke
   const now = Date.now();
   const expires = new Date(record.tokenExpiresAt).getTime();
   if (token !== record.downloadToken || (expires && expires < now)) {
+    // Clean expired records opportunistically
+    if (expires && expires < now) {
+      await purgeExpiredProduction(scope);
+    }
     return null;
   }
   return record;
 }
 
+export async function recordDownload(scope: TenantScope, id: string, ip?: string) {
+  const index = await readIndex(scope);
+  const record = index.items.find((i) => i.id === id);
+  if (!record) return;
+  const at = new Date().toISOString();
+  record.downloadCount = (record.downloadCount ?? 0) + 1;
+  record.lastDownloadedAt = at;
+  const history = record.downloadEvents ?? [];
+  history.unshift({ at, ip });
+  record.downloadEvents = history.slice(0, 25);
+  await writeIndex(index, scope);
+}
+
 export function productionRoot(scope: TenantScope) {
   const { dir } = productionPaths(scope);
   return dir;
+}
+
+export async function purgeExpiredProduction(scope: TenantScope) {
+  const index = await readIndex(scope);
+  const now = Date.now();
+  const keep: ProductionSet[] = [];
+  const expired: ProductionSet[] = [];
+  for (const item of index.items) {
+    const exp = new Date(item.tokenExpiresAt).getTime();
+    if (exp && exp < now) {
+      expired.push(item);
+    } else {
+      keep.push(item);
+    }
+  }
+  if (expired.length > 0) {
+    const { dir } = productionPaths(scope);
+    for (const item of expired) {
+      await rm(path.join(dir, item.id), { recursive: true, force: true });
+    }
+    await writeIndex({ items: keep }, scope);
+  }
 }

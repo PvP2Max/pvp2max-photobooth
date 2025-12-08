@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProductionAttachment, verifyProductionToken } from "@/lib/production";
+import { getProductionAttachment, recordDownload, verifyProductionToken } from "@/lib/production";
 import { rateLimiter, requestKey } from "@/lib/rate-limit";
 import { getEventContext, isAdminRequest } from "@/lib/tenants";
 
@@ -43,6 +43,7 @@ export async function GET(
   if (!file) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  await recordDownload(event.context.scope, id, request.headers.get("x-forwarded-for") || undefined);
 
   return new NextResponse(file.buffer, {
     headers: {
