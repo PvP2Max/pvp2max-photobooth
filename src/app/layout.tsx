@@ -21,46 +21,12 @@ export default function RootLayout({
         <header className="sticky top-0 z-20 bg-[rgba(5,7,18,0.9)] backdrop-blur border-b border-[color-mix(in_srgb,var(--color-border-subtle)_70%,transparent)]">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
             <Link href="/" className="flex items-center gap-3">
-              <Image
-                src="/assets/horizontal-transparent.png"
-                alt="BoothOS"
-                width={170}
-                height={50}
-                className="h-10 w-auto"
-                priority
-              />
+              <div className="relative h-10 w-10 overflow-hidden rounded-xl ring-1 ring-[var(--color-border-subtle)] bg-[var(--color-surface)]">
+                <Image src="/assets/icon-transparent.png" alt="BoothOS" fill sizes="40px" className="object-contain" priority />
+              </div>
+              <span className="text-lg font-semibold text-[var(--color-text)]">BoothOS</span>
             </Link>
             <nav className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">
-              <Link
-                href="/"
-                className="rounded-full px-3 py-2 hover:bg-[rgba(155,92,255,0.12)] transition text-[var(--color-text)]"
-              >
-                Home
-              </Link>
-              <Link
-                href="/checkin"
-                className="rounded-full px-3 py-2 hover:bg-[rgba(155,92,255,0.12)] transition"
-              >
-                Check-in
-              </Link>
-              <Link
-                href="/photographer"
-                className="rounded-full px-3 py-2 hover:bg-[rgba(155,92,255,0.12)] transition"
-              >
-                Photographer
-              </Link>
-              <Link
-                href="/frontdesk"
-                className="rounded-full px-3 py-2 hover:bg-[rgba(155,92,255,0.12)] transition"
-              >
-                Front Desk
-              </Link>
-              <Link
-                href="/backgrounds"
-                className="rounded-full px-3 py-2 hover:bg-[rgba(155,92,255,0.12)] transition"
-              >
-                Backgrounds
-              </Link>
               <HeaderActions />
             </nav>
           </div>
