@@ -680,6 +680,7 @@ export function eventUsage(event: BoothEvent) {
     overlaysAll: event.overlaysAll ?? defaults.overlaysAll ?? false,
     smsEnabled: event.smsEnabled ?? defaults.smsEnabled ?? false,
     allowAiBackgrounds: event.allowAiBackgrounds ?? defaults.allowAiBackgrounds ?? false,
+    galleryZipEnabled: event.galleryZipEnabled ?? defaults.galleryZipEnabled ?? false,
     mode: event.mode ?? "self-serve",
     paymentStatus: event.paymentStatus ?? (event.mode === "photographer" ? "unpaid" : "paid"),
   };
