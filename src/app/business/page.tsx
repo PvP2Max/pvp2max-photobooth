@@ -1143,7 +1143,7 @@ export default function BusinessPage() {
                       </div>
                     )}
                     {event.allowAiBackgrounds && (
-                      <div className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
+                      <div className="w-full overflow-hidden rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[11px] font-semibold text-[var(--color-text)]">
                             AI backgrounds & frames for this event
@@ -1226,7 +1226,7 @@ export default function BusinessPage() {
                     ).map((link) => (
                       <div
                         key={link.label}
-                        className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
+                        className="flex w-full flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
                       >
                         <div className="min-w-0 w-full sm:max-w-[420px]">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
@@ -1234,7 +1234,7 @@ export default function BusinessPage() {
                             {absoluteLink(link.href)}
                           </p>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1 self-start">
+                        <div className="flex shrink-0 flex-wrap items-center gap-1 self-start">
                           <button
                             onClick={() => copy(link.href, link.label, `${event.id}-${link.label}`)}
                             className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 transition ${
