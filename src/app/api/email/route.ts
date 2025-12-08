@@ -262,47 +262,44 @@ export async function POST(request: NextRequest) {
         }: ${attachment.filename}</a></li>`,
     );
 
+    const watermarkNote = usage.watermark
+      ? `<p style="margin:0 0 10px;color:#cbd5e1;font-size:12px;line-height:1.5;">This event is on the free tier, so a BoothOS watermark is present. Upgrade the event to remove it.</p>`
+      : "";
+
     const html = `
-  <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.25);">
-      <div style="padding:28px 28px 12px;">
-        <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BOSS Holiday Photobooth</p>
-        <h1 style="color:#fff;font-size:26px;margin:0 0 12px;">Your photos are ready!</h1>
-        <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 14px;margin:12px 0;">
-          <p style="margin:0;color:#cbd5e1;font-size:13px;">Thank you for using the Better Opportunities for Single Soldiers Holiday Photobooth! Download your edited shots below.</p>
+      <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#0b1022;">
+        <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.25);">
+          <div style="padding:26px 28px 12px;">
+            <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">${context.business.name}</p>
+            <h1 style="color:#fff;font-size:24px;margin:0 0 10px;">Your photos from ${context.event.name} are ready</h1>
+            <p style="margin:0 0 12px;color:#cbd5e1;font-size:13px;line-height:1.5;">Thanks for visiting our booth. Use the secure links below to view and download your photos.</p>
+          </div>
+          <div style="padding:18px 28px;">
+            <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;">Download your photos:</p>
+            <ul style="margin:0 0 12px 18px;color:#cbd5e1;font-size:13px;line-height:1.6;">
+              ${downloadLinks.join("")}
+            </ul>
+            ${watermarkNote}
+            <p style="margin:10px 0 0;color:#94a3b8;font-size:12px;">Links expire after a few days. If they stop working, reply to this email and we’ll refresh them.</p>
+          </div>
+          <div style="background:#0f172a;padding:0 28px 24px;">
+            <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;text-align:center;">
+              <span style="color:#e2e8f0;font-size:12px;">Want BoothOS at your next event? </span>
+              <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:700;">Contact Arctic Aura Designs.</a>
+            </div>
+          </div>
+          <div style="background:#0b1022;padding:14px 28px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;">
+            <span>© ${new Date().getFullYear()} <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;">Arctic Aura Designs</a></span>
+            <span style="color:#475569;">Powered by BoothOS</span>
+          </div>
         </div>
       </div>
-      <div style="padding:22px 28px;">
-        <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;">
-          If you have any issues opening the files, let us know and we’ll resend them.
-        </p>
-        <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;">
-          Download your photos:
-        </p>
-        <ul style="margin:0 0 12px 18px;color:#cbd5e1;font-size:13px;line-height:1.5;">
-          ${downloadLinks.join("")}
-        </ul>
-        <p style="margin:0;color:#cbd5e1;font-size:12px;">
-          With gratitude,<br/>BOSS Holiday Photobooth team
-        </p>
-      </div>
-      <div style="background:#0f172a;padding:0 28px 24px;">
-        <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;text-align:center;">
-          <span style="color:#e2e8f0;font-size:12px;">Need a photobooth for your next event? </span>
-          <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;font-weight:700;">Contact Arctic Aura Designs to book.</a>
-        </div>
-      </div>
-      <div style="background:#0b1022;padding:14px 28px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;">
-        <span>© ${new Date().getFullYear()} <a href="https://arcticauradesigns.com" style="color:#67e8f9;text-decoration:none;">Arctic Aura Designs</a></span>
-      </div>
-    </div>
-  </div>
-      `;
+    `;
 
     try {
       const result = await sendMail({
         to: body.clientEmail,
-        subject: "Your Photos are Ready! - BOSS Holiday Photobooth",
+        subject: `Your photos from ${context.event.name}`,
         html,
         attachments: [],
       });

@@ -7,6 +7,7 @@ export default function SelectLanding() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [sendEmail, setSendEmail] = useState(true);
   const [loading, setLoading] = useState(false);
 
   async function handleStart(e: React.FormEvent<HTMLFormElement>) {
@@ -23,15 +24,21 @@ export default function SelectLanding() {
       const res = await fetch(`/api/selections/start${window.location.search}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, sendEmail }),
       });
-      const data = (await res.json().catch(() => ({}))) as { token?: string; shareUrl?: string; error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        token?: string;
+        shareUrl?: string;
+        error?: string;
+        emailed?: boolean;
+      };
       if (!res.ok || !data.token) {
         setError(data.error || "Could not start selection.");
         return;
       }
       setLink(data.shareUrl || null);
-      setMessage("Selection link created.");
+      const status = data.emailed === false ? " Link not emailed (check SMTP/outbox)." : "";
+      setMessage(`Selection link created.${status}`);
     } catch {
       setError("Failed to create selection link.");
     } finally {
@@ -67,6 +74,15 @@ export default function SelectLanding() {
               className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
               placeholder="guest@example.com"
             />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+            <input
+              type="checkbox"
+              checked={sendEmail}
+              onChange={(e) => setSendEmail(e.target.checked)}
+              className="h-4 w-4 rounded border-[var(--color-border-subtle)] bg-[var(--color-surface)] text-[var(--color-primary-soft)]"
+            />
+            Email the link to the guest automatically
           </label>
           <button
             type="submit"
