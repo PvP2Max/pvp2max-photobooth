@@ -114,6 +114,7 @@ export default function BusinessPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -569,7 +570,7 @@ export default function BusinessPage() {
 
   return (
     <main className="lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 px-0 py-10 mx-auto max-w-6xl">
-      <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
+      <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col justify-between overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
         <p className="text-sm text-[var(--color-text-muted)]">Slug: {session.business.slug}</p>
         <div className="flex flex-col gap-2 text-xs">
@@ -591,6 +592,31 @@ export default function BusinessPage() {
               {tab.label}
             </button>
           ))}
+        </div>
+        <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-4">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="mt-2 flex w-full items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+          >
+            <span className="truncate">{session.user?.email ?? "Account"}</span>
+            <span>{profileOpen ? "–" : "+"}</span>
+          </button>
+          {profileOpen && (
+            <div className="mt-2 space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+              <p className="text-xs text-[var(--color-text-muted)]">{session.business.name}</p>
+              <button
+                onClick={() => {
+                  fetch("/api/auth/business", { method: "DELETE", credentials: "include" }).catch(() => {});
+                  fetch("/api/auth/event", { method: "DELETE", credentials: "include" }).catch(() => {});
+                  window.location.href = "/";
+                }}
+                className="w-full rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
