@@ -39,15 +39,15 @@ export async function applyFilterToBuffer(buffer: Buffer, filterId?: string) {
         .gamma(1.03)
         .toBuffer();
     case "glam":
-      return image.modulate({ saturation: 1.12, brightness: 1.05, contrast: 1.1 }).toBuffer();
+      return image.modulate({ saturation: 1.12, brightness: 1.05 }).toBuffer();
     case "neon":
-      return image.modulate({ saturation: 1.35, brightness: 1.02, contrast: 1.08 }).toBuffer();
+      return image.modulate({ saturation: 1.35, brightness: 1.02 }).toBuffer();
     case "dramatic":
-      return image.modulate({ saturation: 1.15, contrast: 1.15 }).toBuffer();
+      return image.modulate({ saturation: 1.15 }).toBuffer();
     case "cinematic":
-      return image.modulate({ saturation: 1.1, contrast: 1.12, brightness: 0.98 }).toBuffer();
+      return image.modulate({ saturation: 1.1, brightness: 0.98 }).toBuffer();
     case "noir":
-      return image.grayscale().modulate({ contrast: 1.25, brightness: 0.92 }).toBuffer();
+      return image.grayscale().modulate({ brightness: 0.92 }).toBuffer();
     case "none":
     default:
       return buffer;
