@@ -610,16 +610,28 @@ export default function BusinessPage() {
       </section>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <a href="#create" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+        <a
+          href="#create"
+          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+        >
           Create event
         </a>
-        <a href="#events" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+        <a
+          href="#events"
+          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+        >
           Events
         </a>
-        <a href="#deliveries" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+        <a
+          href="#deliveries"
+          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+        >
           Deliveries
         </a>
-        <a href="#staff" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+        <a
+          href="#staff"
+          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+        >
           Staff links
         </a>
       </div>
