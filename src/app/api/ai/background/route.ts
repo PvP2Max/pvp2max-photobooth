@@ -25,7 +25,13 @@ export async function POST(request: NextRequest) {
       { status: 402 },
     );
   }
-  const kind = body.kind === "frame" ? "frame" : "background";
+  if (body.kind === "frame") {
+    return NextResponse.json(
+      { error: "AI frame generation is disabled. Upload frames manually on AI plan events." },
+      { status: 400 },
+    );
+  }
+  const kind = "background";
   const usage = await incrementEventUsage(context.scope, { aiCredits: 1 });
   if (usage.usage.remainingAi < 0) {
     return NextResponse.json({ error: "AI credits exhausted." }, { status: 402 });

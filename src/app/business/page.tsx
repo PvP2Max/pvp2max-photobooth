@@ -1146,7 +1146,7 @@ export default function BusinessPage() {
                       <div className="w-full overflow-hidden rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[11px] font-semibold text-[var(--color-text)]">
-                            AI backgrounds & frames for this event
+                            AI backgrounds for this event
                           </p>
                           {eventNeedsPayment(event) && (
                             <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
@@ -1166,37 +1166,9 @@ export default function BusinessPage() {
                               className="mt-1 w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
                             />
                           </label>
-                          <div className="flex flex-col gap-2 text-[11px] text-[var(--color-text-muted)]">
-                            <div className="flex items-center gap-2">
-                              <label className="flex items-center gap-1">
-                                <input
-                                  type="radio"
-                                  name={`ai-kind-${event.id}`}
-                                  value="background"
-                                  checked={(aiKinds[event.id] ?? "background") === "background"}
-                                  onChange={() =>
-                                    setAiKinds((prev) => ({ ...prev, [event.id]: "background" }))
-                                  }
-                                />
-                                Background
-                              </label>
-                              <label className="flex items-center gap-1">
-                                <input
-                                  type="radio"
-                                  name={`ai-kind-${event.id}`}
-                                  value="frame"
-                                  checked={(aiKinds[event.id] ?? "background") === "frame"}
-                                  onChange={() =>
-                                    setAiKinds((prev) => ({ ...prev, [event.id]: "frame" }))
-                                  }
-                                />
-                                Frame (transparent center)
-                              </label>
-                            </div>
-                            <p className="text-[10px] text-[var(--color-text-soft)]">
-                              Text on frames may mis-generate. Review assets before enabling.
-                            </p>
-                          </div>
+                          <p className="text-[10px] text-[var(--color-text-soft)] md:self-end">
+                            AI generation creates backgrounds only. Upload frames separately (AI plan).
+                          </p>
                           <div className="flex flex-wrap gap-2 md:col-span-2">
                             <button
                               onClick={() => generateAiBackgroundForEvent(event)}

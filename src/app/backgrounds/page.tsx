@@ -8,6 +8,7 @@ type BackgroundState = BackgroundOption & { isCustom?: boolean };
 
 export default function BackgroundsPage() {
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
+  const [eventPlan, setEventPlan] = useState<string | undefined>(undefined);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backgroundUploading, setBackgroundUploading] = useState(false);
@@ -34,6 +35,12 @@ export default function BackgroundsPage() {
 
   useEffect(() => {
     loadBackgrounds();
+    fetch("/api/auth/event", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data: { event?: { plan?: string } }) => {
+        if (data?.event?.plan) setEventPlan(data.event.plan);
+      })
+      .catch(() => {});
   }, []);
 
   async function uploadBackground(event: React.FormEvent<HTMLFormElement>) {
@@ -51,6 +58,10 @@ export default function BackgroundsPage() {
     }
     if (!nameInput.value.trim()) {
       setError("Give the background a name.");
+      return;
+    }
+    if (category === "frame" && eventPlan !== "event-ai") {
+      setError("Frame uploads require the AI event plan ($30).");
       return;
     }
 
@@ -211,10 +222,10 @@ export default function BackgroundsPage() {
                 className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
               >
                 <option value="background">Background</option>
-                <option value="frame">Frame</option>
+                {eventPlan === "event-ai" && <option value="frame">Frame (AI plan only)</option>}
               </select>
               <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
-                Frames should have transparent centers. AI frames with text may mis-spell; review before enabling.
+                Frames are upload-only and require the AI event plan. Frames should have transparent centers.
               </p>
             </label>
             <button

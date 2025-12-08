@@ -45,6 +45,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (category === "frame" && context.event.plan !== "event-ai") {
+    return NextResponse.json(
+      { error: "Frame uploads require the AI event plan ($30)." },
+      { status: 403 },
+    );
+  }
+
   if (!file || !(file instanceof File)) {
     return NextResponse.json(
       { error: "Background file is required." },
