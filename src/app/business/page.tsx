@@ -876,14 +876,14 @@ export default function BusinessPage() {
               />
               AI backgrounds (uses credits)
             </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={newAllowAiFilters}
-                onChange={(e) => setNewAllowAiFilters(e.target.checked)}
-              />
-              AI filters (future)
-            </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newAllowAiFilters}
+                    onChange={(e) => setNewAllowAiFilters(e.target.checked)}
+                  />
+                  Filters
+                </label>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
