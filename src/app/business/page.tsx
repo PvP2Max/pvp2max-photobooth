@@ -687,7 +687,7 @@ export default function BusinessPage() {
   return (
     <main className="lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 px-0 py-10 mx-auto max-w-6xl">
       <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
+        <p className="mb-2 text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
         <div className="flex flex-col gap-2 text-xs">
           {[
             { id: "overview", label: "Overview" },
