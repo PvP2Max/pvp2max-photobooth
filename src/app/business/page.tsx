@@ -763,28 +763,32 @@ export default function BusinessPage() {
           </div>
         </div>
 
-      <section className="mt-4 grid gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] md:grid-cols-4">
-        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
-          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Events</p>
-          <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.total}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">Total</p>
-        </div>
-        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
-          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Live</p>
-          <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.live}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">Open events</p>
-        </div>
-        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
-          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Photographer</p>
-          <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.photographer}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">Pro-mode events</p>
-        </div>
-        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
-          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Subscription</p>
-          <p className="text-lg font-semibold text-[var(--color-text)] capitalize">{stats.subscription}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">Photographer monthly</p>
-        </div>
-      </section>
+      {view === "overview" && (
+        <>
+          <section className="mt-4 grid gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] md:grid-cols-4">
+            <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+              <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Events</p>
+              <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.total}</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Total</p>
+            </div>
+            <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+              <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Live</p>
+              <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.live}</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Open events</p>
+            </div>
+            <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+              <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Photographer</p>
+              <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.photographer}</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Pro-mode events</p>
+            </div>
+            <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+              <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Subscription</p>
+              <p className="text-lg font-semibold text-[var(--color-text)] capitalize">{stats.subscription}</p>
+              <p className="text-xs text-[var(--color-text-muted)]">Photographer monthly</p>
+            </div>
+          </section>
+        </>
+      )}
 
       {/* mobile tab bar */ }
       <div className="mt-4 flex flex-wrap gap-2 text-xs lg:hidden">
@@ -814,12 +818,13 @@ export default function BusinessPage() {
             error
               ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-[rgba(249,115,115,0.35)]"
               : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
-          }`}
+            }`}
         >
           {error || message}
         </div>
       )}
 
+      {view === "overview" && (
       <section className="mt-6 grid gap-3 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -857,6 +862,7 @@ export default function BusinessPage() {
           </button>
         </div>
       </section>
+      )}
 
       {view === "overview" && (
         <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
