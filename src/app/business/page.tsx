@@ -1218,37 +1218,37 @@ export default function BusinessPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:flex-nowrap">
                     <button
                       onClick={() => rotateKey(event.id)}
-                      className="rounded-full bg-[var(--color-primary)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                      className="whitespace-nowrap rounded-full bg-[var(--color-primary)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
                     >
                       Rotate access key
                     </button>
                     {event.status === "closed" ? (
                       <button
                         onClick={() => updateStatus(event.id, "live")}
-                        className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
                       >
                         Reopen
                       </button>
                     ) : (
                       <button
                         onClick={() => updateStatus(event.id, "closed")}
-                        className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
                       >
                         Close event
                       </button>
                     )}
                     <button
                       onClick={() => deleteEvent(event)}
-                      className="rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                      className="whitespace-nowrap rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
                     >
                       Delete event
                     </button>
                     <button
                       onClick={() => loadProductions(event.slug)}
-                      className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                      className="whitespace-nowrap rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
                     >
                       View deliveries
                     </button>
