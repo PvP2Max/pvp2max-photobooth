@@ -866,13 +866,13 @@ export default function BusinessPage() {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setView("events")}
-              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] hover:opacity-95"
+              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(155,92,255,0.32)] hover:opacity-95"
             >
               Create a new event
             </button>
             <button
               onClick={() => setView("deliveries")}
-              className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] shadow-[0_10px_25px_rgba(0,0,0,0.25)] hover:ring-[var(--color-primary)]"
+              className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-white ring-1 ring-[var(--color-border-strong)] shadow-[0_10px_25px_rgba(0,0,0,0.25)] hover:ring-[var(--color-primary)]"
             >
               View deliveries
             </button>
