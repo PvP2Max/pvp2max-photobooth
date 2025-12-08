@@ -576,32 +576,76 @@ export default function BusinessPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">BoothOS Dashboard</p>
-          <h1 className="text-3xl font-semibold text-[var(--color-text)]">
-            {session.business.name}
-          </h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Slug: {session.business.slug} • Signed in as {session.user?.email ?? "user"}
-          </p>
+    <main className="mx-auto max-w-6xl px-0 py-10 lg:flex lg:max-w-7xl lg:gap-6">
+      <aside className="sticky top-20 hidden w-56 flex-shrink-0 flex-col gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
+        <p className="text-sm text-[var(--color-text-muted)]">Slug: {session.business.slug}</p>
+        <div className="flex flex-col gap-2 text-xs">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "events", label: "Events" },
+            { id: "deliveries", label: "Deliveries" },
+            { id: "staff", label: "Staff links" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setView(tab.id as typeof view)}
+              className={`w-full rounded-xl px-3 py-2 text-left ring-1 ${
+                view === tab.id
+                  ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
+                  : "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadSession}
-            className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-          >
-            Refresh
-          </button>
-          <button
-            onClick={logout}
-            className="rounded-full bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-          >
-            Sign out
-          </button>
+        <button
+          onClick={loadSession}
+          className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+        >
+          Refresh
+        </button>
+        <button
+          onClick={logout}
+          className="rounded-xl bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+        >
+          Sign out
+        </button>
+      </aside>
+
+      <div className="flex-1 px-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">BoothOS Dashboard</p>
+            <h1 className="text-3xl font-semibold text-[var(--color-text)]">
+              {session.business.name}
+            </h1>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Slug: {session.business.slug} • Signed in as {session.user?.email ?? "user"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 lg:hidden">
+            {[
+              { id: "overview", label: "Overview" },
+              { id: "events", label: "Events" },
+              { id: "deliveries", label: "Deliveries" },
+              { id: "staff", label: "Staff" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setView(tab.id as typeof view)}
+                className={`rounded-full px-3 py-2 ring-1 text-xs ${
+                  view === tab.id
+                    ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
+                    : "bg-[var(--color-surface)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
       <section className="mt-4 grid gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] md:grid-cols-4">
         <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
@@ -626,7 +670,8 @@ export default function BusinessPage() {
         </div>
       </section>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+      {/* mobile tab bar */ }
+      <div className="mt-4 flex flex-wrap gap-2 text-xs lg:hidden">
         {[
           { id: "overview", label: "Overview" },
           { id: "events", label: "Events" },
@@ -986,7 +1031,7 @@ export default function BusinessPage() {
                         </button>
                       </div>
                     )}
-                    {(((event.mode ?? "self-serve") === "self-serve")
+          {(((event.mode ?? "self-serve") === "self-serve")
                       ? [{ label: "Booth link", href: booth }]
                       : [
                           { label: "Check-in link", href: checkin },
@@ -1001,7 +1046,9 @@ export default function BusinessPage() {
                       >
                         <div className="min-w-0">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
-                          <p className="truncate font-mono text-[11px] text-[var(--color-text)]">{absoluteLink(link.href)}</p>
+                          <p className="truncate font-mono text-[11px] text-[var(--color-text)] max-w-[240px] sm:max-w-[320px]">
+                            {absoluteLink(link.href)}
+                          </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <button
@@ -1240,6 +1287,7 @@ export default function BusinessPage() {
           </div>
         </div>
       )}
+      </div>
     </main>
   );
 }
