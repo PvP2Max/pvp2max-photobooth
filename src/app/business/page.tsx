@@ -118,6 +118,18 @@ export default function BusinessPage() {
     return [...events].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }, [session]);
 
+  const stats = useMemo(() => {
+    const events = session?.events ?? [];
+    const live = events.filter((e) => e.status !== "closed");
+    const photographer = events.filter((e) => e.mode === "photographer");
+    return {
+      total: events.length,
+      live: live.length,
+      photographer: photographer.length,
+      subscription: session?.business.subscriptionStatus ?? "none",
+    };
+  }, [session]);
+
   useEffect(() => {
     const last = window.localStorage.getItem("boothos-last-business") ?? "";
     setLoginEmail(last);
@@ -550,7 +562,7 @@ export default function BusinessPage() {
     <main className="mx-auto max-w-6xl px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Business Console</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">BoothOS Dashboard</p>
           <h1 className="text-3xl font-semibold text-[var(--color-text)]">
             {session.business.name}
           </h1>
@@ -572,6 +584,44 @@ export default function BusinessPage() {
             Sign out
           </button>
         </div>
+      </div>
+
+      <section className="mt-4 grid gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] md:grid-cols-4">
+        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Events</p>
+          <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.total}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Total</p>
+        </div>
+        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Live</p>
+          <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.live}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Open events</p>
+        </div>
+        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Photographer</p>
+          <p className="text-2xl font-semibold text-[var(--color-text)]">{stats.photographer}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Pro-mode events</p>
+        </div>
+        <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-[var(--color-text-soft)]">Subscription</p>
+          <p className="text-lg font-semibold text-[var(--color-text)] capitalize">{stats.subscription}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">Photographer monthly</p>
+        </div>
+      </section>
+
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        <a href="#create" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+          Create event
+        </a>
+        <a href="#events" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+          Events
+        </a>
+        <a href="#deliveries" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+          Deliveries
+        </a>
+        <a href="#staff" className="rounded-full bg-[var(--color-surface)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+          Staff links
+        </a>
       </div>
 
       {(message || error) && (
@@ -624,7 +674,7 @@ export default function BusinessPage() {
         </div>
       </section>
 
-      <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+      <section id="create" className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Create event</p>
@@ -768,7 +818,7 @@ export default function BusinessPage() {
         </form>
       </section>
 
-      <section className="mt-6 grid gap-4">
+      <section id="events" className="mt-6 grid gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
           <p className="text-xs text-[var(--color-text-muted)]">
@@ -996,7 +1046,7 @@ export default function BusinessPage() {
         )}
       </section>
 
-      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+      <section id="deliveries" className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Deliveries</p>
@@ -1076,7 +1126,7 @@ export default function BusinessPage() {
         )}
       </section>
 
-      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+      <section id="staff" className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <h3 className="text-lg font-semibold text-[var(--color-text)]">Staff links</h3>
         <p className="text-sm text-[var(--color-text-muted)]">
           Share these with your team. When they are signed in as the business, they won’t be prompted for an event key.
