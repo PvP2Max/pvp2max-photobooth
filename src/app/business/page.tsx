@@ -568,8 +568,8 @@ export default function BusinessPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-0 py-10 lg:flex lg:max-w-7xl lg:gap-6">
-      <aside className="sticky top-20 hidden w-56 flex-shrink-0 flex-col gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
+    <main className="lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 px-0 py-10 mx-auto max-w-6xl">
+      <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col gap-3 overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
         <p className="text-sm text-[var(--color-text-muted)]">Slug: {session.business.slug}</p>
         <div className="flex flex-col gap-2 text-xs">
@@ -594,7 +594,7 @@ export default function BusinessPage() {
         </div>
       </aside>
 
-      <div className="flex-1 px-6">
+      <div className="flex-1 px-6 lg:h-full lg:overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">BoothOS Dashboard</p>
