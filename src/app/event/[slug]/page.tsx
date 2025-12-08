@@ -63,8 +63,6 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   const [captured, setCaptured] = useState<string | null>(null);
   const [filter, setFilter] = useState(FILTERS[0].id);
   const [removeBackground, setRemoveBackground] = useState(true);
-  const [useAiBackground, setUseAiBackground] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -224,9 +222,6 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       form.append("removeBackground", removeBackground ? "true" : "false");
       form.append("booth", "1");
       form.append("filter", filter);
-      if (useAiBackground && aiPrompt) {
-        form.append("aiPrompt", aiPrompt);
-      }
       const res = await fetch("/api/photos", {
         method: "POST",
         body: form,
@@ -364,7 +359,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                 className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
               />
             </label>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 gap-3 text-sm">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -373,30 +368,15 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                 />
                 Background removal
               </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={useAiBackground}
-                  onChange={(e) => setUseAiBackground(e.target.checked)}
-                  disabled={!planFeatures.allowAiBackgrounds || (usage?.remainingAi ?? 0) <= 0}
-                />
-                AI background (credits)
-              </label>
+              {planFeatures.allowAiBackgrounds && (
+                <div className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-[11px] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
+                  <p className="font-semibold text-[var(--color-text)]">AI backgrounds enabled by your host</p>
+                  <p className="text-[var(--color-text-soft)]">
+                    This booth uses the pre-generated backgrounds/frames configured for the event. No prompts needed here.
+                  </p>
+                </div>
+              )}
             </div>
-            {useAiBackground && (
-              <label className="block text-sm text-[var(--color-text-muted)]">
-                AI prompt
-                <input
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="e.g., snowy mountain at night"
-                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
-                  Tip: Ask for 1:1 photobooth backgrounds. If you request text on frames, AI may mis-spell—review before use.
-                </p>
-              </label>
-            )}
             <button
               onClick={handleSend}
               disabled={sending}

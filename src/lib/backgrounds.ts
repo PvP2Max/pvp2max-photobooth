@@ -39,6 +39,9 @@ async function loadBuiltInAssets(): Promise<BackgroundOption[]> {
   const groups: { dir: string; category: "background" | "frame" }[] = [
     { dir: path.join(assetsRoot, "default-backgrounds"), category: "background" },
     { dir: path.join(assetsRoot, "default-frames"), category: "frame" },
+    // Fallback for user-provided defaults folder
+    { dir: path.join(assetsRoot, "defaults", "backgrounds"), category: "background" },
+    { dir: path.join(assetsRoot, "defaults", "frames"), category: "frame" },
   ];
   const options: BackgroundOption[] = [];
   for (const group of groups) {

@@ -115,6 +115,9 @@ export default function BusinessPage() {
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
+  const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({});
+  const [aiKinds, setAiKinds] = useState<Record<string, "background" | "frame">>({});
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -138,6 +141,21 @@ export default function BusinessPage() {
     setLoginEmail(last);
     void loadSession();
   }, []);
+
+  function eventNeedsPayment(event: EventItem) {
+    if (event.mode === "photographer") {
+      const plan = event.plan ?? "";
+      if (plan === "photographer-single") {
+        return event.paymentStatus !== "paid";
+      }
+      if (plan === "photographer-monthly") {
+        if (session?.business.subscriptionStatus === "active") return false;
+        return event.paymentStatus !== "paid";
+      }
+      return true;
+    }
+    return false;
+  }
 
   async function loadSession() {
     setLoading(true);
@@ -474,6 +492,63 @@ export default function BusinessPage() {
     }
   }
 
+  async function generateAiBackgroundForEvent(event: EventItem) {
+    if (!session) return;
+    const prompt = (aiPrompts[event.id] ?? "").trim();
+    if (!prompt) {
+      setError("Enter a prompt for the AI background/frame.");
+      return;
+    }
+    if (eventNeedsPayment(event)) {
+      setError("Complete payment for this event before generating AI backgrounds.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    setAiLoading((prev) => ({ ...prev, [event.id]: true }));
+    try {
+      const res = await fetch(
+        `/api/ai/background?business=${session.business.slug}&event=${event.slug}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            prompt,
+            kind: aiKinds[event.id] ?? "background",
+          }),
+        },
+      );
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error || "Failed to generate background.");
+        return;
+      }
+      setMessage("AI asset generated and added to this event’s library.");
+      setAiPrompts((prev) => ({ ...prev, [event.id]: "" }));
+    } catch {
+      setError("Failed to generate background.");
+    } finally {
+      setAiLoading((prev) => ({ ...prev, [event.id]: false }));
+    }
+  }
+
+  async function openBackgroundManager(event: EventItem) {
+    if (!session) return;
+    setError(null);
+    try {
+      await fetch("/api/auth/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ businessSlug: session.business.slug, eventSlug: event.slug }),
+      });
+    } catch {
+      // non-blocking
+    }
+    window.location.href = `/backgrounds?business=${session.business.slug}&event=${event.slug}`;
+  }
+
   if (loading) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-12 text-[var(--color-text-muted)]">
@@ -730,7 +805,7 @@ export default function BusinessPage() {
           <button
             onClick={() => startCheckout("photographer-monthly")}
             disabled={checkoutLoading === "photographer-monthly"}
-            className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 font-semibold text-white shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-60"
+            className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-60"
           >
             {checkoutLoading === "photographer-monthly" ? "Loading..." : "Start $250/mo subscription"}
           </button>
@@ -850,14 +925,17 @@ export default function BusinessPage() {
             className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
           />
           {newMode === "photographer" && (
-            <input
-              type="number"
-              min={1}
-              value={newAllowedSelections}
-              onChange={(e) => setNewAllowedSelections(Number(e.target.value) || 1)}
-              placeholder="Selections per guest"
-              className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-            />
+            <label className="text-sm text-[var(--color-text-muted)]">
+              Selections per guest (photographer mode)
+              <input
+                type="number"
+                min={1}
+                value={newAllowedSelections}
+                onChange={(e) => setNewAllowedSelections(Number(e.target.value) || 1)}
+                placeholder="Selections per guest"
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              />
+            </label>
           )}
           <div className="md:col-span-3 flex flex-wrap gap-4 text-sm text-[var(--color-text-muted)]">
             <label className="flex items-center gap-2">
@@ -1033,7 +1111,80 @@ export default function BusinessPage() {
                         </button>
                       </div>
                     )}
-          {(((event.mode ?? "self-serve") === "self-serve")
+                    {event.allowAiBackgrounds && (
+                      <div className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[11px] font-semibold text-[var(--color-text)]">
+                            AI backgrounds & frames for this event
+                          </p>
+                          {eventNeedsPayment(event) && (
+                            <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
+                              Pay first to enable
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto] md:items-end">
+                          <label className="text-[11px] text-[var(--color-text-muted)]">
+                            Prompt (1:1 photobooth style)
+                            <input
+                              value={aiPrompts[event.id] ?? ""}
+                              onChange={(e) =>
+                                setAiPrompts((prev) => ({ ...prev, [event.id]: e.target.value }))
+                              }
+                              placeholder="snowy mountaintop cabin, golden hour"
+                              className="mt-1 w-full rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                            />
+                          </label>
+                          <div className="flex flex-col gap-2 text-[11px] text-[var(--color-text-muted)]">
+                            <div className="flex items-center gap-2">
+                              <label className="flex items-center gap-1">
+                                <input
+                                  type="radio"
+                                  name={`ai-kind-${event.id}`}
+                                  value="background"
+                                  checked={(aiKinds[event.id] ?? "background") === "background"}
+                                  onChange={() =>
+                                    setAiKinds((prev) => ({ ...prev, [event.id]: "background" }))
+                                  }
+                                />
+                                Background
+                              </label>
+                              <label className="flex items-center gap-1">
+                                <input
+                                  type="radio"
+                                  name={`ai-kind-${event.id}`}
+                                  value="frame"
+                                  checked={(aiKinds[event.id] ?? "background") === "frame"}
+                                  onChange={() =>
+                                    setAiKinds((prev) => ({ ...prev, [event.id]: "frame" }))
+                                  }
+                                />
+                                Frame (transparent center)
+                              </label>
+                            </div>
+                            <p className="text-[10px] text-[var(--color-text-soft)]">
+                              Text on frames may mis-generate. Review assets before enabling.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2 md:col-span-2">
+                            <button
+                              onClick={() => generateAiBackgroundForEvent(event)}
+                              disabled={aiLoading[event.id] || eventNeedsPayment(event)}
+                              className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)] disabled:opacity-60"
+                            >
+                              {aiLoading[event.id] ? "Generating..." : "Generate AI asset"}
+                            </button>
+                            <button
+                              onClick={() => openBackgroundManager(event)}
+                              className="rounded-lg bg-[var(--color-surface)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                            >
+                              Manage backgrounds
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {(((event.mode ?? "self-serve") === "self-serve")
                       ? [{ label: "Booth link", href: booth }]
                       : [
                           { label: "Check-in link", href: checkin },
@@ -1044,11 +1195,11 @@ export default function BusinessPage() {
                     ).map((link) => (
                       <div
                         key={link.label}
-                        className="flex items-center justify-between gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)]"
+                        className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div className="min-w-0">
+                        <div className="min-w-0 sm:max-w-[360px]">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
-                          <p className="truncate font-mono text-[11px] text-[var(--color-text)] max-w-[240px] sm:max-w-[320px]">
+                          <p className="break-all font-mono text-[11px] text-[var(--color-text)] sm:truncate">
                             {absoluteLink(link.href)}
                           </p>
                         </div>

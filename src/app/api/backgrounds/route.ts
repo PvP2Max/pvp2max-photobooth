@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request);
+  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request);
+  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request);
+  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
@@ -84,7 +84,7 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request);
+  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateAiBackground } from "@/lib/ai-backgrounds";
 import { addBackground } from "@/lib/backgrounds";
-import { getEventContext, incrementEventUsage } from "@/lib/tenants";
+import { getEventContext, incrementEventUsage, eventRequiresPayment } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request);
+  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
   }
   if (!context.event.allowAiBackgrounds) {
     return NextResponse.json({ error: "AI backgrounds not enabled for this event." }, { status: 403 });
+  }
+  if (eventRequiresPayment(context.event, context.business)) {
+    return NextResponse.json(
+      { error: "Complete event payment before generating AI backgrounds." },
+      { status: 402 },
+    );
   }
   const kind = body.kind === "frame" ? "frame" : "background";
   const usage = await incrementEventUsage(context.scope, { aiCredits: 1 });
