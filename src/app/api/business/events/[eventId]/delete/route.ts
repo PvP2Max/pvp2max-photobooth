@@ -19,9 +19,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
+  const filtered = session.business.events.filter((e) => e.id !== eventId);
   return NextResponse.json({
     business: sanitizeBusiness(session.business),
-    events: session.business.events.filter((e) => e.id !== params.eventId).map(sanitizeEvent),
+    events: filtered.map(sanitizeEvent),
     status: "deleted",
   });
 }
