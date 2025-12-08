@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 
 type BusinessSession = {
   business: {
@@ -108,6 +109,9 @@ export default function BusinessPage() {
   const [selectionLinks, setSelectionLinks] = useState<Record<string, string>>({});
   const [selectionStatus, setSelectionStatus] = useState<Record<string, string>>({});
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [qrLink, setQrLink] = useState<string | null>(null);
+  const [qrLabel, setQrLabel] = useState<string | null>(null);
+  const [qrData, setQrData] = useState<string | null>(null);
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -364,9 +368,20 @@ export default function BusinessPage() {
     setMessage("Resent photos.");
   }
 
-  function copy(text: string) {
+  function copy(text: string, label?: string) {
     navigator.clipboard?.writeText(text).catch(() => {});
-    setMessage("Copied to clipboard.");
+    setMessage(`Copied ${label ?? "link"} to clipboard.`);
+  }
+
+  async function showQr(href: string, label: string) {
+    try {
+      const data = await QRCode.toDataURL(href, { margin: 1, scale: 6 });
+      setQrData(data);
+      setQrLink(href);
+      setQrLabel(label);
+    } catch {
+      setError("Could not generate QR code.");
+    }
   }
 
   async function startCheckout(plan: string, eventId?: string) {
@@ -874,23 +889,38 @@ export default function BusinessPage() {
                         </button>
                       </div>
                     )}
-                    {[
-                      { label: "Check-in link", href: checkin },
-                      { label: "Photographer link", href: photographer },
-                      { label: "Front desk link", href: frontdesk },
-                      { label: "Booth link", href: booth },
-                    ].map((link) => (
-                      <button
+                    {(event.mode === "self-serve"
+                      ? [{ label: "Booth link", href: booth }]
+                      : [
+                          { label: "Check-in link", href: checkin },
+                          { label: "Photographer link", href: photographer },
+                          { label: "Front desk link", href: frontdesk },
+                          { label: "Booth link", href: booth },
+                        ]
+                    ).map((link) => (
+                      <div
                         key={link.label}
-                        onClick={() => copy(link.href)}
-                        className="flex items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface)]"
+                        className="flex items-center justify-between gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)]"
                       >
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
                           <p className="truncate font-mono text-[11px] text-[var(--color-text)]">{link.href}</p>
                         </div>
-                        <span className="text-[10px] text-[var(--color-text-soft)]">Copy</span>
-                      </button>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            onClick={() => copy(link.href, link.label)}
+                            className="rounded-full bg-[var(--color-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                          >
+                            Copy
+                          </button>
+                          <button
+                            onClick={() => showQr(link.href, link.label)}
+                            className="rounded-full bg-[var(--color-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                          >
+                            QR
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1072,6 +1102,36 @@ export default function BusinessPage() {
           </Link>
         </div>
       </section>
+
+      {qrData && qrLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">{qrLabel ?? "QR code"}</p>
+                <p className="text-sm text-[var(--color-text-muted)] break-all">{qrLink}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setQrData(null);
+                  setQrLink(null);
+                  setQrLabel(null);
+                }}
+                className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-[11px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 flex justify-center">
+              <img
+                src={qrData}
+                alt="QR code"
+                className="h-56 w-56 rounded-xl bg-white p-2 ring-1 ring-[var(--color-border-subtle)]"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
