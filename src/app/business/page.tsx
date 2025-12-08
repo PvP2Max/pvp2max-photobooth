@@ -657,7 +657,7 @@ export default function BusinessPage() {
 
   return (
     <main className="lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 px-0 py-10 mx-auto max-w-6xl">
-      <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col justify-between overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
+      <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
         <div className="flex flex-col gap-2 text-xs">
           {[
@@ -679,7 +679,7 @@ export default function BusinessPage() {
             </button>
           ))}
         </div>
-        <div className="mt-6 border-t border-[var(--color-border-subtle)] pt-4">
+        <div className="mt-auto pt-6 border-t border-[var(--color-border-subtle)]">
           <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
           <button
             onClick={() => setProfileOpen((v) => !v)}
@@ -839,13 +839,13 @@ export default function BusinessPage() {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setView("events")}
-              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
+              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] hover:opacity-95"
             >
               Create a new event
             </button>
             <button
               onClick={() => setView("deliveries")}
-              className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+              className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] shadow-[0_10px_25px_rgba(0,0,0,0.25)] hover:ring-[var(--color-primary)]"
             >
               View deliveries
             </button>
