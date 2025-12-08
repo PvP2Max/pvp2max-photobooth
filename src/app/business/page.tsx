@@ -696,7 +696,6 @@ export default function BusinessPage() {
             { id: "overview", label: "Overview" },
             { id: "events", label: "Events" },
             { id: "deliveries", label: "Deliveries" },
-            { id: "staff", label: "Staff links" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -751,7 +750,6 @@ export default function BusinessPage() {
               { id: "overview", label: "Overview" },
               { id: "events", label: "Events" },
               { id: "deliveries", label: "Deliveries" },
-              { id: "staff", label: "Staff" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1430,35 +1428,6 @@ export default function BusinessPage() {
         ) : (
           <p className="mt-3 text-sm text-[var(--color-text-muted)]">Select an event to view deliveries.</p>
         )}
-      </section>
-      )}
-
-      {view === "staff" && (
-      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-        <h3 className="text-lg font-semibold text-[var(--color-text)]">Staff links</h3>
-        <p className="text-sm text-[var(--color-text-muted)]">
-          Share these with your team. When they are signed in as the business, they won’t be prompted for an event key.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          <Link
-            href="/photographer"
-            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
-          >
-            Photographer console
-          </Link>
-          <Link
-            href="/frontdesk"
-            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
-          >
-            Front desk console
-          </Link>
-          <Link
-            href="/checkin"
-            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
-          >
-            Check-in kiosk
-          </Link>
-        </div>
       </section>
       )}
 
