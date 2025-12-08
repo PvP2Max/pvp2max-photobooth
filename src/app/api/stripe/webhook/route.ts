@@ -79,10 +79,10 @@ export async function POST(request: NextRequest) {
 }
 
 async function markEventPaid(businessId: string, eventId: string, plan: BoothEventPlan) {
+  const defaults = applyPlanDefaults(plan);
   await updateEventConfig(businessId, eventId, {
-    plan,
+    ...defaults,
     paymentStatus: "paid",
-    ...applyPlanDefaults(plan),
   });
 }
 

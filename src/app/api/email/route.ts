@@ -9,7 +9,7 @@ import {
   removePhotos,
 } from "@/lib/storage";
 import { saveProduction } from "@/lib/production";
-import { getEventContext } from "@/lib/tenants";
+import { eventUsage, getEventContext } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,11 +30,32 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+async function applyWatermark(buffer: Buffer, watermarkEnabled: boolean) {
+  if (!watermarkEnabled) return buffer;
+  const svg = `<svg width="1200" height="200" xmlns="http://www.w3.org/2000/svg">
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-size="48" font-family="Arial" fill="rgba(255,255,255,0.75)" stroke="rgba(0,0,0,0.4)" stroke-width="1">
+      Powered by BoothOS
+    </text>
+  </svg>`;
+  const overlay = Buffer.from(svg);
+  const composed = await sharp(buffer)
+    .composite([
+      {
+        input: overlay,
+        gravity: "south",
+      },
+    ])
+    .png()
+    .toBuffer();
+  return composed;
+}
+
 export async function POST(request: NextRequest) {
   const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
+  const usage = eventUsage(context.event);
   try {
     const body = (await request.json()) as {
       clientEmail?: string;
@@ -192,11 +213,16 @@ export async function POST(request: NextRequest) {
 
         const backgroundName = await getBackgroundName(context.scope, selection.backgroundId);
 
+        const finalBuffer = await applyWatermark(
+          composed,
+          usage.watermark || context.event.watermarkEnabled === true,
+        );
+
         attachments.push({
           filename: `${
             record.originalName.replace(/\.[^.]+$/, "") || record.id
           }-${backgroundName}.png`,
-          content: composed,
+          content: finalBuffer,
           contentType: "image/png",
         });
       } catch (error) {
