@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 const highlights = [
@@ -67,12 +68,14 @@ export default function Home() {
       <main className="mx-auto flex max-w-6xl flex-col gap-12 px-6 py-14">
         <section className="grid gap-10 overflow-hidden rounded-3xl bg-[var(--color-surface)] px-8 py-12 shadow-[var(--shadow-soft)] ring-1 ring-[var(--color-border-subtle)] md:grid-cols-[1.35fr,1fr] md:items-center">
           <div className="space-y-5">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--color-primary-soft)] ring-1 ring-[var(--color-border-strong)]">
-              BoothOS by Arctic Aura
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(34,211,238,0.18)] text-[10px] text-[var(--color-text)]">
-                SaaS
-              </span>
-            </div>
+            <Image
+              src="/assets/horizontal-transparent.png"
+              alt="BoothOS"
+              width={240}
+              height={80}
+              className="w-auto max-w-xs"
+              priority
+            />
             <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
               The self-serve booth and photographer console built for real events.
             </h1>
@@ -116,6 +119,15 @@ export default function Home() {
           </div>
 
           <div className="relative isolate overflow-hidden rounded-3xl bg-[var(--color-surface-elevated)] p-6 ring-1 ring-[var(--color-border-subtle)]">
+            <div className="absolute right-6 top-6 h-10 w-28">
+              <Image
+                src="/assets/badge-transparent%202.png"
+                alt="BoothOS badge"
+                fill
+                sizes="120px"
+                className="object-contain"
+              />
+            </div>
             <div className="absolute right-4 top-6 h-28 w-28 rounded-full bg-[rgba(155,92,255,0.28)] opacity-40 blur-3xl" />
             <div className="absolute -left-10 bottom-6 h-24 w-24 rounded-full bg-[rgba(34,211,238,0.25)] blur-3xl" />
             <div className="space-y-4">
@@ -128,7 +140,15 @@ export default function Home() {
               <div className="rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-[var(--gradient-brand)]" />
+                    <div className="relative h-10 w-10 overflow-hidden rounded-xl ring-1 ring-[var(--color-border-subtle)]">
+                      <Image
+                        src="/assets/icon-transparent.png"
+                        alt="BoothOS"
+                        fill
+                        sizes="48px"
+                        className="object-contain"
+                      />
+                    </div>
                     <div>
                       <p className="text-sm font-semibold text-[var(--color-text)]">
                         Aurora Ridge Family

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
+import Image from "next/image";
 import HeaderActions from "./header-actions";
 
 export const metadata: Metadata = {
@@ -20,13 +21,16 @@ export default function RootLayout({
         <header className="sticky top-0 z-20 bg-[rgba(5,7,18,0.9)] backdrop-blur border-b border-[color-mix(in_srgb,var(--color-border-subtle)_70%,transparent)]">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
             <Link href="/" className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-[var(--gradient-brand)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]" />
-              <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-text-soft)]">
-                  Arctic Aura
-                </p>
-                <p className="text-sm font-semibold text-[var(--color-text)]">BoothOS</p>
+              <div className="relative h-10 w-10 overflow-hidden rounded-xl ring-1 ring-[var(--color-border-subtle)]">
+                <Image src="/assets/icon-transparent.png" alt="BoothOS" fill sizes="40px" className="object-contain" />
               </div>
+              <Image
+                src="/assets/horizontal-transparent.png"
+                alt="BoothOS wordmark"
+                width={150}
+                height={40}
+                className="hidden sm:block"
+              />
             </Link>
             <nav className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">
               <Link
