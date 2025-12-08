@@ -209,14 +209,6 @@ export default function BusinessPage() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/business", { method: "DELETE", credentials: "include" });
-    await fetch("/api/auth/event", { method: "DELETE", credentials: "include" });
-    setSession(null);
-    setProductions({});
-    setResendEmail({});
-  }
-
   async function createEvent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!session) return;
@@ -600,18 +592,6 @@ export default function BusinessPage() {
             </button>
           ))}
         </div>
-        <button
-          onClick={loadSession}
-          className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-        >
-          Refresh
-        </button>
-        <button
-          onClick={logout}
-          className="rounded-xl bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-        >
-          Sign out
-        </button>
       </aside>
 
       <div className="flex-1 px-6">
