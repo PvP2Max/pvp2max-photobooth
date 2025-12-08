@@ -4,13 +4,17 @@ import { deleteEventById, getBusinessContext, sanitizeBusiness, sanitizeEvent } 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function DELETE(request: NextRequest, { params }: { params: { eventId: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ eventId: string }> },
+) {
   const session = await getBusinessContext(request);
   if (!session?.business) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const deleted = await deleteEventById(session.business.id, params.eventId);
+  const { eventId } = await params;
+  const deleted = await deleteEventById(session.business.id, eventId);
   if (!deleted) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
