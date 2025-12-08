@@ -10,8 +10,6 @@ export default function BackgroundsPage() {
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [eventPlan, setEventPlan] = useState<string | undefined>(undefined);
   const [allowAiBackgrounds, setAllowAiBackgrounds] = useState(false);
-  const [eventSlug, setEventSlug] = useState<string | undefined>(undefined);
-  const [businessSlug, setBusinessSlug] = useState<string | undefined>(undefined);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backgroundUploading, setBackgroundUploading] = useState(false);
@@ -45,8 +43,6 @@ export default function BackgroundsPage() {
       .then((data: { business?: { slug?: string }; event?: { slug?: string; plan?: string; allowAiBackgrounds?: boolean } }) => {
         if (data?.event?.plan) setEventPlan(data.event.plan);
         if (data?.event?.allowAiBackgrounds) setAllowAiBackgrounds(true);
-        if (data?.event?.slug) setEventSlug(data.event.slug);
-        if (data?.business?.slug) setBusinessSlug(data.business.slug);
       })
       .catch(() => {});
   }, []);
@@ -206,21 +202,6 @@ export default function BackgroundsPage() {
             <p className="text-xs text-[var(--color-text-soft)]">
               Toggle which backgrounds/frames are available in the booth. AI-generated frames may misplace text—review before enabling.
             </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2 text-xs">
-            <button
-              onClick={() => {
-                if (businessSlug && eventSlug) {
-                  window.location.href = `/business?view=events&event=${eventSlug}&business=${businessSlug}`;
-                } else {
-                  window.location.href = "/business?view=events";
-                }
-              }}
-              className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-            >
-              Switch event / back to dashboard
-            </button>
           </div>
 
           {allowAiBackgrounds && (

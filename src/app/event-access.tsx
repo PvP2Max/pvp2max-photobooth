@@ -126,11 +126,12 @@ export default function EventAccessGate({ children }: Props) {
     }
   }
 
-  async function handleSignOut() {
-    await fetch("/api/auth/event", { method: "DELETE", credentials: "include" });
-    setSession(null);
-    setAccessCode("");
-  }
+async function handleSignOut() {
+  await fetch("/api/auth/event", { method: "DELETE", credentials: "include" });
+  setSession(null);
+  setAccessCode("");
+  window.location.href = "/business?view=events";
+}
 
   if (loading) {
     return (
