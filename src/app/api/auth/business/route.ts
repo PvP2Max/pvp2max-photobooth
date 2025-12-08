@@ -9,6 +9,7 @@ import {
   verifyBusinessAccess,
   verifyUserCredentials,
   findBusinessBySlug,
+  findBusinessById,
 } from "@/lib/tenants";
 
 export const runtime = "nodejs";

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import "./globals.css";
+import Link from "next/link";
+import HeaderActions from "./header-actions";
 
 export const metadata: Metadata = {
   title: "BoothOS | Arctic Aura Designs",
@@ -58,12 +59,7 @@ export default function RootLayout({
               >
                 Backgrounds
               </Link>
-              <Link
-                href="/dashboard"
-                className="rounded-full bg-[rgba(34,211,238,0.14)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(34,211,238,0.35)] transition hover:bg-[rgba(34,211,238,0.24)]"
-              >
-                Dashboard
-              </Link>
+              <HeaderActions />
             </nav>
           </div>
         </header>
