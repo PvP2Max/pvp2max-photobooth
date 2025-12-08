@@ -113,6 +113,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: false,
+        galleryZipEnabled: true,
       };
     case "event-unlimited":
       return {
@@ -123,6 +124,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: false,
+        galleryZipEnabled: true,
       };
     case "event-ai":
       return {
@@ -133,6 +135,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: true,
+        galleryZipEnabled: true,
       };
     case "photographer-single":
       return {
@@ -143,6 +146,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: true,
+        galleryZipEnabled: true,
       };
     case "photographer-monthly":
       return {
@@ -153,6 +157,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: true,
+        galleryZipEnabled: true,
       };
     case "free":
     default:
@@ -164,6 +169,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         watermarkEnabled: true,
         smsEnabled: false,
         allowAiBackgrounds: false,
+        galleryZipEnabled: false,
       };
   }
 }
