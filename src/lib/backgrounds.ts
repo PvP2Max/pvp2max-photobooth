@@ -269,8 +269,8 @@ export async function findBackgroundAsset(scope: TenantScope, id: string) {
   };
 }
 
-export function builtInBackgrounds() {
-  return BUILT_IN_BACKGROUNDS;
+export async function builtInBackgrounds() {
+  return loadBuiltInAssets();
 }
 
 export async function getBackgroundName(scope: TenantScope, id: string) {
