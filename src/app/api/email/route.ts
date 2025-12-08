@@ -10,6 +10,7 @@ import {
 } from "@/lib/storage";
 import { saveProduction } from "@/lib/production";
 import { eventUsage, getEventContext } from "@/lib/tenants";
+import { applyFilterToBuffer } from "@/lib/filters";
 import { allowedOverlayTheme, loadWatermark, renderOverlay } from "@/lib/overlays";
 
 export const runtime = "nodejs";
@@ -199,6 +200,15 @@ export async function POST(request: NextRequest) {
               backgroundId: selection.backgroundId,
               error,
             });
+          }
+        }
+
+        // Apply selected filter after background removal
+        if (record.filterUsed) {
+          try {
+            cutoutComposite = await applyFilterToBuffer(cutoutComposite, record.filterUsed);
+          } catch (error) {
+            console.error("Filter apply failed", { filter: record.filterUsed, error });
           }
         }
 

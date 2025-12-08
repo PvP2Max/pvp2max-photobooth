@@ -38,6 +38,8 @@ const FILTERS = [
   { id: "bw", label: "B&W", filter: "grayscale(1)" },
   { id: "warm", label: "Warm Glow", filter: "contrast(1.05) saturate(1.1) sepia(0.12)" },
   { id: "cool", label: "Cool", filter: "saturate(0.95) hue-rotate(-8deg)" },
+  { id: "matte", label: "Matte", filter: "saturate(0.9) brightness(0.97) contrast(0.96)" },
+  { id: "soft", label: "Soft Skin", filter: "blur(0px) brightness(1.04) contrast(0.98)" },
 ];
 
 const PREMIUM_FILTERS = [
@@ -45,6 +47,8 @@ const PREMIUM_FILTERS = [
   { id: "glam", label: "Glam", filter: "contrast(1.15) saturate(1.12) brightness(1.05)" },
   { id: "neon", label: "Neon", filter: "saturate(1.4) hue-rotate(12deg) contrast(1.1)" },
   { id: "dramatic", label: "Dramatic", filter: "contrast(1.2) saturate(1.15)" },
+  { id: "cinematic", label: "Cinematic", filter: "saturate(1.1) contrast(1.12) brightness(0.98)" },
+  { id: "noir", label: "Noir", filter: "grayscale(1) contrast(1.25) brightness(0.9)" },
 ];
 
 export default function BoothPage({ params }: { params: { slug: string } }) {
@@ -97,9 +101,13 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   useEffect(() => {
     startCamera();
     const videoEl = videoRef.current;
+    // Hide global nav while in booth mode
+    const header = document.querySelector("header");
+    if (header) (header as HTMLElement).style.display = "none";
     return () => {
       const tracks = (videoEl?.srcObject as MediaStream | null)?.getTracks() || [];
       tracks.forEach((t) => t.stop());
+      if (header) (header as HTMLElement).style.display = "";
     };
   }, [startCamera]);
 
@@ -146,10 +154,14 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     if (!video || !canvas) return null;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    ctx.filter = activeFilter;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const side = Math.min(video.videoWidth || 1280, video.videoHeight || 720) || 720;
+    // Square crop to keep 1:1 for frames/AI backgrounds
+    canvas.width = side;
+    canvas.height = side;
+    const sx = ((video.videoWidth || side) - side) / 2;
+    const sy = ((video.videoHeight || side) - side) / 2;
+    ctx.filter = "none";
+    ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
     const dataUrl = canvas.toDataURL("image/png");
     return dataUrl;
   }
@@ -211,6 +223,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       form.append("file", file);
       form.append("removeBackground", removeBackground ? "true" : "false");
       form.append("booth", "1");
+      form.append("filter", filter);
       if (useAiBackground && aiPrompt) {
         form.append("aiPrompt", aiPrompt);
       }
