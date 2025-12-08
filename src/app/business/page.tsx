@@ -1149,7 +1149,7 @@ export default function BusinessPage() {
                       </div>
                     )}
                     {event.allowAiBackgrounds && (
-                      <div className="w-full overflow-hidden rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
+                      <div className="w-full max-w-full overflow-hidden rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 md:px-4 ring-1 ring-[var(--color-border-subtle)]">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[11px] font-semibold text-[var(--color-text)]">
                             AI backgrounds for this event
@@ -1204,7 +1204,7 @@ export default function BusinessPage() {
                     ).map((link) => (
                       <div
                         key={link.label}
-                        className="flex w-full flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
+                        className="flex w-full max-w-full flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
                       >
                         <div className="min-w-0 w-full sm:max-w-[420px]">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
