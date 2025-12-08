@@ -151,6 +151,11 @@ export default function BusinessPage() {
     const last = window.localStorage.getItem("boothos-last-business") ?? "";
     setLoginEmail(last);
     void loadSession();
+    const params = new URLSearchParams(window.location.search);
+    const qView = params.get("view");
+    if (qView === "events" || qView === "deliveries" || qView === "overview") {
+      setView(qView);
+    }
   }, []);
 
   function eventNeedsPayment(event: EventItem) {
