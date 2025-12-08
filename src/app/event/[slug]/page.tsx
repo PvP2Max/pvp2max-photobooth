@@ -279,7 +279,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
 
         <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
           <div className="rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-            <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
+            <div className="relative aspect-square overflow-hidden rounded-xl bg-black">
               {!captured ? (
                 <video
                   ref={videoRef}

@@ -12,6 +12,7 @@ export default function BackgroundsPage() {
   const [error, setError] = useState<string | null>(null);
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [savingAllowed, setSavingAllowed] = useState(false);
+  const [category, setCategory] = useState<"background" | "frame">("background");
 
   async function loadBackgrounds() {
     try {
@@ -59,6 +60,7 @@ export default function BackgroundsPage() {
       formData.append("name", nameInput.value);
       formData.append("description", descInput.value);
       formData.append("file", file);
+      formData.append("category", category);
 
       const response = await fetch("/api/backgrounds", {
         method: "POST",
@@ -199,6 +201,20 @@ export default function BackgroundsPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-3 text-sm text-[var(--color-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[rgba(155,92,255,0.18)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-text)]"
               />
+            </label>
+            <label className="text-sm text-[var(--color-text-muted)]">
+              Type
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as "background" | "frame")}
+                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              >
+                <option value="background">Background</option>
+                <option value="frame">Frame</option>
+              </select>
+              <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
+                Frames should have transparent centers. AI frames with text may mis-spell; review before enabling.
+              </p>
             </label>
             <button
               type="submit"

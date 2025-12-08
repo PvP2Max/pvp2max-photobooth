@@ -112,6 +112,7 @@ export default function BusinessPage() {
   const [qrLink, setQrLink] = useState<string | null>(null);
   const [qrLabel, setQrLabel] = useState<string | null>(null);
   const [qrData, setQrData] = useState<string | null>(null);
+  const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -610,30 +611,24 @@ export default function BusinessPage() {
       </section>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <a
-          href="#create"
-          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-        >
-          Create event
-        </a>
-        <a
-          href="#events"
-          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-        >
-          Events
-        </a>
-        <a
-          href="#deliveries"
-          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-        >
-          Deliveries
-        </a>
-        <a
-          href="#staff"
-          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-        >
-          Staff links
-        </a>
+        {[
+          { id: "overview", label: "Overview" },
+          { id: "events", label: "Events" },
+          { id: "deliveries", label: "Deliveries" },
+          { id: "staff", label: "Staff links" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setView(tab.id as typeof view)}
+            className={`rounded-full px-3 py-2 ring-1 ${
+              view === tab.id
+                ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
+                : "bg-[var(--color-surface)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {(message || error) && (
@@ -686,7 +681,31 @@ export default function BusinessPage() {
         </div>
       </section>
 
-      <section id="create" className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+      {view === "overview" && (
+        <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Quick actions for creating events and managing billing.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setView("events")}
+              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
+            >
+              Create a new event
+            </button>
+            <button
+              onClick={() => setView("deliveries")}
+              className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+            >
+              View deliveries
+            </button>
+          </div>
+        </section>
+      )}
+
+      {view === "events" && (
+        <>
+      <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Create event</p>
@@ -830,7 +849,7 @@ export default function BusinessPage() {
         </form>
       </section>
 
-      <section id="events" className="mt-6 grid gap-4">
+      <section className="mt-6 grid gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
           <p className="text-xs text-[var(--color-text-muted)]">
@@ -1058,7 +1077,11 @@ export default function BusinessPage() {
         )}
       </section>
 
-      <section id="deliveries" className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+        </>
+      )}
+
+      {view === "deliveries" && (
+      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Deliveries</p>
@@ -1137,8 +1160,10 @@ export default function BusinessPage() {
           <p className="mt-3 text-sm text-[var(--color-text-muted)]">Select an event to view deliveries.</p>
         )}
       </section>
+      )}
 
-      <section id="staff" className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+      {view === "staff" && (
+      <section className="mt-8 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
         <h3 className="text-lg font-semibold text-[var(--color-text)]">Staff links</h3>
         <p className="text-sm text-[var(--color-text-muted)]">
           Share these with your team. When they are signed in as the business, they won’t be prompted for an event key.
@@ -1164,8 +1189,9 @@ export default function BusinessPage() {
           </Link>
         </div>
       </section>
+      )}
 
-      {qrData && qrLink && (
+      {view === "staff" && qrData && qrLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(0,0,0,0.45)] px-4">
           <div className="w-full max-w-sm rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
             <div className="flex items-start justify-between gap-3">
