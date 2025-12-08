@@ -113,6 +113,7 @@ export default function BusinessPage() {
   const [qrLabel, setQrLabel] = useState<string | null>(null);
   const [qrData, setQrData] = useState<string | null>(null);
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
+  const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -381,16 +382,31 @@ export default function BusinessPage() {
     setMessage("Resent photos.");
   }
 
-  function copy(text: string, label?: string) {
-    navigator.clipboard?.writeText(text).catch(() => {});
-    setMessage(`Copied ${label ?? "link"} to clipboard.`);
+  function absoluteLink(href: string) {
+    if (href.startsWith("http")) return href;
+    if (typeof window === "undefined") return href;
+    return `${window.location.origin}${href}`;
+  }
+
+  function copy(text: string, label?: string, key?: string) {
+    const absolute = absoluteLink(text);
+    navigator.clipboard?.writeText(absolute).catch(() => {});
+    if (key) {
+      setCopiedLink((prev) => ({ ...prev, [key]: true }));
+      setTimeout(() => {
+        setCopiedLink((prev) => ({ ...prev, [key]: false }));
+      }, 5000);
+    } else {
+      setMessage(`Copied ${label ?? "link"} to clipboard.`);
+    }
   }
 
   async function showQr(href: string, label: string) {
     try {
-      const data = await QRCode.toDataURL(href, { margin: 1, scale: 6 });
+      const absolute = absoluteLink(href);
+      const data = await QRCode.toDataURL(absolute, { margin: 1, scale: 6 });
       setQrData(data);
-      setQrLink(href);
+      setQrLink(absolute);
       setQrLabel(label);
     } catch {
       setError("Could not generate QR code.");
@@ -970,7 +986,7 @@ export default function BusinessPage() {
                         </button>
                       </div>
                     )}
-                    {(event.mode === "self-serve"
+                    {(((event.mode ?? "self-serve") === "self-serve")
                       ? [{ label: "Booth link", href: booth }]
                       : [
                           { label: "Check-in link", href: checkin },
@@ -985,14 +1001,18 @@ export default function BusinessPage() {
                       >
                         <div className="min-w-0">
                           <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
-                          <p className="truncate font-mono text-[11px] text-[var(--color-text)]">{link.href}</p>
+                          <p className="truncate font-mono text-[11px] text-[var(--color-text)]">{absoluteLink(link.href)}</p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <button
-                            onClick={() => copy(link.href, link.label)}
-                            className="rounded-full bg-[var(--color-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                            onClick={() => copy(link.href, link.label, `${event.id}-${link.label}`)}
+                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 transition ${
+                              copiedLink[`${event.id}-${link.label}`]
+                                ? "bg-[rgba(34,197,94,0.2)] text-[var(--color-text)] ring-[rgba(34,197,94,0.5)]"
+                                : "bg-[var(--color-surface)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
+                            }`}
                           >
-                            Copy
+                            {copiedLink[`${event.id}-${link.label}`] ? "Copied" : "Copy"}
                           </button>
                           <button
                             onClick={() => showQr(link.href, link.label)}

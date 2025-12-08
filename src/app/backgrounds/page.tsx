@@ -75,6 +75,7 @@ export default function BackgroundsPage() {
       }
       setBackgrounds((prev) => [...prev, payload.background!]);
       form.reset();
+      setCategory("background");
       setMessage("Background added.");
     } catch (err) {
       const msg =
