@@ -125,6 +125,20 @@ export default function BusinessPage() {
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
+  const navTabs = useMemo(
+    () => [
+      { id: "overview" as const, label: "Overview" },
+      { id: "events" as const, label: "Events" },
+      { id: "deliveries" as const, label: "Deliveries" },
+    ],
+    [],
+  );
+  const mobileTabs = useMemo(
+    () => [...navTabs, { id: "staff" as const, label: "Staff links" }],
+    [navTabs],
+  );
+  const [sidebarCondensed, setSidebarCondensed] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -149,9 +163,20 @@ export default function BusinessPage() {
     void loadSession();
     const params = new URLSearchParams(window.location.search);
     const qView = params.get("view");
-    if (qView === "events" || qView === "deliveries" || qView === "overview") {
+    if (qView === "events" || qView === "deliveries" || qView === "overview" || qView === "staff") {
       setView(qView);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const needsCondensed = window.innerWidth < 1280;
+      setSidebarCondensed(needsCondensed);
+      if (!needsCondensed) setSidebarExpanded(false);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   function eventNeedsPayment(event: EventItem) {
@@ -186,6 +211,12 @@ export default function BusinessPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function signOut() {
+    fetch("/api/auth/business", { method: "DELETE", credentials: "include" }).catch(() => {});
+    fetch("/api/auth/event", { method: "DELETE", credentials: "include" }).catch(() => {});
+    window.location.href = "/";
   }
 
   async function login(e: React.FormEvent<HTMLFormElement>) {
@@ -560,6 +591,31 @@ export default function BusinessPage() {
     window.location.href = `/backgrounds?business=${session.business.slug}&event=${event.slug}`;
   }
 
+  const renderNavButtons = (options?: { condensed?: boolean; onSelect?: () => void }) =>
+    navTabs.map((tab) => {
+      const active = view === tab.id;
+      const activeClasses = active
+        ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
+        : "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-[var(--color-border-subtle)]";
+      const sizing = options?.condensed
+        ? "flex h-10 w-10 items-center justify-center text-[11px]"
+        : "w-full px-3 py-2 text-left text-xs";
+      return (
+        <button
+          key={tab.id}
+          onClick={() => {
+            setView(tab.id);
+            options?.onSelect?.();
+          }}
+          className={`rounded-xl ring-1 transition ${sizing} ${activeClasses}`}
+          aria-label={options?.condensed ? `Go to ${tab.label}` : undefined}
+          title={options?.condensed ? tab.label : undefined}
+        >
+          {options?.condensed ? tab.label.slice(0, 1) : tab.label}
+        </button>
+      );
+    });
+
   if (loading) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-12 text-[var(--color-text-muted)]">
@@ -655,56 +711,123 @@ export default function BusinessPage() {
   }
 
   return (
-    <main className="lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 px-0 py-10 mx-auto max-w-6xl">
-      <aside className="sticky top-20 hidden h-[calc(100vh-160px)] w-56 flex-shrink-0 flex-col overflow-y-auto rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex">
-        <p className="mb-2 text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
-        <div className="flex flex-col gap-2 text-xs">
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "events", label: "Events" },
-            { id: "deliveries", label: "Deliveries" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setView(tab.id as typeof view)}
-              className={`w-full rounded-xl px-3 py-2 text-left ring-1 ${
-                view === tab.id
-                  ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
-                  : "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-auto pt-6 border-t border-[var(--color-border-subtle)]">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
-          <button
-            onClick={() => setProfileOpen((v) => !v)}
-            className="mt-2 flex w-full items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-          >
-            <span className="truncate">{session.user?.email ?? "Account"}</span>
-            <span>{profileOpen ? "–" : "+"}</span>
-          </button>
-          {profileOpen && (
-            <div className="mt-2 space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
-              <p className="text-xs text-[var(--color-text-muted)]">{session.business.name}</p>
-              <button
-                onClick={() => {
-                  fetch("/api/auth/business", { method: "DELETE", credentials: "include" }).catch(() => {});
-                  fetch("/api/auth/event", { method: "DELETE", credentials: "include" }).catch(() => {});
-                  window.location.href = "/";
-                }}
-                className="w-full rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-              >
-                Sign out
-              </button>
-            </div>
+    <main className="mx-auto w-full max-w-6xl px-0 py-10 lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 lg:overflow-hidden">
+      <aside
+        className={`sticky top-20 hidden h-[calc(100vh-160px)] flex-shrink-0 rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex ${
+          sidebarCondensed ? "w-16 p-2" : "w-56 p-4"
+        }`}
+      >
+        <div className={`flex h-full flex-col ${sidebarCondensed ? "gap-3" : "overflow-y-auto"}`}>
+          {sidebarCondensed ? (
+            <>
+              <div className="flex flex-col items-center gap-3">
+                <button
+                  onClick={() => setSidebarExpanded(true)}
+                  aria-label="Expand navigation"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-surface-elevated)] ring-1 ring-[var(--color-border-subtle)] transition hover:ring-[var(--color-primary)]"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-[var(--color-text)]"
+                  >
+                    <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <div className="flex flex-col items-center gap-2">{renderNavButtons({ condensed: true })}</div>
+              </div>
+              <div className="mt-auto flex flex-col items-center gap-2 pb-1">
+                <button
+                  onClick={() => setSidebarExpanded(true)}
+                  title={session.user?.email ?? "Account"}
+                  aria-label="Open account"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-[var(--color-text-on-primary)] ring-1 ring-[var(--color-primary)]"
+                >
+                  {(session.user?.email || session.business.name || "A").slice(0, 1).toUpperCase()}
+                </button>
+                <button
+                  onClick={signOut}
+                  className="w-full rounded-lg bg-[var(--color-surface-elevated)] px-2 py-2 text-[10px] font-semibold text-[var(--color-danger)] ring-1 ring-[var(--color-border-subtle)] transition hover:ring-[rgba(249,115,115,0.35)]"
+                >
+                  Sign out
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-2 text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
+              <div className="flex flex-col gap-2 text-xs">{renderNavButtons()}</div>
+              <div className="mt-auto border-t border-[var(--color-border-subtle)] pt-6">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
+                <button
+                  onClick={() => setProfileOpen((v) => !v)}
+                  className="mt-2 flex w-full items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                >
+                  <span className="truncate">{session.user?.email ?? "Account"}</span>
+                  <span>{profileOpen ? "–" : "+"}</span>
+                </button>
+                {profileOpen && (
+                  <div className="mt-2 space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+                    <p className="text-xs text-[var(--color-text-muted)]">{session.business.name}</p>
+                    <button
+                      onClick={signOut}
+                      className="w-full rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </aside>
 
-      <div className="flex-1 px-6 lg:h-full lg:overflow-y-auto">
+      {sidebarCondensed && sidebarExpanded && (
+        <div
+          className="fixed inset-0 z-30 hidden bg-[var(--color-overlay)]/80 p-4 backdrop-blur-sm lg:flex"
+          onClick={() => setSidebarExpanded(false)}
+        >
+          <div
+            className="w-72 rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-soft)] ring-1 ring-[var(--color-border-subtle)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Navigation</p>
+                <p className="text-sm font-semibold text-[var(--color-text)]">{session.business.name}</p>
+              </div>
+              <button
+                onClick={() => setSidebarExpanded(false)}
+                className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 text-xs">
+              {renderNavButtons({ onSelect: () => setSidebarExpanded(false) })}
+            </div>
+            <div className="mt-5 border-t border-[var(--color-border-subtle)] pt-4 text-sm">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
+              <p className="mt-1 text-[var(--color-text)]">{session.user?.email ?? "Account"}</p>
+              <button
+                onClick={() => {
+                  setSidebarExpanded(false);
+                  signOut();
+                }}
+                className="mt-3 w-full rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1 px-6 lg:h-full lg:overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">BoothOS Dashboard</p>
@@ -713,14 +836,10 @@ export default function BusinessPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2 lg:hidden">
-            {[
-              { id: "overview", label: "Overview" },
-              { id: "events", label: "Events" },
-              { id: "deliveries", label: "Deliveries" },
-            ].map((tab) => (
+            {navTabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setView(tab.id as typeof view)}
+                onClick={() => setView(tab.id)}
                 className={`rounded-full px-3 py-2 ring-1 text-xs ${
                   view === tab.id
                     ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
@@ -760,17 +879,12 @@ export default function BusinessPage() {
         </>
       )}
 
-      {/* mobile tab bar */ }
+      {/* mobile tab bar */}
       <div className="mt-4 flex flex-wrap gap-2 text-xs lg:hidden">
-        {[
-          { id: "overview", label: "Overview" },
-          { id: "events", label: "Events" },
-          { id: "deliveries", label: "Deliveries" },
-          { id: "staff", label: "Staff links" },
-        ].map((tab) => (
+        {mobileTabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setView(tab.id as typeof view)}
+            onClick={() => setView(tab.id)}
             className={`rounded-full px-3 py-2 ring-1 ${
               view === tab.id
                 ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
@@ -941,7 +1055,7 @@ export default function BusinessPage() {
                 checked={newAllowBgRemoval}
                 onChange={(e) => setNewAllowBgRemoval(e.target.checked)}
               />
-              Background removal
+              Allow background removal (cutouts)
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -1075,7 +1189,7 @@ export default function BusinessPage() {
                         <button
                           onClick={() => startCheckout("photographer-single", event.id)}
                           disabled={checkoutLoading === "photographer-single" + event.id}
-                          className="rounded-full bg-[var(--color-primary)] px-3 py-1 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                          className="rounded-full bg-[var(--color-accent)] px-3 py-1 font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
                         >
                           {checkoutLoading === "photographer-single" + event.id
                             ? "Loading..."
@@ -1136,7 +1250,7 @@ export default function BusinessPage() {
                         <div className="mt-2 flex flex-wrap gap-2">
                           <button
                             onClick={() => openBackgroundManager(event)}
-                            className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                            className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] transition hover:ring-[var(--color-accent)]"
                           >
                             Open backgrounds manager
                           </button>
@@ -1186,7 +1300,7 @@ export default function BusinessPage() {
                   <div className="flex flex-wrap items-center gap-2 text-xs sm:flex-nowrap">
                     <button
                       onClick={() => rotateKey(event.id)}
-                      className="whitespace-nowrap rounded-full bg-[var(--color-primary)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                      className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] transition hover:ring-[var(--color-accent)]"
                     >
                       Rotate access key
                     </button>
@@ -1230,15 +1344,15 @@ export default function BusinessPage() {
                             onChange={(e) =>
                               setSelectionEmails((prev) => ({ ...prev, [event.id]: e.target.value }))
                             }
-                            className="min-w-[220px] flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)]"
-                          />
-                          <button
-                            onClick={() => sendSelectionLink(event)}
-                            className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
-                          >
-                            Send link
-                          </button>
-                        </div>
+                          className="min-w-[220px] flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)]"
+                        />
+                        <button
+                          onClick={() => sendSelectionLink(event)}
+                          className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
+                        >
+                          Send link
+                        </button>
+                      </div>
                         {selectionStatus[event.id] && (
                           <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
                             {selectionStatus[event.id]}{" "}
@@ -1324,7 +1438,7 @@ export default function BusinessPage() {
                     />
                     <button
                       onClick={() => resend(item.id, productionEvent)}
-                      className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)]"
+                      className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
                     >
                       Resend
                     </button>

@@ -79,6 +79,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     if (planFeatures.premiumFilters) return [...FILTERS, ...PREMIUM_FILTERS];
     return FILTERS;
   }, [planFeatures.premiumFilters]);
+  const backgroundRemovalEnabled = session?.event?.allowBackgroundRemoval ?? true;
 
   const startCamera = useCallback(async () => {
     try {
@@ -364,10 +365,16 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
                 <input
                   type="checkbox"
                   checked={removeBackground}
+                  disabled={!backgroundRemovalEnabled}
                   onChange={(e) => setRemoveBackground(e.target.checked)}
                 />
-                Background removal
+                Background removal (host-controlled)
               </label>
+              {!backgroundRemovalEnabled && (
+                <p className="text-[11px] text-[var(--color-text-soft)]">
+                  Background removal is disabled for this event; photos will send without cutouts.
+                </p>
+              )}
               {planFeatures.allowAiBackgrounds && (
                 <div className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-[11px] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
                   <p className="font-semibold text-[var(--color-text)]">AI backgrounds enabled by your host</p>
