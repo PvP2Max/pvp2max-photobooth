@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 
@@ -178,6 +178,17 @@ export default function BusinessPage() {
   const [sidebarCondensed, setSidebarCondensed] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const isSidebarWide = !sidebarCondensed || sidebarExpanded;
+  const [testStream, setTestStream] = useState<MediaStream | null>(null);
+  const [testVideoReady, setTestVideoReady] = useState(false);
+  const [testCapture, setTestCapture] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [testShowTips, setTestShowTips] = useState(false);
+  const testVideoRef = useRef<HTMLVideoElement | null>(null);
+  const testCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const defaultBgPreview = "/assets/defaults/backgrounds/Modern White Marble.png";
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -188,11 +199,15 @@ export default function BusinessPage() {
     const events = session?.events ?? [];
     const live = events.filter((e) => e.status !== "closed");
     const photographer = events.filter((e) => e.mode === "photographer");
+    const isPhotographerActive =
+      (session?.business.subscriptionStatus ?? "") === "active" ||
+      (session?.business.subscriptionPlan ?? "").toLowerCase().includes("photographer");
     return {
       total: events.length,
       live: live.length,
       photographer: photographer.length,
       subscription: session?.business.subscriptionStatus ?? "none",
+      isPhotographerActive,
     };
   }, [session]);
 
@@ -217,6 +232,12 @@ export default function BusinessPage() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      testStream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [testStream]);
 
   function eventNeedsPayment(event: EventItem) {
     if (event.mode === "photographer") {
@@ -537,6 +558,92 @@ export default function BusinessPage() {
     } else {
       setMessage(`Copied ${label ?? "link"} to clipboard.`);
     }
+  }
+
+  async function startTestCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      setTestStream(stream);
+      setTestError(null);
+      setTestMessage("Camera ready. Capture a test shot.");
+      const videoEl = testVideoRef.current;
+      if (videoEl) {
+        videoEl.srcObject = stream;
+        await videoEl.play();
+        setTestVideoReady(true);
+      }
+    } catch {
+      setTestError("Camera unavailable. Check permissions.");
+    }
+  }
+
+  function stopTestCamera() {
+    testStream?.getTracks().forEach((t) => t.stop());
+    setTestStream(null);
+    setTestVideoReady(false);
+  }
+
+  function captureTestFrame() {
+    if (!testVideoRef.current || !testCanvasRef.current) return;
+    const video = testVideoRef.current;
+    const canvas = testCanvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    canvas.width = w;
+    canvas.height = h;
+    ctx.drawImage(video, 0, 0, w, h);
+    const url = canvas.toDataURL("image/png");
+    setTestCapture(url);
+    setTestResult(null);
+    setTestMessage("Captured. Process to preview on a default background.");
+  }
+
+  async function processTestFile(file: File) {
+    setTestLoading(true);
+    setTestError(null);
+    setTestShowTips(false);
+    setTestMessage("Removing background…");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/remove-background", { method: "POST", body: form });
+      const data = (await res.json().catch(() => ({}))) as { imageBase64?: string; contentType?: string; error?: string };
+      if (!res.ok || !data.imageBase64) {
+        throw new Error(data.error || "Background removal failed.");
+      }
+      const contentType = data.contentType || "image/png";
+      const cutout = `data:${contentType};base64,${data.imageBase64}`;
+      setTestResult(cutout);
+      setTestMessage("Preview ready. Does this look right?");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to process test image.";
+      setTestError(msg);
+      setTestMessage(null);
+    } finally {
+      setTestLoading(false);
+    }
+  }
+
+  async function processTestCapture() {
+    if (!testCapture) {
+      setTestError("Capture or upload a photo first.");
+      return;
+    }
+    const blob = await fetch(testCapture).then((r) => r.blob());
+    const file = new File([blob], "test-capture.png", { type: "image/png" });
+    await processTestFile(file);
+  }
+
+  async function handleTestUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setTestCapture(URL.createObjectURL(file));
+    await processTestFile(file);
   }
 
   async function showQr(href: string, label: string) {
@@ -1180,6 +1287,162 @@ export default function BusinessPage() {
             >
               View deliveries
             </button>
+          </div>
+        </section>
+      )}
+
+      {view === "overview" && (
+        <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">AI test bench</p>
+              <h2 className="text-xl font-semibold text-[var(--color-text)]">Test background removal</h2>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Capture (or upload for photographer subscription) to remove the background and preview on a default backdrop.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-soft)]">
+              <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+                Deletes after preview (not stored)
+              </span>
+              {!stats.isPhotographerActive && (
+                <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]">
+                  Uploads unlock with photographer subscription
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-3 rounded-2xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+              <div className="rounded-xl bg-[var(--color-bg-subtle)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+                <video
+                  ref={testVideoRef}
+                  className={`h-64 w-full rounded-lg bg-[var(--color-bg)] object-cover ${testVideoReady ? "" : "opacity-70"}`}
+                  muted
+                  playsInline
+                />
+                <canvas ref={testCanvasRef} className="hidden" />
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={startTestCamera}
+                    className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
+                  >
+                    {testStream ? "Restart camera" : "Start camera"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={captureTestFrame}
+                    disabled={!testStream}
+                    className="rounded-full bg-[var(--gradient-brand)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)] disabled:opacity-60"
+                  >
+                    Capture test shot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={stopTestCamera}
+                    disabled={!testStream}
+                    className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] disabled:opacity-60"
+                  >
+                    Stop camera
+                  </button>
+                  {stats.isPhotographerActive && (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleTestUpload}
+                      />
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    onClick={processTestCapture}
+                    disabled={!testCapture || testLoading}
+                    className="rounded-full bg-[var(--color-accent)] px-3 py-2 font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)] disabled:opacity-60"
+                  >
+                    {testLoading ? "Processing…" : "Process + preview"}
+                  </button>
+                </div>
+              </div>
+              {testCapture && (
+                <div className="text-xs text-[var(--color-text-muted)]">
+                  Captured preview ready. You can re-capture or process with the current image.
+                </div>
+              )}
+              {testError && (
+                <div className="rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
+                  {testError}
+                </div>
+              )}
+              {testMessage && (
+                <div className="rounded-xl bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+                  {testMessage}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-2xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
+              <p className="text-sm font-semibold text-[var(--color-text)]">Preview</p>
+              <div className="rounded-xl bg-[var(--color-bg-subtle)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+                <div
+                  className="relative aspect-video overflow-hidden rounded-lg ring-1 ring-[var(--color-border-subtle)]"
+                  style={{
+                    backgroundImage: `url(${defaultBgPreview})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  {testResult ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={testResult}
+                      alt="Processed preview"
+                      className="absolute inset-0 h-full w-full object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs text-[var(--color-text-muted)]">
+                      Capture and process to preview here.
+                    </div>
+                  )}
+                </div>
+              </div>
+              {testResult && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTestShowTips(false);
+                      setTestMessage("Great! Background removal looks good.");
+                    }}
+                    className="rounded-full bg-[var(--color-success-soft)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]"
+                  >
+                    Looks right
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTestShowTips(true)}
+                    className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
+                  >
+                    Not quite
+                  </button>
+                </div>
+              )}
+              {testShowTips && (
+                <div className="rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+                  <p className="font-semibold">Tips for cleaner cutouts:</p>
+                  <ul className="mt-2 list-disc pl-5 text-[var(--color-text-muted)]">
+                    <li>Use soft, angled lighting (40–80% power) aimed slightly downward.</li>
+                    <li>Stand 1–2 feet away from a flat, solid-colored wall to reduce spill.</li>
+                    <li>Avoid motion blur—steady the device and use adequate light.</li>
+                    <li>Keep the subject fully in frame and avoid heavy shadows behind them.</li>
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       )}
