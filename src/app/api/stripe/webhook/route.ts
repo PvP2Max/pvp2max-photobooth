@@ -105,7 +105,7 @@ async function createPaidEventFromMetadata(businessId: string, plan: BoothEventP
     const defaults = applyPlanDefaults(plan);
     const { event } = await createEvent(businessId, {
       name: parsed.name,
-      status: (parsed.status as any) ?? "live",
+      status: parsed.status === "closed" ? "closed" : "live",
       mode: parsed.mode ?? "self-serve",
       plan,
       allowBackgroundRemoval: parsed.allowBackgroundRemoval ?? true,
