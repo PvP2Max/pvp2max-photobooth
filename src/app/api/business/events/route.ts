@@ -53,6 +53,16 @@ export async function POST(request: NextRequest) {
   if (!body.name) {
     return NextResponse.json({ error: "Name is required." }, { status: 400 });
   }
+  if (!body.eventDate) {
+    return NextResponse.json(
+      { error: "Event date is required. Events auto-delete 7 days after the date." },
+      { status: 400 },
+    );
+  }
+  const parsedDate = new Date(body.eventDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return NextResponse.json({ error: "Event date is invalid." }, { status: 400 });
+  }
 
   const plan = (body.plan as BoothEventPlan | undefined) ?? "event-basic";
   const isFree = plan === "free";

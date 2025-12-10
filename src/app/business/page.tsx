@@ -125,6 +125,7 @@ export default function BusinessPage() {
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const navIcons: Record<"overview" | "events" | "deliveries", ReactNode> = {
     overview: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -310,6 +311,10 @@ export default function BusinessPage() {
   async function createEvent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!session) return;
+    if (!newEventDate) {
+      setError("Event date is required. Events auto-delete 7 days after this date.");
+      return;
+    }
     setError(null);
     setMessage(null);
     try {
@@ -329,7 +334,7 @@ export default function BusinessPage() {
           deliverySms: newDeliverySms,
           overlayTheme: newOverlayTheme,
           galleryPublic: newGalleryPublic,
-          eventDate: newEventDate || undefined,
+          eventDate: newEventDate,
           eventTime: newEventTime || undefined,
           allowedSelections: newMode === "photographer" ? newAllowedSelections : undefined,
         }),
@@ -371,6 +376,7 @@ export default function BusinessPage() {
       setNewOverlayTheme("none");
       setNewEventDate("");
       setNewEventTime("");
+      setCreateModalOpen(false);
     } catch {
       setError("Could not create event.");
     }
@@ -932,10 +938,169 @@ export default function BusinessPage() {
           className={`mt-4 rounded-2xl px-4 py-3 text-sm ring-1 ${
             error
               ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-[rgba(249,115,115,0.35)]"
-              : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
+            : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
             }`}
         >
           {error || message}
+        </div>
+      )}
+
+      {createModalOpen && (
+        <div className="fixed inset-0 z-40 flex items-start justify-center bg-[var(--color-overlay)]/80 p-4 backdrop-blur-sm">
+          <div className="relative mt-10 w-full max-w-4xl rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Create event</p>
+                <h3 className="text-xl font-semibold text-[var(--color-text)]">Spin up a new event</h3>
+                <p className="text-sm text-[var(--color-text-muted)]">
+                  Events auto-delete (including storage) 7 days after the event date.
+                </p>
+              </div>
+              <button
+                onClick={() => setCreateModalOpen(false)}
+                aria-label="Close create event modal"
+                className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
+              >
+                Close
+              </button>
+            </div>
+            <form onSubmit={createEvent} className="mt-4 grid gap-3 md:grid-cols-3">
+              <input
+                required
+                value={newEventName}
+                onChange={(e) => setNewEventName(e.target.value)}
+                placeholder="Event name (e.g., Winter Gala)"
+                className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              />
+              <input
+                value={newEventKey}
+                onChange={(e) => setNewEventKey(e.target.value)}
+                placeholder="Event access key (optional)"
+                className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              />
+              <select
+                value={newMode}
+                onChange={(e) => setNewMode(e.target.value as "self-serve" | "photographer")}
+                className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              >
+                <option value="self-serve">Self-service booth</option>
+                <option value="photographer">Photographer mode</option>
+              </select>
+              <select
+                value={newPlan}
+                onChange={(e) => setNewPlan(e.target.value)}
+                className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
+              >
+                {newMode === "self-serve" ? (
+                  <>
+                    <option value="free">Free (50 photos, basic overlays)</option>
+                    <option value="event-basic">$10 / 100 photos</option>
+                    <option value="event-unlimited">$20 / unlimited</option>
+                    <option value="event-ai">$30 / unlimited + AI backgrounds</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="photographer-single">$100 photographer event</option>
+                    <option value="photographer-monthly">$250 photographer monthly</option>
+                  </>
+                )}
+              </select>
+              <label className="text-sm text-[var(--color-text-muted)]">
+                Event date (required)
+                <input
+                  required
+                  type="date"
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                />
+              </label>
+              <label className="text-sm text-[var(--color-text-muted)]">
+                Event time (optional)
+                <input
+                  type="time"
+                  value={newEventTime}
+                  onChange={(e) => setNewEventTime(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                />
+              </label>
+              {newMode === "photographer" && (
+                <label className="text-sm text-[var(--color-text-muted)]">
+                  Selections per guest (photographer mode)
+                  <input
+                    type="number"
+                    min={1}
+                    value={newAllowedSelections}
+                    onChange={(e) => setNewAllowedSelections(Number(e.target.value) || 1)}
+                    placeholder="Selections per guest"
+                    className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                  />
+                </label>
+              )}
+              <div className="md:col-span-3 flex flex-wrap gap-4 text-sm text-[var(--color-text-muted)]">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newAllowBgRemoval}
+                    onChange={(e) => setNewAllowBgRemoval(e.target.checked)}
+                  />
+                  Allow background removal (cutouts)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newAllowAiBg}
+                    onChange={(e) => setNewAllowAiBg(e.target.checked)}
+                  />
+                  AI backgrounds (uses credits)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newAllowAiFilters}
+                    onChange={(e) => setNewAllowAiFilters(e.target.checked)}
+                  />
+                  Filters
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newDeliverySms}
+                    onChange={(e) => setNewDeliverySms(e.target.checked)}
+                  />
+                  Enable SMS delivery (placeholder)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={newGalleryPublic}
+                    onChange={(e) => setNewGalleryPublic(e.target.checked)}
+                  />
+                  Public gallery
+                </label>
+              </div>
+              <div className="md:col-span-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[11px] text-[var(--color-text-soft)]">
+                  Events and storage purge 7 days after the event date to conserve space.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreateModalOpen(false)}
+                    className="rounded-xl bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
+                  >
+                    Create event
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -986,7 +1151,10 @@ export default function BusinessPage() {
           </p>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => setView("events")}
+              onClick={() => {
+                setView("events");
+                setCreateModalOpen(true);
+              }}
               className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(155,92,255,0.32)] hover:opacity-95"
             >
               Create a new event
@@ -1002,412 +1170,283 @@ export default function BusinessPage() {
       )}
 
       {view === "events" && (
-        <>
-      <section className="mt-6 grid gap-4 rounded-2xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Create event</p>
-            <h2 className="text-xl font-semibold">Spin up a new event</h2>
-          </div>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Keys are shown once; rotate anytime.
-          </p>
-        </div>
-        <form onSubmit={createEvent} className="grid gap-3 md:grid-cols-3">
-          <input
-            required
-            value={newEventName}
-            onChange={(e) => setNewEventName(e.target.value)}
-            placeholder="Event name (e.g., Winter Gala)"
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          />
-          <input
-            value={newEventKey}
-            onChange={(e) => setNewEventKey(e.target.value)}
-            placeholder="Event access key (optional)"
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          />
-          <select
-            value={newMode}
-            onChange={(e) => setNewMode(e.target.value as "self-serve" | "photographer")}
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          >
-            <option value="self-serve">Self-service booth</option>
-            <option value="photographer">Photographer mode</option>
-          </select>
-          <select
-            value={newPlan}
-            onChange={(e) => setNewPlan(e.target.value)}
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          >
-            {newMode === "self-serve" ? (
-              <>
-                <option value="free">Free (50 photos, basic overlays)</option>
-                <option value="event-basic">$10 / 100 photos</option>
-                <option value="event-unlimited">$20 / unlimited</option>
-                <option value="event-ai">$30 / unlimited + AI backgrounds</option>
-              </>
-            ) : (
-              <>
-                <option value="photographer-single">$100 photographer event</option>
-                <option value="photographer-monthly">$250 photographer monthly</option>
-              </>
-            )}
-          </select>
-          <input
-            value={newEventDate}
-            onChange={(e) => setNewEventDate(e.target.value)}
-            placeholder="Event date (optional)"
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          />
-          <input
-            value={newEventTime}
-            onChange={(e) => setNewEventTime(e.target.value)}
-            placeholder="Event time (optional)"
-            className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-          />
-          {newMode === "photographer" && (
-            <label className="text-sm text-[var(--color-text-muted)]">
-              Selections per guest (photographer mode)
-              <input
-                type="number"
-                min={1}
-                value={newAllowedSelections}
-                onChange={(e) => setNewAllowedSelections(Number(e.target.value) || 1)}
-                placeholder="Selections per guest"
-                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-              />
-            </label>
-          )}
-          <div className="md:col-span-3 flex flex-wrap gap-4 text-sm text-[var(--color-text-muted)]">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={newAllowBgRemoval}
-                onChange={(e) => setNewAllowBgRemoval(e.target.checked)}
-              />
-              Allow background removal (cutouts)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={newAllowAiBg}
-                onChange={(e) => setNewAllowAiBg(e.target.checked)}
-              />
-              AI backgrounds (uses credits)
-            </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={newAllowAiFilters}
-                    onChange={(e) => setNewAllowAiFilters(e.target.checked)}
-                  />
-                  Filters
-                </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={newDeliverySms}
-                onChange={(e) => setNewDeliverySms(e.target.checked)}
-              />
-              Enable SMS delivery (placeholder)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={newGalleryPublic}
-                onChange={(e) => setNewGalleryPublic(e.target.checked)}
-              />
-              Public gallery
-            </label>
-          </div>
-          <div className="md:col-span-3 flex justify-end">
-            <button
-              type="submit"
-              className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
-            >
-              Create event
-            </button>
-          </div>
-          <div className="md:col-span-3 rounded-xl bg-[var(--color-surface-elevated)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)]">
-            Want a custom frame or background? Contact Arctic Aura Designs and mention you came from BoothOS for a discounted design:
-            {" "}
-            <a
-              className="text-[var(--color-primary)] underline"
-              href="mailto:info@arcticauradesigns.com?subject=%5BInquiry%5D%20Custom%20Background/Frame%20for%20BoothOS"
-            >
-              info@arcticauradesigns.com
-            </a>
-          </div>
-        </form>
-      </section>
-
-      <section className="mt-6 grid gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Copy the links and share with your staff. If you’re logged in, no event key is needed.
-          </p>
-        </div>
-        {activeEvents.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">No events yet.</p>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {activeEvents.map((event) => {
-              const usage = usageFor(event);
-              const checkin = linkFor("/checkin", session.business.slug, event.slug);
-              const photographer = linkFor("/photographer", session.business.slug, event.slug);
-              const frontdesk = linkFor("/frontdesk", session.business.slug, event.slug);
-              const booth = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
-              return (
-                <div
-                  key={event.id}
-                  className="rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] space-y-3"
+        <section className="mt-6 grid gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
+            <div className="flex flex-col items-end gap-2 text-right">
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Events auto-delete (with storage) 7 days after the event date.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setCreateModalOpen(true)}
+                  className="rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-xs font-semibold text-white shadow-[0_12px_30px_rgba(155,92,255,0.32)] hover:opacity-95"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
-                      <p className="text-xs text-[var(--color-text-muted)]">
-                        Slug: {event.slug} • Created {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}
-                      </p>
-                      <p className="text-xs text-[var(--color-text-muted)]">
-                        Mode: {event.mode ?? "self-serve"} • Plan: {event.plan ?? "event-basic"} • Overlay:{" "}
-                        {overlayLabel(event.overlayTheme)}
-                      </p>
-                      <p className="text-[11px] text-[var(--color-text-soft)]">
-                        Access key hint: {event.accessHint ?? "—"}
-                      </p>
-                      {issuingKey[event.id] && (
-                        <p className="mt-1 text-[11px] text-[var(--color-success)]">
-                          New key: {issuingKey[event.id]}
+                  New event
+                </button>
+                <p className="text-[11px] text-[var(--color-text-muted)]">
+                  Copy links and share with staff. Logged-in users skip event keys.
+                </p>
+              </div>
+            </div>
+          </div>
+          {activeEvents.length === 0 ? (
+            <p className="text-sm text-[var(--color-text-muted)]">No events yet.</p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {activeEvents.map((event) => {
+                const usage = usageFor(event);
+                const checkin = linkFor("/checkin", session.business.slug, event.slug);
+                const photographer = linkFor("/photographer", session.business.slug, event.slug);
+                const frontdesk = linkFor("/frontdesk", session.business.slug, event.slug);
+                const booth = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          Slug: {event.slug} • Created {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : ""}
                         </p>
-                      )}
-                      {event.mode === "photographer" && (
-                        <p className="text-[11px] text-[var(--color-text-muted)]">
-                          Payment: {event.paymentStatus ?? "unpaid"} • Allowed selections:{" "}
-                          {event.allowedSelections ?? 3}
+                        <p className="text-xs text-[var(--color-text-muted)]">
+                          Mode: {event.mode ?? "self-serve"} • Plan: {event.plan ?? "event-basic"} • Overlay:{" "}
+                          {overlayLabel(event.overlayTheme)}
                         </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${
-                          event.status === "closed"
-                            ? "bg-[rgba(249,115,115,0.16)] text-[var(--color-text)] ring-[rgba(249,115,115,0.35)]"
-                            : "bg-[rgba(34,197,94,0.14)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
-                        }`}
-                      >
-                        {event.status ?? "live"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="grid gap-2 text-xs">
-                    <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                      <span>
-                        Photos: {usage.photoUsed}
-                        {usage.photoCap === null ? " / ∞" : ` / ${usage.photoCap}`} (remaining{" "}
-                        {usage.remainingPhotos === null ? "∞" : usage.remainingPhotos})
-                      </span>
-                      <span>
-                        AI credits: {usage.aiUsed} / {usage.aiCredits} (remaining {usage.remainingAi})
-                      </span>
-                    </div>
-                    {event.mode === "photographer" && event.paymentStatus !== "paid" && (
-                      <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                        <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]">
-                          Payment required to unlock photographer mode.
-                        </span>
-                        <button
-                          onClick={() => startCheckout("photographer-single", event.id)}
-                          disabled={checkoutLoading === "photographer-single" + event.id}
-                          className="rounded-full bg-[var(--color-accent)] px-3 py-1 font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
-                        >
-                          {checkoutLoading === "photographer-single" + event.id
-                            ? "Loading..."
-                            : "Pay $100 event"}
-                        </button>
-                        <button
-                          onClick={() => startCheckout("photographer-monthly")}
-                          disabled={checkoutLoading === "photographer-monthly"}
-                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                        >
-                          {checkoutLoading === "photographer-monthly" ? "Loading..." : "Start $250/mo"}
-                        </button>
-                      </div>
-                    )}
-                    {event.plan === "free" && (
-                      <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                        <span className="rounded-full bg-[rgba(103,232,249,0.12)] px-3 py-1 ring-1 ring-[rgba(103,232,249,0.35)] text-[var(--color-text)]">
-                          Free tier: watermark + 50 photo cap.
-                        </span>
-                        <button
-                          onClick={() => startCheckout("event-basic", event.id)}
-                          disabled={checkoutLoading === "event-basic" + event.id}
-                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                        >
-                          Upgrade to Basic
-                        </button>
-                        <button
-                          onClick={() => startCheckout("event-unlimited", event.id)}
-                          disabled={checkoutLoading === "event-unlimited" + event.id}
-                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                        >
-                          Unlimited
-                        </button>
-                        <button
-                          onClick={() => startCheckout("event-ai", event.id)}
-                          disabled={checkoutLoading === "event-ai" + event.id}
-                          className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                        >
-                          AI backgrounds
-                        </button>
-                      </div>
-                    )}
-                    {event.allowAiBackgrounds && (
-                      <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 md:px-4 ring-1 ring-[var(--color-border-subtle)]">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-[11px] font-semibold text-[var(--color-text)]">
-                            AI backgrounds for this event
+                        <p className="text-[11px] text-[var(--color-text-soft)]">
+                          Access key hint: {event.accessHint ?? "—"}
+                        </p>
+                        {issuingKey[event.id] && (
+                          <p className="mt-1 text-[11px] text-[var(--color-success)]">
+                            New key: {issuingKey[event.id]}
                           </p>
-                          {eventNeedsPayment(event) && (
-                            <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
-                              Pay first to enable
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
-                          Generate AI backgrounds and upload frames inside the Backgrounds manager. Frames are upload-only on the AI plan.
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            onClick={() => openBackgroundManager(event)}
-                            className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] transition hover:ring-[var(--color-accent)]"
-                          >
-                            Open backgrounds manager
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {(((event.mode ?? "self-serve") === "self-serve")
-                      ? [{ label: "Booth link", href: booth }]
-                      : [
-                          { label: "Check-in link", href: checkin },
-                          { label: "Photographer link", href: photographer },
-                          { label: "Front desk link", href: frontdesk },
-                          { label: "Booth link", href: booth },
-                        ]
-                    ).map((link) => (
-                      <div
-                        key={link.label}
-                        className="flex w-full min-w-0 max-w-full flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
-                      >
-                        <div className="min-w-0 w-full sm:max-w-[420px]">
-                          <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
-                          <p className="break-words font-mono text-[11px] text-[var(--color-text)] sm:truncate">
-                            {absoluteLink(link.href)}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 flex-wrap items-center gap-1 self-start">
-                          <button
-                            onClick={() => copy(link.href, link.label, `${event.id}-${link.label}`)}
-                            className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 transition ${
-                              copiedLink[`${event.id}-${link.label}`]
-                                ? "bg-[rgba(34,197,94,0.2)] text-[var(--color-text)] ring-[rgba(34,197,94,0.5)]"
-                                : "bg-[var(--color-surface)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
-                            }`}
-                          >
-                            {copiedLink[`${event.id}-${link.label}`] ? "Copied" : "Copy"}
-                          </button>
-                          <button
-                            onClick={() => showQr(link.href, link.label)}
-                            className="rounded-full bg-[var(--color-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                          >
-                            QR
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs sm:flex-nowrap">
-                    <button
-                      onClick={() => rotateKey(event.id)}
-                      className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] transition hover:ring-[var(--color-accent)]"
-                    >
-                      Rotate access key
-                    </button>
-                    {event.status === "closed" ? (
-                      <button
-                        onClick={() => updateStatus(event.id, "live")}
-                        className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                      >
-                        Reopen
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => updateStatus(event.id, "closed")}
-                        className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                      >
-                        Close event
-                      </button>
-                    )}
-                    <button
-                      onClick={() => loadProductions(event.slug)}
-                      className="whitespace-nowrap rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                    >
-                      View deliveries
-                    </button>
-                    <button
-                      onClick={() => deleteEvent(event)}
-                      className="whitespace-nowrap rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-                    >
-                      Delete event
-                    </button>
-                    {event.mode === "photographer" && (
-                      <div className="w-full rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
-                        <p className="text-[11px] font-semibold text-[var(--color-text)]">
-                          Send selection link
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <input
-                            type="email"
-                            placeholder="guest@example.com"
-                            value={selectionEmails[event.id] ?? ""}
-                            onChange={(e) =>
-                              setSelectionEmails((prev) => ({ ...prev, [event.id]: e.target.value }))
-                            }
-                          className="min-w-[220px] flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)]"
-                        />
-                        <button
-                          onClick={() => sendSelectionLink(event)}
-                          className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
-                        >
-                          Send link
-                        </button>
-                      </div>
-                        {selectionStatus[event.id] && (
-                          <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                            {selectionStatus[event.id]}{" "}
-                            {selectionLinks[event.id] && (
-                              <button
-                                onClick={() => copy(selectionLinks[event.id])}
-                                className="ml-2 text-[11px] font-semibold text-[var(--color-primary)] underline"
-                              >
-                                Copy link
-                              </button>
-                            )}
+                        )}
+                        {event.mode === "photographer" && (
+                          <p className="text-[11px] text-[var(--color-text-muted)]">
+                            Payment: {event.paymentStatus ?? "unpaid"} • Allowed selections:{" "}
+                            {event.allowedSelections ?? 3}
                           </p>
                         )}
                       </div>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${
+                            event.status === "closed"
+                              ? "bg-[rgba(249,115,115,0.16)] text-[var(--color-text)] ring-[rgba(249,115,115,0.35)]"
+                              : "bg-[rgba(34,197,94,0.14)] text-[var(--color-text)] ring-[rgba(34,197,94,0.35)]"
+                          }`}
+                        >
+                          {event.status ?? "live"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 text-xs">
+                      <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                        <span>
+                          Photos: {usage.photoUsed}
+                          {usage.photoCap === null ? " / ∞" : ` / ${usage.photoCap}`} (remaining{" "}
+                          {usage.remainingPhotos === null ? "∞" : usage.remainingPhotos})
+                        </span>
+                        <span>
+                          AI credits: {usage.aiUsed} / {usage.aiCredits} (remaining {usage.remainingAi})
+                        </span>
+                      </div>
+                      {event.mode === "photographer" && event.paymentStatus !== "paid" && (
+                        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                          <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]">
+                            Payment required to unlock photographer mode.
+                          </span>
+                          <button
+                            onClick={() => startCheckout("photographer-single", event.id)}
+                            disabled={checkoutLoading === "photographer-single" + event.id}
+                            className="rounded-full bg-[var(--color-accent)] px-3 py-1 font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
+                          >
+                            {checkoutLoading === "photographer-single" + event.id
+                              ? "Loading..."
+                              : "Pay $100 event"}
+                          </button>
+                          <button
+                            onClick={() => startCheckout("photographer-monthly")}
+                            disabled={checkoutLoading === "photographer-monthly"}
+                            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                          >
+                            {checkoutLoading === "photographer-monthly" ? "Loading..." : "Start $250/mo"}
+                          </button>
+                        </div>
+                      )}
+                      {event.plan === "free" && (
+                        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
+                          <span className="rounded-full bg-[rgba(103,232,249,0.12)] px-3 py-1 ring-1 ring-[rgba(103,232,249,0.35)] text-[var(--color-text)]">
+                            Free tier: watermark + 50 photo cap.
+                          </span>
+                          <button
+                            onClick={() => startCheckout("event-basic", event.id)}
+                            disabled={checkoutLoading === "event-basic" + event.id}
+                            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                          >
+                            Upgrade to Basic
+                          </button>
+                          <button
+                            onClick={() => startCheckout("event-unlimited", event.id)}
+                            disabled={checkoutLoading === "event-unlimited" + event.id}
+                            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                          >
+                            Unlimited
+                          </button>
+                          <button
+                            onClick={() => startCheckout("event-ai", event.id)}
+                            disabled={checkoutLoading === "event-ai" + event.id}
+                            className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                          >
+                            AI backgrounds
+                          </button>
+                        </div>
+                      )}
+                      {event.allowAiBackgrounds && (
+                        <div className="w-full min-w-0 max-w-full overflow-hidden rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 md:px-4 ring-1 ring-[var(--color-border-subtle)]">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold text-[var(--color-text)]">
+                              AI backgrounds for this event
+                            </p>
+                            {eventNeedsPayment(event) && (
+                              <span className="rounded-full bg-[rgba(249,115,115,0.12)] px-3 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
+                                Pay first to enable
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-[11px] text-[var(--color-text-soft)]">
+                            Generate AI backgrounds and upload frames inside the Backgrounds manager. Frames are upload-only on the AI plan.
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              onClick={() => openBackgroundManager(event)}
+                              className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-2 text-[11px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] transition hover:ring-[var(--color-accent)]"
+                            >
+                              Open backgrounds manager
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {(((event.mode ?? "self-serve") === "self-serve")
+                        ? [{ label: "Booth link", href: booth }]
+                        : [
+                            { label: "Check-in link", href: checkin },
+                            { label: "Photographer link", href: photographer },
+                            { label: "Front desk link", href: frontdesk },
+                            { label: "Booth link", href: booth },
+                          ]
+                      ).map((link) => (
+                        <div
+                          key={link.label}
+                          className="flex w-full min-w-0 max-w-full flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left ring-1 ring-[var(--color-border-subtle)] sm:flex-row sm:items-start sm:justify-between"
+                        >
+                          <div className="min-w-0 w-full sm:max-w-[420px]">
+                            <p className="text-[11px] text-[var(--color-text-muted)]">{link.label}</p>
+                            <p className="break-words font-mono text-[11px] text-[var(--color-text)] sm:truncate">
+                              {absoluteLink(link.href)}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-1 self-start">
+                            <button
+                              onClick={() => copy(link.href, link.label, `${event.id}-${link.label}`)}
+                              className={`rounded-full px-2 py-1 text-[10px] font-semibold ring-1 transition ${
+                                copiedLink[`${event.id}-${link.label}`]
+                                  ? "bg-[rgba(34,197,94,0.2)] text-[var(--color-text)] ring-[rgba(34,197,94,0.5)]"
+                                  : "bg-[var(--color-surface)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
+                              }`}
+                            >
+                              {copiedLink[`${event.id}-${link.label}`] ? "Copied" : "Copy"}
+                            </button>
+                            <button
+                              onClick={() => showQr(link.href, link.label)}
+                              className="rounded-full bg-[var(--color-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                            >
+                              QR
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:flex-nowrap">
+                      <button
+                        onClick={() => rotateKey(event.id)}
+                        className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-strong)] transition hover:ring-[var(--color-accent)]"
+                      >
+                        Rotate access key
+                      </button>
+                      {event.status === "closed" ? (
+                        <button
+                          onClick={() => updateStatus(event.id, "live")}
+                          className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        >
+                          Reopen
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => updateStatus(event.id, "closed")}
+                          className="whitespace-nowrap rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                        >
+                          Close event
+                        </button>
+                      )}
+                      <button
+                        onClick={() => loadProductions(event.slug)}
+                        className="whitespace-nowrap rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                      >
+                        View deliveries
+                      </button>
+                      <button
+                        onClick={() => deleteEvent(event)}
+                        className="whitespace-nowrap rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                      >
+                        Delete event
+                      </button>
+                      {event.mode === "photographer" && (
+                        <div className="w-full rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
+                          <p className="text-[11px] font-semibold text-[var(--color-text)]">
+                            Send selection link
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <input
+                              type="email"
+                              placeholder="guest@example.com"
+                              value={selectionEmails[event.id] ?? ""}
+                              onChange={(e) =>
+                                setSelectionEmails((prev) => ({ ...prev, [event.id]: e.target.value }))
+                              }
+                              className="min-w-[220px] flex-1 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-xs text-[var(--color-text)] placeholder:text-[var(--input-placeholder)]"
+                            />
+                            <button
+                              onClick={() => sendSelectionLink(event)}
+                              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-xs font-semibold text-[var(--color-text-on-dark)] ring-1 ring-[var(--color-accent-soft)] shadow-[0_8px_22px_rgba(56,189,248,0.28)]"
+                            >
+                              Send link
+                            </button>
+                          </div>
+                          {selectionStatus[event.id] && (
+                            <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
+                              {selectionStatus[event.id]}{" "}
+                              {selectionLinks[event.id] && (
+                                <button
+                                  onClick={() => copy(selectionLinks[event.id])}
+                                  className="ml-2 text-[11px] font-semibold text-[var(--color-primary)] underline"
+                                >
+                                  Copy link
+                                </button>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-        </>
+                );
+              })}
+            </div>
+          )}
+        </section>
       )}
 
       {view === "deliveries" && (
