@@ -5,5 +5,5 @@ export const metadata = {
 };
 
 export default function LoginPage() {
-  return <BusinessConsole />;
+  return <BusinessConsole mode="authOnly" />;
 }

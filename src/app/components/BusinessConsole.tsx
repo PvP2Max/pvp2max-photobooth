@@ -88,7 +88,9 @@ function overlayLabel(theme?: string) {
   }
 }
 
-export default function BusinessConsole() {
+type ConsoleMode = "full" | "authOnly";
+
+export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode }) {
   const router = useRouter();
   const [session, setSession] = useState<BusinessSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -501,6 +503,15 @@ export default function BusinessConsole() {
     return (
       <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
         Checking session…
+      </div>
+    );
+  }
+
+  if (mode === "authOnly" && session) {
+    router.replace("/dashboard");
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
+        Redirecting to dashboard…
       </div>
     );
   }
