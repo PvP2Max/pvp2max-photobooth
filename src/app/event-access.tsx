@@ -63,7 +63,7 @@ export default function EventAccessGate({ children }: Props) {
         setLoading(false);
       }
     },
-    [businessSlug, eventSlug, session],
+    [businessSlug, eventSlug],
   );
 
   useEffect(() => {
@@ -126,12 +126,12 @@ export default function EventAccessGate({ children }: Props) {
     }
   }
 
-async function handleSignOut() {
-  await fetch("/api/auth/event", { method: "DELETE", credentials: "include" });
-  setSession(null);
-  setAccessCode("");
-  window.location.href = "/business?view=events";
-}
+  async function handleSignOut() {
+    await fetch("/api/auth/event", { method: "DELETE", credentials: "include" });
+    setSession(null);
+    setAccessCode("");
+    window.location.href = "/login?view=events";
+  }
 
   if (loading) {
     return (
