@@ -622,10 +622,10 @@ export default function BusinessConsole() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="grid min-h-screen gap-6 px-4 py-6 lg:grid-cols-[280px,1fr]">
+      <div className="grid min-h-screen gap-6 px-4 py-6 lg:grid-cols-[230px,1fr]">
         <aside
-          className={`rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-4 transition-all ${
-            isSidebarWide ? "w-full" : "w-[80px]"
+          className={`rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
+            isSidebarWide ? "w-full max-w-[230px]" : "w-[80px]"
           }`}
         >
           <div className="flex items-center justify-between gap-3">
