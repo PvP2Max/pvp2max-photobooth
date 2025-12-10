@@ -177,20 +177,21 @@ export default function CalculatorPage() {
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background: #f5f7fb;
-          color: #0f172a;
+          background: var(--color-bg);
+          color: var(--color-text);
         }
         .hero {
-          background: #0b1224;
-          color: #e2e8f0;
+          background: var(--color-surface);
+          color: var(--color-text);
           padding: 32px 16px;
           text-align: center;
+          border-bottom: 1px solid var(--color-border-subtle);
         }
         .eyebrow {
           text-transform: uppercase;
           letter-spacing: 0.24em;
           font-size: 0.8rem;
-          color: #a5b4fc;
+          color: var(--color-primary-soft);
           margin: 0 0 8px;
         }
         h1 {
@@ -200,7 +201,7 @@ export default function CalculatorPage() {
         .subtitle {
           margin: 8px auto 0;
           max-width: 720px;
-          color: #cbd5e1;
+          color: var(--color-text-muted);
         }
         .container {
           max-width: 960px;
@@ -208,9 +209,10 @@ export default function CalculatorPage() {
           padding: 0 16px;
         }
         .card {
-          background: #ffffff;
+          background: var(--color-surface);
           border-radius: 18px;
-          box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+          box-shadow: var(--shadow-soft);
+          border: 1px solid var(--color-border-subtle);
           padding: 24px;
         }
         .layout {
@@ -236,13 +238,14 @@ export default function CalculatorPage() {
           width: 100%;
           padding: 10px 12px;
           border-radius: 10px;
-          border: 1px solid #e2e8f0;
-          background: #f8fafc;
+          border: 1px solid var(--color-border-subtle);
+          background: var(--color-bg);
+          color: var(--color-text);
           font-size: 1rem;
         }
         .helper {
           font-size: 0.9rem;
-          color: #475569;
+          color: var(--color-text-muted);
           margin: 0;
         }
         .error {
@@ -252,7 +255,7 @@ export default function CalculatorPage() {
         }
         .btn {
           margin-top: 6px;
-          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          background: var(--gradient-brand);
           color: #fff;
           border: none;
           border-radius: 12px;
@@ -268,49 +271,49 @@ export default function CalculatorPage() {
           box-shadow: 0 16px 34px rgba(37, 99, 235, 0.34);
         }
         .results {
-          background: #dbeafe;
-          border: 1px solid #bfdbfe;
+          background: var(--color-surface-elevated);
+          border: 1px solid var(--color-border-subtle);
           border-radius: 14px;
           padding: 16px;
         }
         .results h3 {
           margin: 0 0 12px;
-          color: #0f172a;
+          color: var(--color-text);
         }
         .stat {
           display: flex;
           justify-content: space-between;
           align-items: center;
           padding: 10px 0;
-          border-bottom: 1px solid #e2e8f0;
+          border-bottom: 1px solid var(--color-border-subtle);
         }
         .stat:last-child {
           border-bottom: none;
         }
         .label {
-          color: #475569;
+          color: var(--color-text-muted);
         }
         .value {
           font-weight: 700;
           font-size: 1.1rem;
         }
         .positive {
-          color: #15803d;
+          color: var(--color-success);
           font-size: 1.2rem;
         }
         .warning {
           margin-top: 10px;
           padding: 10px 12px;
-          background: #fff7ed;
-          border: 1px solid #fed7aa;
+          background: var(--color-warning-soft);
+          border: 1px solid rgba(251, 191, 36, 0.35);
           border-radius: 10px;
-          color: #b45309;
+          color: var(--color-warning);
           font-size: 0.95rem;
         }
         .note {
           text-align: center;
           margin: 18px 0 4px;
-          color: #475569;
+          color: var(--color-text-muted);
           font-size: 0.95rem;
         }
       `}</style>
