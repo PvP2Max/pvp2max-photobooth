@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createEvent,
-  getBusinessContext,
-  sanitizeBusiness,
-  sanitizeEvent,
-  planDefaults,
-} from "@/lib/tenants";
+import { createEvent, getBusinessContext, sanitizeBusiness, sanitizeEvent } from "@/lib/tenants";
 import type { BoothEventPlan } from "@/lib/tenants";
 import { getStripeClient, stripePrices } from "@/lib/stripe";
 
@@ -100,16 +94,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const defaults = planDefaults(plan);
     const payload = {
       name: body.name,
       status: body.status ?? "live",
       mode: (body.mode as "self-serve" | "photographer" | undefined) ?? "self-serve",
       allowBackgroundRemoval: body.allowBackgroundRemoval ?? true,
-      allowAiBackgrounds: body.allowAiBackgrounds ?? defaults.allowAiBackgrounds ?? false,
-      allowAiFilters: body.allowAiFilters ?? defaults.allowAiBackgrounds ?? false,
+      allowAiBackgrounds: body.allowAiBackgrounds ?? false,
+      allowAiFilters: body.allowAiFilters ?? false,
       deliveryEmail: body.deliveryEmail ?? true,
-      deliverySms: body.deliverySms ?? defaults.smsEnabled ?? false,
+      deliverySms: body.deliverySms ?? false,
       galleryPublic: body.galleryPublic ?? false,
       eventDate: body.eventDate,
       eventTime: body.eventTime,
