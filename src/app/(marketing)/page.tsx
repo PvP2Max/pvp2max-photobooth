@@ -12,9 +12,9 @@ export default function HomePage() {
     <div className="space-y-16">
       <section className="grid gap-10 overflow-hidden rounded-3xl bg-[var(--color-surface)] px-8 py-12 ring-1 ring-[var(--color-border-subtle)] lg:grid-cols-[1.25fr,1fr] lg:items-center">
         <div className="space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-text)] ring-1 ring-[rgba(155,92,255,0.35)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
             AI-powered booth software
-          </div>
+          </p>
           <div className="space-y-3">
             <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
               Turn Any iPad Into a Smart Photo Booth
@@ -43,10 +43,6 @@ export default function HomePage() {
               Free plan includes 50 photos. No credit card required.
             </p>
           </div>
-          <div className="rounded-2xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-            BoothOS handles overlays, AI background removal, and instant delivery links so guests can
-            grab their photos without waiting in a line for printouts.
-          </div>
         </div>
 
         <div className="relative isolate rounded-3xl bg-[var(--color-bg-subtle)] p-6 ring-1 ring-[var(--color-border-subtle)]">
@@ -60,33 +56,27 @@ export default function HomePage() {
               </span>
             </div>
             <div className="grid gap-3">
-              {["Countdown + filters", "Email or text link delivery", "Auto cleanup after send"].map(
-                (item) => (
-                  <div
-                    key={item}
-                    className="flex items-center justify-between rounded-2xl bg-[var(--color-surface)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)]"
-                  >
-                    <span className="text-sm text-[var(--color-text)]">{item}</span>
-                    <span className="h-2 w-2 rounded-full bg-[var(--color-primary-soft)]" />
-                  </div>
-                ),
-              )}
-            </div>
-            <div className="rounded-2xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
-                Trusted for
-              </p>
-              <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                Weddings, school dances, military balls, graduations, birthdays, and small business
-                pop-ups.
-              </p>
+              {[
+                "Background-free capture",
+                "Countdown + filters",
+                "Email or text link delivery",
+                "Auto cleanup after send",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center justify-between rounded-2xl bg-[var(--color-surface)] px-4 py-3 ring-1 ring-[var(--color-border-subtle)]"
+                >
+                  <span className="text-sm text-[var(--color-text)]">{item}</span>
+                  <span className="h-2 w-2 rounded-full bg-[var(--color-primary-soft)]" />
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
       <p className="text-center text-sm text-[var(--color-text-muted)]">
-        Perfect for parties, weddings, school dances, military balls, and small business events.
+        Trusted for weddings, school dances, military balls, graduations, birthdays, and small business pop-ups.
       </p>
 
       <section className="space-y-6">
