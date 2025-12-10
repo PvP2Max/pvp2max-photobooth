@@ -31,7 +31,7 @@ export default function HeaderActions() {
         href="/dashboard"
         className="rounded-full bg-[var(--gradient-brand)] px-4 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_10px_25px_rgba(155,92,255,0.3)] transition hover:opacity-90"
       >
-        Log in
+        Login
       </Link>
     );
   }
@@ -41,7 +41,7 @@ export default function HeaderActions() {
       href="/dashboard"
       className="rounded-full bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)] hover:ring-[var(--color-primary)]"
     >
-      Go to dashboard
+      Dashboard
     </Link>
   );
 }
