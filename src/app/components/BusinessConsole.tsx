@@ -638,18 +638,21 @@ export default function BusinessConsole() {
                               onCopy={copyLink}
                               onQr={() => generateQr(checkinLink, `${event.name} check-in`)}
                               showQr
+                              copied={copyStatus[`${event.slug}-checkin`] === true}
                             />
                             <LinkActions
                               label="Photographer"
                               url={photographerLink}
                               copyKey={`${event.slug}-photographer`}
                               onCopy={copyLink}
+                              copied={copyStatus[`${event.slug}-photographer`] === true}
                             />
                             <LinkActions
                               label="Front desk"
                               url={frontdeskLink}
                               copyKey={`${event.slug}-frontdesk`}
                               onCopy={copyLink}
+                              copied={copyStatus[`${event.slug}-frontdesk`] === true}
                             />
                           </div>
                         ) : (
@@ -661,6 +664,7 @@ export default function BusinessConsole() {
                               onCopy={copyLink}
                               onQr={() => generateQr(boothLink, `${event.name} booth`)}
                               showQr
+                              copied={copyStatus[`${event.slug}-booth`] === true}
                             />
                           </div>
                         )}
@@ -1042,6 +1046,7 @@ function LinkActions({
   onCopy,
   onQr,
   showQr = false,
+  copied = false,
 }: {
   label: string;
   url: string;
@@ -1049,20 +1054,20 @@ function LinkActions({
   onCopy: (key: string, url: string) => void;
   onQr?: () => void;
   showQr?: boolean;
+  copied?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-[var(--color-text)]">{label}</p>
-        <a href={url} className="text-xs text-[var(--color-accent)] hover:underline" target="_blank" rel="noreferrer">
-          {url}
-        </a>
-      </div>
+      <div className="min-w-0 flex-1 text-sm font-semibold text-[var(--color-text)]">{label}</div>
       <button
         onClick={() => onCopy(copyKey, url)}
-        className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
+        className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 transition ${
+          copied
+            ? "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-[rgba(34,197,94,0.5)]"
+            : "bg-[var(--color-surface)] text-[var(--color-text)] ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface)]/80"
+        }`}
       >
-        Copy
+        {copied ? "Copied" : "Copy"}
       </button>
       {showQr && onQr && (
         <button
