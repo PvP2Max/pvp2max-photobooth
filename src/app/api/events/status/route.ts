@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBusinessContext, updateEventStatus } from "@/lib/tenants";
+import { getBusinessContext, sanitizeEvent, updateEventStatus } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,14 +19,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "eventSlug and status are required." }, { status: 400 });
   }
 
-  const updated = await updateEventStatus({
-    businessId: context.business.id,
-    eventSlug,
-    status,
-  });
-  if (!updated) {
-    return NextResponse.json({ error: "Event not found." }, { status: 404 });
-  }
+  const event = context.business.events.find((e) => e.slug === eventSlug);
+  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
 
-  return NextResponse.json({ event: updated });
+  const updated = await updateEventStatus(context.business.id, event.id, status);
+
+  return NextResponse.json({ event: sanitizeEvent(updated) });
 }
