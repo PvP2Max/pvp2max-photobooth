@@ -113,7 +113,7 @@ export default function BusinessConsole() {
   const [newEventDate, setNewEventDate] = useState("");
   const [newEventTime, setNewEventTime] = useState("");
   const [issuingKey, setIssuingKey] = useState<Record<string, string>>({});
-  const [resendEmail, setResendEmail] = useState<Record<string, string>>({});
+  const [resendEmailMap, setResendEmailMap] = useState<Record<string, string>>({});
   const [productionEvent, setProductionEvent] = useState<string>("");
   const [productions, setProductions] = useState<Record<string, ProductionItem[]>>({});
   const [loadingProductions, setLoadingProductions] = useState(false);
@@ -418,8 +418,8 @@ export default function BusinessConsole() {
     }
   }
 
-  async function resendEmail(productionId: string, eventSlug: string) {
-    const email = resendEmail[eventSlug];
+  async function resendDeliveryEmail(productionId: string, eventSlug: string) {
+    const email = resendEmailMap[eventSlug];
     if (!email) return;
     setSelectionStatus((prev) => ({ ...prev, [productionId]: "Sending…" }));
     try {
@@ -926,14 +926,14 @@ export default function BusinessConsole() {
                         <input
                           type="email"
                           placeholder="Resend to email"
-                          value={resendEmail[prod.id] || ""}
+                          value={resendEmailMap[prod.id] || ""}
                           onChange={(e) =>
-                            setResendEmail((prev) => ({ ...prev, [prod.id]: e.target.value }))
+                            setResendEmailMap((prev) => ({ ...prev, [prod.id]: e.target.value }))
                           }
                           className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
                         />
                         <button
-                          onClick={() => resendEmail(prod.id, productionEvent)}
+                          onClick={() => resendDeliveryEmail(prod.id, productionEvent)}
                           className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
                         >
                           Resend
