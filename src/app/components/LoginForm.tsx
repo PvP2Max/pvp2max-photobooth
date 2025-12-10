@@ -23,7 +23,7 @@ export default function LoginForm() {
       const endpoint = registering ? "/api/auth/register" : "/api/auth/business";
       const payload = registering
         ? { email, password, businessName, businessSlug, eventName, eventSlug }
-        : { email, password, businessSlug };
+        : { email, password };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,18 +73,6 @@ export default function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
             />
-          </label>
-          <label className="text-sm text-[var(--color-text-muted)]">
-            Business slug (optional)
-            <input
-              value={businessSlug}
-              onChange={(e) => setBusinessSlug(e.target.value)}
-              placeholder="your-company"
-              className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-            />
-            <span className="text-[11px] text-[var(--color-text-soft)]">
-              Helps find the right account if you belong to multiple.
-            </span>
           </label>
           <label className="text-sm text-[var(--color-text-muted)]">
             Password
