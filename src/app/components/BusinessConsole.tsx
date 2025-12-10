@@ -451,15 +451,6 @@ export default function BusinessConsole() {
     );
   }
 
-  if (mode === "authOnly" && session) {
-    router.replace("/dashboard");
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
-        Redirecting to dashboard…
-      </div>
-    );
-  }
-
   if (!session) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
