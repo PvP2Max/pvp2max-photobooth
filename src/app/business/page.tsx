@@ -961,13 +961,13 @@ export default function BusinessPage() {
                         href="/settings/billing"
                         className="rounded-lg bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
                       >
-                        Billing (manage subscription)
+                        Billing
                       </a>
                       <a
                         href="/settings"
                         className="rounded-lg bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
                       >
-                        Settings (profile & password)
+                        Settings
                       </a>
                       <button
                         onClick={signOut}

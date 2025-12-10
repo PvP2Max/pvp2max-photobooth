@@ -461,6 +461,19 @@ export async function verifyUserCredentials(email: string, password: string) {
   return valid ? user : null;
 }
 
+export async function updateUserPasswordById(userId: string, currentPassword: string, newPassword: string) {
+  const users = await readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) throw new Error("User not found.");
+  const valid = verifyPassword(currentPassword, user.passwordSalt, user.passwordHash);
+  if (!valid) throw new Error("Current password is incorrect.");
+  const hashed = hashPassword(newPassword);
+  user.passwordHash = hashed.hash;
+  user.passwordSalt = hashed.salt;
+  await writeUsers(users);
+  return { id: user.id, email: user.email };
+}
+
 export async function findBusinessBySlug(slug: string) {
   const index = await readTenantIndex();
   return index.businesses.find((b) => b.slug === slugify(slug, slug));
