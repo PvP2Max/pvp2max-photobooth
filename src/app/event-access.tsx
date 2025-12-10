@@ -63,7 +63,7 @@ export default function EventAccessGate({ children }: Props) {
         setLoading(false);
       }
     },
-    [businessSlug, eventSlug],
+    [businessSlug, eventSlug, session],
   );
 
   useEffect(() => {

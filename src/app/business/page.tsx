@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 
@@ -126,9 +125,6 @@ export default function BusinessPage() {
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
-  const [aiPrompts, setAiPrompts] = useState<Record<string, string>>({});
-  const [aiKinds, setAiKinds] = useState<Record<string, "background" | "frame">>({});
-  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -545,47 +541,6 @@ export default function BusinessPage() {
     } catch {
       setError("Failed to create selection link.");
       setSelectionStatus((prev) => ({ ...prev, [event.id]: "Failed" }));
-    }
-  }
-
-  async function generateAiBackgroundForEvent(event: EventItem) {
-    if (!session) return;
-    const prompt = (aiPrompts[event.id] ?? "").trim();
-    if (!prompt) {
-      setError("Enter a prompt for the AI background/frame.");
-      return;
-    }
-    if (eventNeedsPayment(event)) {
-      setError("Complete payment for this event before generating AI backgrounds.");
-      return;
-    }
-    setError(null);
-    setMessage(null);
-    setAiLoading((prev) => ({ ...prev, [event.id]: true }));
-    try {
-      const res = await fetch(
-        `/api/ai/background?business=${session.business.slug}&event=${event.slug}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            prompt,
-            kind: aiKinds[event.id] ?? "background",
-          }),
-        },
-      );
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(data.error || "Failed to generate background.");
-        return;
-      }
-      setMessage("AI asset generated and added to this event’s library.");
-      setAiPrompts((prev) => ({ ...prev, [event.id]: "" }));
-    } catch {
-      setError("Failed to generate background.");
-    } finally {
-      setAiLoading((prev) => ({ ...prev, [event.id]: false }));
     }
   }
 
