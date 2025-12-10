@@ -123,6 +123,7 @@ export default function BusinessConsole() {
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
   const navIcons: Record<"overview" | "events" | "deliveries", ReactNode> = {
     overview: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -443,6 +444,16 @@ export default function BusinessConsole() {
     }
   }
 
+  function copyLink(key: string, url: string) {
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        setCopyStatus((prev) => ({ ...prev, [key]: true }));
+        window.setTimeout(() => setCopyStatus((prev) => ({ ...prev, [key]: false })), 1500);
+      })
+      .catch(() => {});
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
@@ -584,11 +595,11 @@ export default function BusinessConsole() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
-                          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
-                            {event.slug}
-                          </p>
-                        </div>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
+                    {event.slug}
+                  </p>
+                </div>
                         <span className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-[11px] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
                           {event.status === "closed" ? "Closed" : "Live"}
                         </span>
@@ -618,10 +629,41 @@ export default function BusinessConsole() {
                       </div>
 
                       <div className="grid gap-2 text-xs text-[var(--color-text-muted)]">
-                        <LinkRow label="Booth" href={boothLink} />
-                        <LinkRow label="Check-in" href={checkinLink} />
-                        <LinkRow label="Photographer" href={photographerLink} />
-                        <LinkRow label="Front desk" href={frontdeskLink} />
+                        {event.mode === "photographer" ? (
+                          <div className="flex flex-col gap-2">
+                            <LinkActions
+                              label="Check-in"
+                              url={checkinLink}
+                              copyKey={`${event.slug}-checkin`}
+                              onCopy={copyLink}
+                              onQr={() => generateQr(checkinLink, `${event.name} check-in`)}
+                              showQr
+                            />
+                            <LinkActions
+                              label="Photographer"
+                              url={photographerLink}
+                              copyKey={`${event.slug}-photographer`}
+                              onCopy={copyLink}
+                            />
+                            <LinkActions
+                              label="Front desk"
+                              url={frontdeskLink}
+                              copyKey={`${event.slug}-frontdesk`}
+                              onCopy={copyLink}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <LinkActions
+                              label="Booth link"
+                              url={boothLink}
+                              copyKey={`${event.slug}-booth`}
+                              onCopy={copyLink}
+                              onQr={() => generateQr(boothLink, `${event.name} booth`)}
+                              showQr
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap gap-2 text-xs">
@@ -993,14 +1035,51 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function LinkRow({ label, href }: { label: string; href: string }) {
+function LinkActions({
+  label,
+  url,
+  copyKey,
+  onCopy,
+  onQr,
+  showQr = false,
+}: {
+  label: string;
+  url: string;
+  copyKey: string;
+  onCopy: (key: string, url: string) => void;
+  onQr?: () => void;
+  showQr?: boolean;
+}) {
   return (
-    <a
-      href={href}
-      className="flex items-center justify-between rounded-lg bg-[var(--color-surface)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-    >
-      <span>{label}</span>
-      <span className="text-[var(--color-text-muted)]">→</span>
-    </a>
+    <div className="flex flex-wrap items-center gap-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-[var(--color-text)]">{label}</p>
+        <a href={url} className="text-xs text-[var(--color-accent)] hover:underline" target="_blank" rel="noreferrer">
+          {url}
+        </a>
+      </div>
+      <button
+        onClick={() => onCopy(copyKey, url)}
+        className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
+      >
+        Copy
+      </button>
+      {showQr && onQr && (
+        <button
+          onClick={onQr}
+          className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
+        >
+          QR
+        </button>
+      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="rounded-full bg-[var(--gradient-brand)] px-3 py-1 text-xs font-semibold text-[var(--color-text-on-primary)] shadow-[0_8px_20px_rgba(155,92,255,0.25)] transition hover:opacity-90"
+      >
+        Open
+      </a>
+    </div>
   );
 }
