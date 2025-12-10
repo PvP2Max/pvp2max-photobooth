@@ -192,12 +192,6 @@ export default function BusinessConsole() {
     return plan.includes("photographer") || hasPhotogEvent;
   }, [session]);
 
-  const primaryEvent = useMemo(() => {
-    const events = session?.events ?? [];
-    const liveFirst = events.find((e) => e.status !== "closed");
-    return liveFirst ?? events[0];
-  }, [session]);
-
   const stats = useMemo(() => {
     const events = session?.events ?? [];
     const live = events.filter((e) => e.status !== "closed");
@@ -467,7 +461,7 @@ export default function BusinessConsole() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="grid min-h-screen gap-6 px-4 py-6 lg:grid-cols-[230px,1fr]">
+      <div className="mx-auto grid min-h-screen max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[230px,1fr]">
         <aside
           className={`rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
             isSidebarWide ? "w-full max-w-[230px]" : "w-[80px]"
@@ -563,51 +557,6 @@ export default function BusinessConsole() {
               >
                 Front desk
               </button>
-            </div>
-          </div>
-
-          <div className="grid gap-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] md:grid-cols-2">
-            <div className="space-y-2">
-              <p className="text-sm uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
-              <p className="text-lg font-semibold text-[var(--color-text)]">{session.business.name}</p>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                {isPhotographer ? "Photographer subscription" : "Self-serve / pay-per-event"} •{" "}
-                {session.business.subscriptionPlan ?? "event-based"}
-              </p>
-              <div className="flex flex-wrap gap-2 text-xs text-[var(--color-text-muted)]">
-                <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)]">
-                  {session.user?.email}
-                </span>
-                <span className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)]">
-                  {session.business.slug}
-                </span>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <p className="text-sm font-semibold text-[var(--color-text)]">Quick links</p>
-              <div className="flex flex-wrap gap-2">
-                {primaryEvent && (
-                  <>
-                    <LinkRow label="Open booth" href={linkFor("/event", session.business.slug, primaryEvent.slug)} />
-                    <LinkRow label="Check-in" href={linkFor("/checkin", session.business.slug, primaryEvent.slug)} />
-                    <LinkRow
-                      label="Backgrounds"
-                      href={linkFor("/backgrounds", session.business.slug, primaryEvent.slug)}
-                    />
-                    {isPhotographer && (
-                      <LinkRow
-                        label="Photographer"
-                        href={linkFor("/photographer", session.business.slug, primaryEvent.slug)}
-                      />
-                    )}
-                  </>
-                )}
-                {!primaryEvent && (
-                  <div className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-                    Create an event to unlock booth and staff links.
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
