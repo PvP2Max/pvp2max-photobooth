@@ -172,7 +172,6 @@ export default function BusinessConsole() {
   const isSidebarWide = !sidebarCondensed || sidebarExpanded;
   const [testStream, setTestStream] = useState<MediaStream | null>(null);
   const [testVideoReady, setTestVideoReady] = useState(false);
-  const [testCapture, setTestCapture] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
@@ -181,6 +180,7 @@ export default function BusinessConsole() {
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const testCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const defaultBgPreview = "/assets/defaults/backgrounds/Modern White Marble.png";
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -479,6 +479,105 @@ export default function BusinessConsole() {
       .catch(() => {});
   }
 
+  function stopTestStream() {
+    if (testStream) {
+      testStream.getTracks().forEach((track) => track.stop());
+    }
+    setTestStream(null);
+    setTestVideoReady(false);
+  }
+
+  useEffect(() => {
+    return () => {
+      stopTestStream();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const video = testVideoRef.current;
+    if (video && testStream) {
+      video.srcObject = testStream;
+      video.onloadedmetadata = async () => {
+        try {
+          await video.play();
+          setTestVideoReady(true);
+        } catch {
+          setTestError("Could not start preview. Check camera permissions.");
+        }
+      };
+    }
+    if (!testStream && video) {
+      video.srcObject = null;
+    }
+  }, [testStream]);
+
+  async function startBackgroundTest() {
+    setTestError(null);
+    setTestMessage(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+      });
+      setTestStream(stream);
+      setTestMessage("Camera ready. Capture a frame to preview.");
+    } catch (err) {
+      console.error(err);
+      setTestError("Unable to access camera. Please allow permission.");
+      stopTestStream();
+    }
+  }
+
+  async function captureBackgroundTest() {
+    const video = testVideoRef.current;
+    const canvas = testCanvasRef.current;
+    if (!video || !canvas || !testStream) {
+      setTestError("Start the camera first, then capture a frame.");
+      return;
+    }
+    if (!video.videoWidth) {
+      setTestError("Camera is warming up. Try again in a moment.");
+      return;
+    }
+    setTestLoading(true);
+    setTestError(null);
+    setTestMessage(null);
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setTestError("Preview not available. Try again.");
+      setTestLoading(false);
+      return;
+    }
+
+    const bg = new Image();
+    bg.crossOrigin = "anonymous";
+    bg.src = defaultBgPreview;
+
+    const drawComposite = () => {
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(bg, 0, 0, width, height);
+      ctx.drawImage(video, 0, 0, width, height);
+      const url = canvas.toDataURL("image/png");
+      setTestResult(url);
+      setTestMessage("Preview captured. Save a screenshot to share with clients.");
+      setTestLoading(false);
+    };
+
+    bg.onload = drawComposite;
+    bg.onerror = () => {
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(video, 0, 0, width, height);
+      const url = canvas.toDataURL("image/png");
+      setTestResult(url);
+      setTestMessage("Preview captured (background image unavailable).");
+      setTestLoading(false);
+    };
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
@@ -502,24 +601,24 @@ export default function BusinessConsole() {
           className={`sticky top-6 self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
             isSidebarWide ? "w-[230px]" : "w-[80px]"
           }`}
-          onMouseEnter={() => sidebarCondensed && setSidebarExpanded(true)}
-          onMouseLeave={() => sidebarCondensed && setSidebarExpanded(false)}
+          onMouseEnter={() => {
+            if (!sidebarCondensed) return;
+            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = setTimeout(() => setSidebarExpanded(true), 80);
+          }}
+          onMouseLeave={() => {
+            if (!sidebarCondensed) return;
+            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+            hoverTimerRef.current = setTimeout(() => setSidebarExpanded(false), 120);
+          }}
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-surface-elevated)] ring-1 ring-[var(--color-border-subtle)]">
-                <span className="text-lg font-semibold text-[var(--color-primary)]">B</span>
-              </div>
-              {isSidebarWide && (
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">{session.business.name}</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">{session.user?.email}</p>
-                </div>
-              )}
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-elevated)] ring-1 ring-[var(--color-border-subtle)]">
+              <span className="text-lg font-semibold text-[var(--color-primary)]">B</span>
             </div>
             <button
               onClick={() => setSidebarCondensed((prev) => !prev)}
-              className="rounded-full px-2 py-1 text-xs text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-xs text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
               aria-label={isSidebarWide ? "Collapse sidebar" : "Expand sidebar"}
             >
               {isSidebarWide ? "⟨" : "⟩"}
@@ -543,7 +642,7 @@ export default function BusinessConsole() {
             ))}
           </nav>
 
-          <div className="mt-6 flex flex-col gap-2 border-t border-[var(--color-border-subtle)] pt-3">
+          <div className="mt-auto flex flex-col gap-2 border-t border-[var(--color-border-subtle)] pt-3">
             <button
               onClick={() => setProfileOpen((prev) => !prev)}
               className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface-elevated)]"
@@ -609,158 +708,250 @@ export default function BusinessConsole() {
           </div>
 
           {view === "overview" && (
-            <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">Active events</h2>
-              <div className="grid gap-3 lg:grid-cols-2">
-                {activeEvents.map((event) => {
-                  const usage = usageFor(event);
-                  const boothLink = linkFor("/event", session.business.slug, event.slug);
-                  const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
-                  const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
-                  const frontdeskLink = linkFor("/frontdesk", session.business.slug, event.slug);
-                  return (
-                    <div
-                      key={event.id}
-                      className="space-y-3 rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
-                    {event.slug}
-                  </p>
-                </div>
-                        <span className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-[11px] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
-                          {event.status === "closed" ? "Closed" : "Live"}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-text-muted)]">
-                        <div>
-                          <p>Plan</p>
-                          <p className="font-semibold text-[var(--color-text)]">{event.plan ?? "Event-based"}</p>
-                        </div>
-                        <div>
-                          <p>Mode</p>
-                          <p className="font-semibold text-[var(--color-text)]">{event.mode ?? "self-serve"}</p>
-                        </div>
-                        <div>
-                          <p>Photos</p>
-                          <p className="font-semibold text-[var(--color-text)]">
-                            {usage.photoCap === null ? "Unlimited" : `${usage.photoUsed ?? 0}/${usage.photoCap}`}
-                          </p>
-                        </div>
-                        <div>
-                          <p>AI credits</p>
-                          <p className="font-semibold text-[var(--color-text)]">
-                            {usage.aiCredits === undefined ? "—" : `${usage.aiUsed}/${usage.aiCredits}`}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-2 text-xs text-[var(--color-text-muted)]">
-                        {event.mode === "photographer" ? (
-                          <div className="flex flex-col gap-2">
-                            <LinkActions
-                              label="Check-in"
-                              url={checkinLink}
-                              copyKey={`${event.slug}-checkin`}
-                              onCopy={copyLink}
-                              onQr={() => generateQr(checkinLink, `${event.name} check-in`)}
-                              showQr
-                              copied={copyStatus[`${event.slug}-checkin`] === true}
-                            />
-                            <LinkActions
-                              label="Photographer"
-                              url={photographerLink}
-                              copyKey={`${event.slug}-photographer`}
-                              onCopy={copyLink}
-                              copied={copyStatus[`${event.slug}-photographer`] === true}
-                            />
-                            <LinkActions
-                              label="Front desk"
-                              url={frontdeskLink}
-                              copyKey={`${event.slug}-frontdesk`}
-                              onCopy={copyLink}
-                              copied={copyStatus[`${event.slug}-frontdesk`] === true}
-                            />
+            <div className="space-y-4">
+              <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+                <h2 className="text-lg font-semibold text-[var(--color-text)]">Active events</h2>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {activeEvents.map((event) => {
+                    const usage = usageFor(event);
+                    const boothLink = linkFor("/event", session.business.slug, event.slug);
+                    const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
+                    const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
+                    const frontdeskLink = linkFor("/frontdesk", session.business.slug, event.slug);
+                    return (
+                      <div
+                        key={event.id}
+                        className="space-y-3 rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
+                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
+                              {event.slug}
+                            </p>
                           </div>
-                        ) : (
-                          <div className="flex flex-col gap-2">
-                            <LinkActions
-                              label="Booth link"
-                              url={boothLink}
-                              copyKey={`${event.slug}-booth`}
-                              onCopy={copyLink}
-                              onQr={() => generateQr(boothLink, `${event.name} booth`)}
-                              showQr
-                              copied={copyStatus[`${event.slug}-booth`] === true}
-                            />
+                          <span className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-[11px] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+                            {event.status === "closed" ? "Closed" : "Live"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-text-muted)]">
+                          <div>
+                            <p>Plan</p>
+                            <p className="font-semibold text-[var(--color-text)]">{event.plan ?? "Event-based"}</p>
                           </div>
-                        )}
-                      </div>
+                          <div>
+                            <p>Mode</p>
+                            <p className="font-semibold text-[var(--color-text)]">{event.mode ?? "self-serve"}</p>
+                          </div>
+                          <div>
+                            <p>Photos</p>
+                            <p className="font-semibold text-[var(--color-text)]">
+                              {usage.photoCap === null ? "Unlimited" : `${usage.photoUsed ?? 0}/${usage.photoCap}`}
+                            </p>
+                          </div>
+                          <div>
+                            <p>AI credits</p>
+                            <p className="font-semibold text-[var(--color-text)]">
+                              {usage.aiCredits === undefined ? "—" : `${usage.aiUsed}/${usage.aiCredits}`}
+                            </p>
+                          </div>
+                        </div>
 
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        <button
-                          onClick={() => deleteEvent(event.id)}
-                          className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-text)]"
-                        >
-                          Delete event
-                        </button>
-                        <button
-                          onClick={() => rotateEventKey(event.slug)}
-                          className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-                        >
-                          {issuingKey[event.slug] ?? "Rotate key"}
-                        </button>
-                        <button
-                          onClick={() => createCheckout("event-basic", event.slug)}
-                          className="rounded-full bg-[var(--gradient-brand)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-                        >
-                          Buy event plan
-                        </button>
-                        {event.mode === "photographer" && (
-                          <button
-                            onClick={() => createSelectionLink(event.slug)}
-                            className="rounded-full px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-                          >
-                            Send selection link
-                          </button>
-                        )}
-                      </div>
-
-                      {event.mode === "photographer" && (
-                        <div className="space-y-2 text-xs text-[var(--color-text-muted)]">
-                          <label className="flex flex-col gap-2">
-                            Selection email
-                            <input
-                              type="email"
-                              value={selectionEmails[event.slug] || ""}
-                              onChange={(e) =>
-                                setSelectionEmails((prev) => ({ ...prev, [event.slug]: e.target.value }))
-                              }
-                              className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                            />
-                          </label>
-                          {selectionLinks[event.slug] && (
-                            <div className="rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
-                              {selectionLinks[event.slug]}
+                        <div className="grid gap-2 text-xs text-[var(--color-text-muted)]">
+                          {event.mode === "photographer" ? (
+                            <div className="flex flex-col gap-2">
+                              <LinkActions
+                                label="Check-in"
+                                url={checkinLink}
+                                copyKey={`${event.slug}-checkin`}
+                                onCopy={copyLink}
+                                onQr={() => generateQr(checkinLink, `${event.name} check-in`)}
+                                showQr
+                                copied={copyStatus[`${event.slug}-checkin`] === true}
+                              />
+                              <LinkActions
+                                label="Photographer"
+                                url={photographerLink}
+                                copyKey={`${event.slug}-photographer`}
+                                onCopy={copyLink}
+                                copied={copyStatus[`${event.slug}-photographer`] === true}
+                              />
+                              <LinkActions
+                                label="Front desk"
+                                url={frontdeskLink}
+                                copyKey={`${event.slug}-frontdesk`}
+                                onCopy={copyLink}
+                                copied={copyStatus[`${event.slug}-frontdesk`] === true}
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <LinkActions
+                                label="Booth link"
+                                url={boothLink}
+                                copyKey={`${event.slug}-booth`}
+                                onCopy={copyLink}
+                                onQr={() => generateQr(boothLink, `${event.name} booth`)}
+                                showQr
+                                copied={copyStatus[`${event.slug}-booth`] === true}
+                              />
                             </div>
                           )}
-                          {selectionStatus[event.slug] && (
-                            <p className="text-[var(--color-text-muted)]">{selectionStatus[event.slug]}</p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <button
+                            onClick={() => deleteEvent(event.id)}
+                            className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-text)]"
+                          >
+                            Delete event
+                          </button>
+                          <button
+                            onClick={() => rotateEventKey(event.slug)}
+                            className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
+                          >
+                            {issuingKey[event.slug] ?? "Rotate key"}
+                          </button>
+                          <button
+                            onClick={() => createCheckout("event-basic", event.slug)}
+                            className="rounded-full bg-[var(--gradient-brand)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
+                          >
+                            Buy event plan
+                          </button>
+                          {event.mode === "photographer" && (
+                            <button
+                              onClick={() => createSelectionLink(event.slug)}
+                              className="rounded-full px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+                            >
+                              Send selection link
+                            </button>
                           )}
+                        </div>
+
+                        {event.mode === "photographer" && (
+                          <div className="space-y-2 text-xs text-[var(--color-text-muted)]">
+                            <label className="flex flex-col gap-2">
+                              Selection email
+                              <input
+                                type="email"
+                                value={selectionEmails[event.slug] || ""}
+                                onChange={(e) =>
+                                  setSelectionEmails((prev) => ({ ...prev, [event.slug]: e.target.value }))
+                                }
+                                className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                              />
+                            </label>
+                            {selectionLinks[event.slug] && (
+                              <div className="rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+                                {selectionLinks[event.slug]}
+                              </div>
+                            )}
+                            {selectionStatus[event.slug] && (
+                              <p className="text-[var(--color-text-muted)]">{selectionStatus[event.slug]}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {activeEvents.length === 0 && (
+                    <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
+                      No events yet. Create one to get started.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-[var(--color-text)]">Background tester</h2>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    Check lighting and framing before the event. Capture a quick preview with the default
+                    background.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={startBackgroundTest}
+                    className="rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
+                  >
+                    {testStream ? "Restart camera" : "Start test"}
+                  </button>
+                  <button
+                    onClick={captureBackgroundTest}
+                    disabled={testLoading}
+                    className="rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90 disabled:opacity-60"
+                  >
+                    {testLoading ? "Capturing…" : "Capture preview"}
+                  </button>
+                  <button
+                    onClick={stopTestStream}
+                    className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+                  >
+                    Stop
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="space-y-3">
+                  <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--color-bg-subtle)] ring-1 ring-[var(--color-border-subtle)]">
+                    <video
+                      ref={testVideoRef}
+                      className="h-full w-full object-cover"
+                      playsInline
+                      muted
+                      autoPlay
+                    />
+                    {!testVideoReady && (
+                      <div className="flex h-full w-full items-center justify-center text-sm text-[var(--color-text-muted)]">
+                        {testStream ? "Starting camera…" : "Start the tester to preview your setup."}
+                      </div>
+                    )}
+                  </div>
+                  {testError && <p className="text-sm text-[var(--color-text)]">{testError}</p>}
+                  {testMessage && <p className="text-sm text-[var(--color-text-muted)]">{testMessage}</p>}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-[var(--color-text)]">Captured preview</p>
+                      <button
+                        onClick={() => setTestShowTips((prev) => !prev)}
+                        className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                      >
+                        {testShowTips ? "Hide tips" : "Show tips"}
+                      </button>
+                    </div>
+                    <div className="mt-3 aspect-[4/3] overflow-hidden rounded-lg bg-[var(--color-bg-subtle)] ring-1 ring-[var(--color-border-subtle)]">
+                      {testResult ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={testResult} alt="Background test result" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xs text-[var(--color-text-muted)]">
+                          Capture a frame to see how your background will look.
                         </div>
                       )}
                     </div>
-                  );
-                })}
-                {activeEvents.length === 0 && (
-                  <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-                    No events yet. Create one to get started.
                   </div>
-                )}
+                  {testShowTips && (
+                    <div className="space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+                      <p className="font-semibold">Quick tips</p>
+                      <ul className="space-y-1 text-[var(--color-text-muted)]">
+                        <li>• Keep subjects 2–3 ft in front of a light gray wall or backdrop.</li>
+                        <li>• Aim the ring light slightly above eye level to avoid harsh shadows.</li>
+                        <li>• Remove backlighting and keep the camera at 5–5.3 ft height.</li>
+                        <li>• Capture once to confirm framing, then start your event.</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
+              <canvas ref={testCanvasRef} className="hidden" />
+            </div>
             </div>
           )}
 
