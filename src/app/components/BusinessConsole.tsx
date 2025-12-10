@@ -461,10 +461,10 @@ export default function BusinessConsole() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="mx-auto grid min-h-screen max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[230px,1fr]">
+      <div className="mx-auto flex min-h-screen max-w-7xl items-start gap-6 px-4 py-6">
         <aside
-          className={`rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
-            isSidebarWide ? "w-full max-w-[230px]" : "w-[80px]"
+          className={`sticky top-6 self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
+            isSidebarWide ? "w-[230px]" : "w-[80px]"
           }`}
         >
           <div className="flex items-center justify-between gap-3">
@@ -529,7 +529,7 @@ export default function BusinessConsole() {
           </div>
         </aside>
 
-        <main className="space-y-6">
+        <main className="flex-1 space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
