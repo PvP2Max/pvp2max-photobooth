@@ -318,18 +318,18 @@ export default function BusinessPage() {
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch("/api/business/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: newEventName,
-          accessCode: newEventKey || undefined,
-          plan: newPlan,
-          mode: newMode,
-          allowBackgroundRemoval: newAllowBgRemoval,
-          allowAiBackgrounds: newAllowAiBg,
-          allowAiFilters: newAllowAiFilters,
+          const res = await fetch("/api/business/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name: newEventName,
+              accessCode: newMode === "photographer" ? newEventKey || undefined : undefined,
+              plan: newPlan,
+              mode: newMode,
+              allowBackgroundRemoval: newAllowBgRemoval,
+              allowAiBackgrounds: newAllowAiBg,
+              allowAiFilters: newAllowAiFilters,
           deliveryEmail: true,
           deliverySms: newDeliverySms,
           overlayTheme: newOverlayTheme,
@@ -972,19 +972,21 @@ export default function BusinessPage() {
                 placeholder="Event name (e.g., Winter Gala)"
                 className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
               />
-              <input
-                value={newEventKey}
-                onChange={(e) => setNewEventKey(e.target.value)}
-                placeholder="Event access key (optional)"
-                className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-              />
+              {newMode === "photographer" && (
+                <input
+                  value={newEventKey}
+                  onChange={(e) => setNewEventKey(e.target.value)}
+                  placeholder="Event access key (optional)"
+                  className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                />
+              )}
               <select
                 value={newMode}
                 onChange={(e) => setNewMode(e.target.value as "self-serve" | "photographer")}
                 className="w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none"
               >
-                <option value="self-serve">Self-service booth</option>
-                <option value="photographer">Photographer mode</option>
+                <option value="self-serve">Self-service booth (logged-in staff auto-unlocked)</option>
+                <option value="photographer">Photographer mode (staff passkey optional)</option>
               </select>
               <select
                 value={newPlan}
