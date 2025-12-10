@@ -497,25 +497,6 @@ export async function deleteEventById(businessId: string, eventId: string) {
   return Boolean(target);
 }
 
-export async function updateEventStatus({
-  businessId,
-  eventSlug,
-  status,
-}: {
-  businessId: string;
-  eventSlug: string;
-  status: BoothEvent["status"];
-}) {
-  const index = await readTenantIndex();
-  const biz = index.businesses.find((b) => b.id === businessId);
-  if (!biz) return null;
-  const target = biz.events.find((e) => e.slug === slugify(eventSlug, eventSlug));
-  if (!target) return null;
-  target.status = status;
-  await writeTenantIndex(index);
-  return sanitizeEvent(target);
-}
-
 export async function createBusiness({
   name,
   slug,
