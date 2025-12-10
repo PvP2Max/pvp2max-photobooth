@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
 
 type BusinessSession = {
@@ -125,7 +125,7 @@ export default function BusinessPage() {
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
-  const navIcons: Record<"overview" | "events" | "deliveries", JSX.Element> = {
+  const navIcons: Record<"overview" | "events" | "deliveries", ReactNode> = {
     overview: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
