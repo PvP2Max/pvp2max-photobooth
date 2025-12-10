@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 
 type BusinessSession = {
@@ -88,6 +89,7 @@ function overlayLabel(theme?: string) {
 }
 
 export default function BusinessPage() {
+  const router = useRouter();
   const [session, setSession] = useState<BusinessSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -619,18 +621,29 @@ export default function BusinessPage() {
 
   async function openBackgroundManager(event: EventItem) {
     if (!session) return;
+    const ownsEvent = session.events.some((ev) => ev.id === event.id);
+    if (!ownsEvent) {
+      setError("You do not have access to this event.");
+      return;
+    }
     setError(null);
     try {
-      await fetch("/api/auth/event", {
+      const res = await fetch("/api/auth/event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ businessSlug: session.business.slug, eventSlug: event.slug }),
       });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error || "Unable to open backgrounds for this event.");
+        return;
+      }
     } catch {
-      // non-blocking
+      setError("Unable to open backgrounds for this event.");
+      return;
     }
-    window.location.href = `/backgrounds?business=${session.business.slug}&event=${event.slug}`;
+    router.push(`/backgrounds?business=${session.business.slug}&event=${event.slug}`);
   }
 
   const renderNavButtons = (options?: { condensed?: boolean; onSelect?: () => void }) =>
