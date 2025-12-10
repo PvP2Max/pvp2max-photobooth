@@ -694,35 +694,39 @@ export default function BusinessConsole() {
                         >
                           Buy event plan
                         </button>
-                        <button
-                          onClick={() => createSelectionLink(event.slug)}
-                          className="rounded-full px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-                        >
-                          Send selection link
-                        </button>
+                        {event.mode === "photographer" && (
+                          <button
+                            onClick={() => createSelectionLink(event.slug)}
+                            className="rounded-full px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+                          >
+                            Send selection link
+                          </button>
+                        )}
                       </div>
 
-                      <div className="space-y-2 text-xs text-[var(--color-text-muted)]">
-                        <label className="flex flex-col gap-2">
-                          Selection email
-                          <input
-                            type="email"
-                            value={selectionEmails[event.slug] || ""}
-                            onChange={(e) =>
-                              setSelectionEmails((prev) => ({ ...prev, [event.slug]: e.target.value }))
-                            }
-                            className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                          />
-                        </label>
-                        {selectionLinks[event.slug] && (
-                          <div className="rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
-                            {selectionLinks[event.slug]}
-                          </div>
-                        )}
-                        {selectionStatus[event.slug] && (
-                          <p className="text-[var(--color-text-muted)]">{selectionStatus[event.slug]}</p>
-                        )}
-                      </div>
+                      {event.mode === "photographer" && (
+                        <div className="space-y-2 text-xs text-[var(--color-text-muted)]">
+                          <label className="flex flex-col gap-2">
+                            Selection email
+                            <input
+                              type="email"
+                              value={selectionEmails[event.slug] || ""}
+                              onChange={(e) =>
+                                setSelectionEmails((prev) => ({ ...prev, [event.slug]: e.target.value }))
+                              }
+                              className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                            />
+                          </label>
+                          {selectionLinks[event.slug] && (
+                            <div className="rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
+                              {selectionLinks[event.slug]}
+                            </div>
+                          )}
+                          {selectionStatus[event.slug] && (
+                            <p className="text-[var(--color-text-muted)]">{selectionStatus[event.slug]}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
