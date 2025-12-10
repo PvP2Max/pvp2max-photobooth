@@ -124,6 +124,7 @@ export default function BusinessConsole() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const navIcons: Record<"overview" | "events" | "deliveries", ReactNode> = {
     overview: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -168,7 +169,6 @@ export default function BusinessConsole() {
     [],
   );
   const [sidebarCondensed, setSidebarCondensed] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const isSidebarWide = !sidebarCondensed || sidebarExpanded;
   const [testStream, setTestStream] = useState<MediaStream | null>(null);
   const [testVideoReady, setTestVideoReady] = useState(false);
@@ -477,6 +477,8 @@ export default function BusinessConsole() {
           className={`sticky top-6 self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
             isSidebarWide ? "w-[230px]" : "w-[80px]"
           }`}
+          onMouseEnter={() => sidebarCondensed && setSidebarExpanded(true)}
+          onMouseLeave={() => sidebarCondensed && setSidebarExpanded(false)}
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -485,22 +487,21 @@ export default function BusinessConsole() {
               </div>
               {isSidebarWide && (
                 <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">
-                    {session.business.name}
-                  </p>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">{session.business.name}</p>
                   <p className="text-xs text-[var(--color-text-muted)]">{session.user?.email}</p>
                 </div>
               )}
             </div>
             <button
               onClick={() => setSidebarCondensed((prev) => !prev)}
-              className="rounded-full px-3 py-1 text-xs text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+              className="rounded-full px-2 py-1 text-xs text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+              aria-label={isSidebarWide ? "Collapse sidebar" : "Expand sidebar"}
             >
-              {isSidebarWide ? "Condense" : "Expand"}
+              {isSidebarWide ? "⟨" : "⟩"}
             </button>
           </div>
 
-          <div className="mt-6 space-y-2">
+          <nav className="mt-6 space-y-2">
             {navTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -515,20 +516,24 @@ export default function BusinessConsole() {
                 {isSidebarWide && <span>{tab.label}</span>}
               </button>
             ))}
-          </div>
+          </nav>
 
-          <div className="mt-6 space-y-2">
+          <div className="mt-6 flex flex-col gap-2 border-t border-[var(--color-border-subtle)] pt-3">
             <button
               onClick={() => setProfileOpen((prev) => !prev)}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface-elevated)]"
             >
-              <span>Account</span>
-              <span>{profileOpen ? "–" : "+"}</span>
+              <span>{isSidebarWide ? session.business.name : "Account"}</span>
+              {isSidebarWide && <span>{profileOpen ? "–" : "+"}</span>}
             </button>
             {profileOpen && (
               <div className="space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 text-sm ring-1 ring-[var(--color-border-subtle)]">
-                <p className="text-[var(--color-text-muted)]">Email: {session.user?.email}</p>
-                <p className="text-[var(--color-text-muted)]">Plan: {session.business.subscriptionPlan ?? "Event-based"}</p>
+                <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]">
+                  Billing
+                </button>
+                <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]">
+                  Settings
+                </button>
                 <button
                   onClick={logout}
                   className="w-full rounded-full bg-[var(--color-surface)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
