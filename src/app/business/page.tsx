@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
 export const metadata = {
-  title: "BoothOS Dashboard",
+  title: "Dashboard | BoothOS",
 };
 
-export default function BusinessRedirectPage() {
+export default function BusinessPage() {
   redirect("/dashboard");
 }

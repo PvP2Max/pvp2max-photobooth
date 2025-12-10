@@ -88,19 +88,12 @@ function overlayLabel(theme?: string) {
   }
 }
 
-type ConsoleMode = "full" | "authOnly";
-
-export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode }) {
+export default function BusinessConsole() {
   const router = useRouter();
   const [session, setSession] = useState<BusinessSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [registering, setRegistering] = useState(false);
-  const [newBusinessName, setNewBusinessName] = useState("");
-  const [newBusinessSlug, setNewBusinessSlug] = useState("");
   const [newEventName, setNewEventName] = useState("");
   const [newEventKey, setNewEventKey] = useState("");
   const [newPlan, setNewPlan] = useState("event-basic");
@@ -126,7 +119,7 @@ export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode 
   const [qrLink, setQrLink] = useState<string | null>(null);
   const [qrLabel, setQrLabel] = useState<string | null>(null);
   const [qrData, setQrData] = useState<string | null>(null);
-  const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
+  const [view, setView] = useState<"overview" | "events" | "deliveries">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -173,10 +166,6 @@ export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode 
     ],
     [],
   );
-  const mobileTabs = useMemo(
-    () => [...navTabs, { id: "staff" as const, label: "Staff links" }],
-    [navTabs],
-  );
   const [sidebarCondensed, setSidebarCondensed] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const isSidebarWide = !sidebarCondensed || sidebarExpanded;
@@ -195,6 +184,12 @@ export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
     return [...events].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }, [session]);
+
+  const isPhotographer = useMemo(() => {
+    const plan = session?.business.subscriptionPlan ?? "";
+    const hasPhotogEvent = (session?.events ?? []).some((e) => e.plan?.startsWith("photographer"));
+    return plan.includes("photographer") || hasPhotogEvent;
   }, [session]);
 
   const stats = useMemo(() => {
@@ -237,62 +232,11 @@ export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode 
     void fetchSession();
   }, []);
 
-  async function login(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/auth/user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      });
-      const data = (await res.json()) as BusinessSession & { error?: string };
-      if (!res.ok || data.error) {
-        setError(data.error || "Invalid credentials.");
-        return;
-      }
-      setSession(data);
-      setMessage("Signed in. Redirecting…");
-      router.push("/dashboard");
-    } catch (err) {
-      console.error(err);
-      setError("Could not sign in. Try again.");
+  useEffect(() => {
+    if (!loading && !session) {
+      router.replace("/login");
     }
-  }
-
-  async function registerAccount(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          email: loginEmail,
-          password: loginPassword,
-          businessName: newBusinessName,
-          businessSlug: newBusinessSlug,
-          eventName: newEventName,
-          eventSlug: newEventKey,
-        }),
-      });
-      const data = (await res.json()) as BusinessSession & { error?: string };
-      if (!res.ok || data.error) {
-        setError(data.error || "Could not register.");
-        return;
-      }
-      setSession(data);
-      setMessage("Account created. Redirecting…");
-      router.push("/dashboard");
-    } catch (err) {
-      console.error(err);
-      setError("Could not register. Try again.");
-    }
-  }
+  }, [loading, session, router]);
 
   function logout() {
     fetch("/api/auth/user", { method: "DELETE", credentials: "include" })
@@ -518,115 +462,8 @@ export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode 
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-        <div className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-12">
-          <div className="rounded-3xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-            <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
-              BoothOS Login
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold">Sign in or create your business</h1>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Sign in to manage events, background assets, and deliveries. New here? Create a business and seed your
-              first event.
-            </p>
-
-            {error && (
-              <div className="mt-3 rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
-                {error}
-              </div>
-            )}
-
-            {message && (
-              <div className="mt-3 rounded-xl bg-[var(--color-success-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]">
-                {message}
-              </div>
-            )}
-
-            <form onSubmit={registering ? registerAccount : login} className="mt-4 space-y-3">
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-sm text-[var(--color-text-muted)]">
-                  Email
-                  <input
-                    required
-                    type="email"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                  />
-                </label>
-                <label className="text-sm text-[var(--color-text-muted)]">
-                  Password
-                  <input
-                    required
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                  />
-                </label>
-              </div>
-
-              {registering && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="text-sm text-[var(--color-text-muted)]">
-                    Business name
-                    <input
-                      required
-                      value={newBusinessName}
-                      onChange={(e) => setNewBusinessName(e.target.value)}
-                      className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                    />
-                  </label>
-                  <label className="text-sm text-[var(--color-text-muted)]">
-                    Business slug
-                    <input
-                      required
-                      value={newBusinessSlug}
-                      onChange={(e) => setNewBusinessSlug(e.target.value)}
-                      placeholder="your-company"
-                      className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                    />
-                  </label>
-                  <label className="text-sm text-[var(--color-text-muted)]">
-                    Event name
-                    <input
-                      required
-                      value={newEventName}
-                      onChange={(e) => setNewEventName(e.target.value)}
-                      className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                    />
-                  </label>
-                  <label className="text-sm text-[var(--color-text-muted)]">
-                    Event slug
-                    <input
-                      required
-                      value={newEventKey}
-                      onChange={(e) => setNewEventKey(e.target.value)}
-                      placeholder="holiday-2025"
-                      className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                    />
-                  </label>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="submit"
-                  className="rounded-full bg-[var(--gradient-brand)] px-5 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-                >
-                  {registering ? "Create business" : "Sign in"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRegistering((prev) => !prev)}
-                  className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-                >
-                  {registering ? "Use existing account" : "Create a new business instead"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
+        Redirecting to login…
       </div>
     );
   }
@@ -707,7 +544,14 @@ export default function BusinessConsole({ mode = "full" }: { mode?: ConsoleMode 
               <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
                 BoothOS dashboard
               </p>
-              <h1 className="text-2xl font-semibold text-[var(--color-text)]">Events & delivery</h1>
+              <h1 className="text-2xl font-semibold text-[var(--color-text)]">
+                {isPhotographer ? "Photographer workspace" : "Events & delivery"}
+              </h1>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {isPhotographer
+                  ? "Manage photographer events, check-ins, and delivery flows."
+                  : "Track self-serve events, uploads, and deliveries for your booth."}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
