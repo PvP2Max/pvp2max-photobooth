@@ -348,6 +348,31 @@ export default function BusinessConsole() {
     }
   }
 
+  async function deleteEvent(eventId: string) {
+    if (!window.confirm("Delete this event and all its files now? This cannot be undone.")) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/events/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ eventId }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok || payload.error) {
+        throw new Error(payload.error || "Could not delete event.");
+      }
+      setSession((prev) =>
+        prev ? { ...prev, events: prev.events.filter((e) => e.id !== eventId) } : prev,
+      );
+      setMessage("Event deleted and storage removed.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not delete event.";
+      setError(msg);
+    }
+  }
+
   async function fetchProductions(eventSlug: string) {
     setLoadingProductions(true);
     try {
@@ -677,10 +702,10 @@ export default function BusinessConsole() {
 
                       <div className="flex flex-wrap gap-2 text-xs">
                         <button
-                          onClick={() => closeEvent(event.slug, event.status === "closed" ? "live" : "closed")}
-                          className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
+                          onClick={() => deleteEvent(event.id)}
+                          className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-text)]"
                         >
-                          {event.status === "closed" ? "Reopen event" : "Close event"}
+                          Delete event
                         </button>
                         <button
                           onClick={() => rotateEventKey(event.slug)}
