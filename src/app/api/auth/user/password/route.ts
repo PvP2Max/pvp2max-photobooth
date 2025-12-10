@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   const context = await getBusinessContext(request);
-  if (!context?.user) {
+  if (!context || !("user" in context) || !context.user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
   const body = (await request.json().catch(() => ({}))) as {
