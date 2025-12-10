@@ -125,6 +125,41 @@ export default function BusinessPage() {
   const [view, setView] = useState<"overview" | "events" | "deliveries" | "staff">("overview");
   const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
+  const navIcons: Record<"overview" | "events" | "deliveries", JSX.Element> = {
+    overview: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+    events: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+    deliveries: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M4.5 5h15a.5.5 0 0 1 .4.8L12 15 4.1 5.8A.5.5 0 0 1 4.5 5Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M4 6.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  };
   const navTabs = useMemo(
     () => [
       { id: "overview" as const, label: "Overview" },
@@ -139,6 +174,7 @@ export default function BusinessPage() {
   );
   const [sidebarCondensed, setSidebarCondensed] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const isSidebarWide = !sidebarCondensed || sidebarExpanded;
 
   const activeEvents = useMemo(() => {
     const events = session?.events ?? [];
@@ -611,7 +647,7 @@ export default function BusinessPage() {
           aria-label={options?.condensed ? `Go to ${tab.label}` : undefined}
           title={options?.condensed ? tab.label : undefined}
         >
-          {options?.condensed ? tab.label.slice(0, 1) : tab.label}
+          {options?.condensed ? navIcons[tab.id] : tab.label}
         </button>
       );
     });
@@ -713,53 +749,74 @@ export default function BusinessPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-0 py-10 lg:flex lg:h-[calc(100vh-80px)] lg:max-w-7xl lg:gap-6 lg:overflow-hidden">
       <aside
-        className={`sticky top-20 hidden h-[calc(100vh-160px)] flex-shrink-0 rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] lg:flex ${
-          sidebarCondensed ? "w-16 p-2" : "w-56 p-4"
+        className={`sticky top-20 hidden h-[calc(100vh-160px)] flex-shrink-0 rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)] transition-[width] duration-300 ease-in-out lg:flex ${
+          isSidebarWide ? "w-64 p-4" : "w-16 p-2"
         }`}
       >
-        <div className={`flex h-full flex-col ${sidebarCondensed ? "gap-3" : "overflow-y-auto"}`}>
-          {sidebarCondensed ? (
+        <div className={`flex h-full flex-col ${isSidebarWide ? "overflow-y-auto" : "items-center gap-3"}`}>
+          {!isSidebarWide ? (
             <>
-              <div className="flex flex-col items-center gap-3">
-                <button
-                  onClick={() => setSidebarExpanded(true)}
-                  aria-label="Expand navigation"
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-surface-elevated)] ring-1 ring-[var(--color-border-subtle)] transition hover:ring-[var(--color-primary)]"
+              <button
+                onClick={() => setSidebarExpanded(true)}
+                aria-label="Expand navigation"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-surface-elevated)] ring-1 ring-[var(--color-border-subtle)] transition hover:ring-[var(--color-primary)]"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-[var(--color-text)]"
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="text-[var(--color-text)]"
-                  >
-                    <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </button>
-                <div className="flex flex-col items-center gap-2">{renderNavButtons({ condensed: true })}</div>
-              </div>
+                  <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+              <div className="flex flex-col items-center gap-2">{renderNavButtons({ condensed: true })}</div>
               <div className="mt-auto flex flex-col items-center gap-2 pb-1">
                 <button
                   onClick={() => setSidebarExpanded(true)}
-                  title={session.user?.email ?? "Account"}
+                  title={session.business.name}
                   aria-label="Open account"
                   className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-[var(--color-text-on-primary)] ring-1 ring-[var(--color-primary)]"
                 >
-                  {(session.user?.email || session.business.name || "A").slice(0, 1).toUpperCase()}
-                </button>
-                <button
-                  onClick={signOut}
-                  className="w-full rounded-lg bg-[var(--color-surface-elevated)] px-2 py-2 text-[10px] font-semibold text-[var(--color-danger)] ring-1 ring-[var(--color-border-subtle)] transition hover:ring-[rgba(249,115,115,0.35)]"
-                >
-                  Sign out
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-[var(--color-text-on-primary)]"
+                  >
+                    <path
+                      d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.33 0-6 1.64-6 3.66V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1.34C18 15.64 15.33 14 12 14Z"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p className="mb-2 text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
-              <div className="flex flex-col gap-2 text-xs">{renderNavButtons()}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Dashboard</p>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">{session.business.name}</p>
+                </div>
+                {sidebarCondensed && (
+                  <button
+                    onClick={() => setSidebarExpanded(false)}
+                    aria-label="Collapse navigation"
+                    className="h-9 w-9 rounded-xl bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              <div className="mt-3 flex flex-col gap-2 text-xs">{renderNavButtons()}</div>
               <div className="mt-auto border-t border-[var(--color-border-subtle)] pt-6">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
                 <button
@@ -771,13 +828,28 @@ export default function BusinessPage() {
                 </button>
                 {profileOpen && (
                   <div className="mt-2 space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
-                    <p className="text-xs text-[var(--color-text-muted)]">{session.business.name}</p>
-                    <button
-                      onClick={signOut}
-                      className="w-full rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-                    >
-                      Sign out
-                    </button>
+                    <p className="text-xs font-semibold text-[var(--color-text)]">{session.business.name}</p>
+                    <p className="text-[11px] text-[var(--color-text-soft)]">{session.user?.email}</p>
+                    <div className="grid gap-2 text-xs">
+                      <a
+                        href="/settings/billing"
+                        className="rounded-lg bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
+                      >
+                        Billing (manage subscription)
+                      </a>
+                      <a
+                        href="/settings"
+                        className="rounded-lg bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:ring-[var(--color-accent)]"
+                      >
+                        Settings (profile & password)
+                      </a>
+                      <button
+                        onClick={signOut}
+                        className="rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                      >
+                        Sign out
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -785,47 +857,6 @@ export default function BusinessPage() {
           )}
         </div>
       </aside>
-
-      {sidebarCondensed && sidebarExpanded && (
-        <div
-          className="fixed inset-0 z-30 hidden bg-[var(--color-overlay)]/80 p-4 backdrop-blur-sm lg:flex"
-          onClick={() => setSidebarExpanded(false)}
-        >
-          <div
-            className="w-72 rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-soft)] ring-1 ring-[var(--color-border-subtle)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Navigation</p>
-                <p className="text-sm font-semibold text-[var(--color-text)]">{session.business.name}</p>
-              </div>
-              <button
-                onClick={() => setSidebarExpanded(false)}
-                className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-              >
-                Close
-              </button>
-            </div>
-            <div className="mt-4 flex flex-col gap-2 text-xs">
-              {renderNavButtons({ onSelect: () => setSidebarExpanded(false) })}
-            </div>
-            <div className="mt-5 border-t border-[var(--color-border-subtle)] pt-4 text-sm">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">Account</p>
-              <p className="mt-1 text-[var(--color-text)]">{session.user?.email ?? "Account"}</p>
-              <button
-                onClick={() => {
-                  setSidebarExpanded(false);
-                  signOut();
-                }}
-                className="mt-3 w-full rounded-lg bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="min-w-0 flex-1 px-6 lg:h-full lg:overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1320,16 +1351,16 @@ export default function BusinessPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => deleteEvent(event)}
-                      className="whitespace-nowrap rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-                    >
-                      Delete event
-                    </button>
-                    <button
                       onClick={() => loadProductions(event.slug)}
                       className="whitespace-nowrap rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
                     >
                       View deliveries
+                    </button>
+                    <button
+                      onClick={() => deleteEvent(event)}
+                      className="whitespace-nowrap rounded-full bg-[var(--color-danger)]/90 px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
+                    >
+                      Delete event
                     </button>
                     {event.mode === "photographer" && (
                       <div className="w-full rounded-xl bg-[var(--color-surface-elevated)] px-3 py-3 ring-1 ring-[var(--color-border-subtle)]">
