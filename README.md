@@ -10,6 +10,7 @@ Front-desk and photographer workflow for capturing shots, removing backgrounds v
 - Install deps with `bun install`.
 - Run quality gate: `bun run lint`.
 - Build for production: `bun run build`.
+- Marketing calculator: visit `/calculator` for the BoothOS Savings Calculator (single-page, client-only) to compare rental vs BoothOS plans.
 
 ## Docker
 
