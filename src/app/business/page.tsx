@@ -829,7 +829,7 @@ export default function BusinessPage() {
                   onClick={() => setProfileOpen((v) => !v)}
                   className="mt-2 flex w-full items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-left text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
                 >
-                  <span className="truncate">{session.user?.email ?? "Account"}</span>
+                  <span className="truncate">{session.business.name || session.user?.email || "Account"}</span>
                   <span>{profileOpen ? "–" : "+"}</span>
                 </button>
                 {profileOpen && (
