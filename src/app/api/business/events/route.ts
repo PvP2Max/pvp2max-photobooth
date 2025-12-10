@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     const payload = {
       name: body.name,
       status: body.status ?? "live",
-      mode: (body.mode as "self-serve" | "photographer" | undefined) ?? "self-serve",
+      mode: "self-serve",
       allowBackgroundRemoval: body.allowBackgroundRemoval ?? true,
       allowAiBackgrounds: body.allowAiBackgrounds ?? false,
       allowAiFilters: body.allowAiFilters ?? false,
