@@ -541,7 +541,7 @@ export default function BusinessConsole() {
     }
     setTestLoading(true);
     setTestError(null);
-    setTestMessage(null);
+    setTestMessage("Processing background removal…");
     const width = video.videoWidth;
     const height = video.videoHeight;
     canvas.width = width;
@@ -552,30 +552,43 @@ export default function BusinessConsole() {
       setTestLoading(false);
       return;
     }
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(video, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL("image/png");
 
-    const bg = new Image();
-    bg.crossOrigin = "anonymous";
-    bg.src = defaultBgPreview;
-
-    const drawComposite = () => {
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(bg, 0, 0, width, height);
-      ctx.drawImage(video, 0, 0, width, height);
-      const url = canvas.toDataURL("image/png");
-      setTestResult(url);
-      setTestMessage("Preview captured. Save a screenshot to share with clients.");
+    try {
+      const res = await fetch("/api/backgrounds/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl, background: "Modern White Marble.png" }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { image?: string; error?: string };
+      if (!res.ok || !payload.image) {
+        throw new Error(payload.error || "Preview failed. Showing raw frame.");
+      }
+      setTestResult(payload.image);
+      setTestMessage("Background removed and applied to the default backdrop.");
+    } catch (err) {
+      console.error(err);
+      const bg = new Image();
+      bg.crossOrigin = "anonymous";
+      bg.src = defaultBgPreview;
+      bg.onload = () => {
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(bg, 0, 0, width, height);
+        ctx.drawImage(video, 0, 0, width, height);
+        const url = canvas.toDataURL("image/png");
+        setTestResult(url);
+        setTestMessage("Preview captured without AI removal (fallback).");
+      };
+      bg.onerror = () => {
+        const url = canvas.toDataURL("image/png");
+        setTestResult(url);
+        setTestMessage("Preview captured (background image unavailable).");
+      };
+    } finally {
       setTestLoading(false);
-    };
-
-    bg.onload = drawComposite;
-    bg.onerror = () => {
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(video, 0, 0, width, height);
-      const url = canvas.toDataURL("image/png");
-      setTestResult(url);
-      setTestMessage("Preview captured (background image unavailable).");
-      setTestLoading(false);
-    };
+    }
   }
 
   if (loading) {
