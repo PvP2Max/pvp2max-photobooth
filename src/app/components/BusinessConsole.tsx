@@ -95,7 +95,6 @@ export default function BusinessConsole() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
-  const [newEventKey, setNewEventKey] = useState("");
   const [newPlan, setNewPlan] = useState("event-basic");
   const [newMode, setNewMode] = useState<"self-serve" | "photographer">("self-serve");
   const [newAllowedSelections, setNewAllowedSelections] = useState(3);
@@ -192,6 +191,11 @@ export default function BusinessConsole() {
     const hasPhotogEvent = (session?.events ?? []).some((e) => e.plan?.startsWith("photographer"));
     return plan.includes("photographer") || hasPhotogEvent;
   }, [session]);
+  const hasPhotographerSubscription = useMemo(() => {
+    const plan = session?.business.subscriptionPlan ?? "";
+    const status = session?.business.subscriptionStatus ?? "";
+    return plan.includes("photographer") && status === "active";
+  }, [session]);
 
   const stats = useMemo(() => {
     const events = session?.events ?? [];
@@ -253,7 +257,6 @@ export default function BusinessConsole() {
     setError(null);
     const payload = {
       name: newEventName,
-      slug: newEventKey,
       plan: newPlan,
       mode: newMode,
       allowedSelections: newAllowedSelections,
@@ -283,7 +286,6 @@ export default function BusinessConsole() {
       );
       setMessage("Event created.");
       setNewEventName("");
-      setNewEventKey("");
       setNewPlan("event-basic");
       setNewMode("self-serve");
       setNewAllowedSelections(3);
@@ -1111,16 +1113,6 @@ export default function BusinessConsole() {
                 />
               </label>
               <label className="text-sm text-[var(--color-text-muted)]">
-                Event slug
-                <input
-                  required
-                  value={newEventKey}
-                  onChange={(e) => setNewEventKey(e.target.value)}
-                  placeholder="event-2025"
-                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-[var(--color-text-muted)]">
                 Plan
                 <select
                   value={newPlan}
@@ -1131,7 +1123,9 @@ export default function BusinessConsole() {
                   <option value="event-unlimited">Event Unlimited ($20)</option>
                   <option value="event-ai">Event AI ($30)</option>
                   <option value="photographer-event">Photographer Event ($100)</option>
-                  <option value="photographer-monthly">Photographer Monthly ($250)</option>
+                  {hasPhotographerSubscription && (
+                    <option value="photographer-monthly">Photographer Monthly ($250)</option>
+                  )}
                 </select>
               </label>
               <label className="text-sm text-[var(--color-text-muted)]">
