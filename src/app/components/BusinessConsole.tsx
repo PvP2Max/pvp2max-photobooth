@@ -176,6 +176,7 @@ export default function BusinessConsole() {
   const [testError, setTestError] = useState<string | null>(null);
   const [testMessage, setTestMessage] = useState<string | null>(null);
   const [testShowTips, setTestShowTips] = useState(false);
+  const [testProcessing, setTestProcessing] = useState(false);
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const testCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const defaultBgPreview = "/assets/defaults/backgrounds/Modern White Marble.png";
@@ -543,7 +544,8 @@ export default function BusinessConsole() {
     }
     setTestLoading(true);
     setTestError(null);
-    setTestMessage("Processing background removal…");
+    setTestMessage("Captured frame. Applying background removal…");
+    setTestProcessing(true);
     const width = video.videoWidth;
     const height = video.videoHeight;
     canvas.width = width;
@@ -557,6 +559,7 @@ export default function BusinessConsole() {
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(video, 0, 0, width, height);
     const dataUrl = canvas.toDataURL("image/png");
+    setTestResult(dataUrl);
 
     try {
       const res = await fetch("/api/backgrounds/test", {
@@ -590,6 +593,7 @@ export default function BusinessConsole() {
       };
     } finally {
       setTestLoading(false);
+      setTestProcessing(false);
     }
   }
 
@@ -928,6 +932,9 @@ export default function BusinessConsole() {
                   </div>
                   {testError && <p className="text-sm text-[var(--color-text)]">{testError}</p>}
                   {testMessage && <p className="text-sm text-[var(--color-text-muted)]">{testMessage}</p>}
+                  {testProcessing && (
+                    <p className="text-xs text-[var(--color-text-muted)]">Running background removal…</p>
+                  )}
                 </div>
 
                 <div className="space-y-3">
