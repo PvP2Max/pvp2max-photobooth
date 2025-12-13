@@ -127,7 +127,11 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
 
   const loadSession = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/event", { credentials: "include" });
+      const qs = new URLSearchParams({
+        business: businessSlug || "",
+        event: eventSlug || "",
+      }).toString();
+      const res = await fetch(`/api/auth/event?${qs}`, { credentials: "include" });
       if (res.ok) {
         const data = (await res.json()) as SessionResponse;
         setSession(data);
@@ -144,7 +148,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       setSession(null);
       setNeedsLogin(true);
     }
-  }, []);
+  }, [businessSlug, eventSlug]);
 
   useEffect(() => {
     void attemptAutoUnlock().then(() => loadSession());
