@@ -45,7 +45,7 @@ export async function GET(
   }
   await recordDownload(event.context.scope, id, request.headers.get("x-forwarded-for") || undefined);
 
-  return new NextResponse(file.buffer, {
+  return new NextResponse(file.buffer as unknown as BodyInit, {
     headers: {
       "Content-Type": file.contentType,
       "Content-Disposition": `attachment; filename="${encodeURIComponent(file.filename)}"`,
