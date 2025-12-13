@@ -111,25 +111,36 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     };
   }, [startCamera]);
 
+  const businessParam = useMemo(() => businessSlug || searchParams.get("business") || "", [businessSlug, searchParams]);
+  const eventParam = useMemo(() => eventSlug || searchParams.get("event") || "", [eventSlug, searchParams]);
+
   const attemptAutoUnlock = useCallback(async () => {
-    if (!businessSlug || !eventSlug) return;
+    if (!businessParam || !eventParam) {
+      setNeedsLogin(true);
+      return;
+    }
     try {
       await fetch("/api/auth/event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ businessSlug, eventSlug }),
+        body: JSON.stringify({ businessSlug: businessParam, eventSlug: eventParam }),
       });
     } catch {
       setNeedsLogin(true);
     }
-  }, [businessSlug, eventSlug]);
+  }, [businessParam, eventParam]);
 
   const loadSession = useCallback(async () => {
     try {
+      if (!businessParam || !eventParam) {
+        setSession(null);
+        setNeedsLogin(true);
+        return;
+      }
       const qs = new URLSearchParams({
-        business: businessSlug || "",
-        event: eventSlug || "",
+        business: businessParam,
+        event: eventParam,
       }).toString();
       const res = await fetch(`/api/auth/event?${qs}`, { credentials: "include" });
       if (res.ok) {
@@ -148,7 +159,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       setSession(null);
       setNeedsLogin(true);
     }
-  }, [businessSlug, eventSlug]);
+  }, [businessParam, eventParam]);
 
   useEffect(() => {
     void attemptAutoUnlock().then(() => loadSession());
