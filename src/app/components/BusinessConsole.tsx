@@ -62,7 +62,9 @@ function linkFor(pathname: string, business: string, event: string) {
     process.env.NEXT_PUBLIC_APP_BASE_URL ||
     process.env.APP_BASE_URL ||
     "";
-  return `${base}${pathname}?${qs}`;
+  // Ensure pathname has leading slash
+  const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  return `${base}${path}?${qs}`;
 }
 
 function usageFor(event: EventItem) {
