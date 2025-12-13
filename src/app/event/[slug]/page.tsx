@@ -112,7 +112,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   }, [startCamera]);
 
   const businessParam = useMemo(() => businessSlug || searchParams.get("business") || "", [businessSlug, searchParams]);
-  const eventParam = useMemo(() => eventSlug || searchParams.get("event") || "", [eventSlug, searchParams]);
+  const eventParam = eventSlug;
 
   const attemptAutoUnlock = useCallback(async () => {
     if (!businessParam || !eventParam) {
