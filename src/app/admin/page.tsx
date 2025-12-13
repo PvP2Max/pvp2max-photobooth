@@ -9,6 +9,7 @@ type ProductionItem = {
   createdAt: string;
   downloadToken?: string;
   tokenExpiresAt?: string;
+  bundleFilename?: string;
   attachments: { filename: string; contentType: string; size: number }[];
 };
 
