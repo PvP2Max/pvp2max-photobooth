@@ -60,12 +60,14 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
   const [selectedBackgrounds, setSelectedBackgrounds] = useState<Set<string>>(new Set());
   const [loadingBackgrounds, setLoadingBackgrounds] = useState(false);
+  const [businessSession, setBusinessSession] = useState<{ slug: string } | null>(null);
 
   const businessParam = useMemo(
     () => businessSlug || searchParams.get("business") || "",
     [businessSlug, searchParams],
   );
   const eventParam = eventSlug;
+  const resolvedBusiness = businessParam || businessSession?.slug || "";
   const selectionLimit = session?.event?.allowedSelections ?? 1;
 
   const activeBackground = useMemo(() => {
@@ -73,8 +75,28 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     if (selected) return backgrounds.find((bg) => bg.id === selected) || backgrounds[0];
     return backgrounds[0];
   }, [backgrounds, selectedBackgrounds]);
-  const businessLabel = session?.business?.slug ?? businessParam ?? "Unknown";
+  const businessLabel = session?.business?.slug ?? resolvedBusiness ?? "Unknown";
   const modeLabel = session?.event?.mode ?? "self-serve";
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/business", { credentials: "include" });
+        if (!cancelled && res.ok) {
+          const data = (await res.json()) as { business?: { slug?: string } };
+          if (data.business?.slug) {
+            setBusinessSession({ slug: data.business.slug });
+          }
+        }
+      } catch {
+        // ignore; kiosk links may rely solely on event keys
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const startCamera = useCallback(async () => {
     try {
@@ -106,7 +128,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   }, [stopCamera]);
 
   const attemptAutoUnlock = useCallback(async () => {
-    if (!businessParam || !eventParam) {
+    if (!resolvedBusiness || !eventParam) {
       setNeedsLogin(true);
       return;
     }
@@ -116,7 +138,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          businessSlug: businessParam,
+          businessSlug: resolvedBusiness,
           eventSlug: eventParam,
           accessCode: accessCode || undefined,
         }),
@@ -124,12 +146,12 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     } catch {
       setNeedsLogin(true);
     }
-  }, [businessParam, eventParam, accessCode]);
+  }, [resolvedBusiness, eventParam, accessCode]);
 
   const loadSession = useCallback(async () => {
     try {
       const qs = new URLSearchParams({
-        business: businessParam,
+        business: resolvedBusiness,
         event: eventParam,
       });
       if (accessCode) qs.set("key", accessCode);
