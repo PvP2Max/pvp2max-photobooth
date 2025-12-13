@@ -57,7 +57,12 @@ type ProductionItem = {
 
 function linkFor(pathname: string, business: string, event: string) {
   const qs = new URLSearchParams({ business, event }).toString();
-  return `${pathname}?${qs}`;
+  const base =
+    (typeof window !== "undefined" && window.location?.origin) ||
+    process.env.NEXT_PUBLIC_APP_BASE_URL ||
+    process.env.APP_BASE_URL ||
+    "";
+  return `${base}${pathname}?${qs}`;
 }
 
 function usageFor(event: EventItem) {
@@ -720,12 +725,6 @@ export default function BusinessConsole() {
               >
                 Create event
               </button>
-              <button
-                onClick={() => router.push("/frontdesk")}
-                className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-              >
-                Front desk
-              </button>
             </div>
           </div>
 
@@ -804,6 +803,8 @@ export default function BusinessConsole() {
                                 url={photographerLink}
                                 copyKey={`${event.slug}-photographer`}
                                 onCopy={copyLink}
+                                onQr={() => generateQr(photographerLink, `${event.name} photographer`)}
+                                showQr
                                 copied={copyStatus[`${event.slug}-photographer`] === true}
                               />
                               <LinkActions
@@ -811,6 +812,8 @@ export default function BusinessConsole() {
                                 url={frontdeskLink}
                                 copyKey={`${event.slug}-frontdesk`}
                                 onCopy={copyLink}
+                                onQr={() => generateQr(frontdeskLink, `${event.name} front desk`)}
+                                showQr
                                 copied={copyStatus[`${event.slug}-frontdesk`] === true}
                               />
                             </div>
