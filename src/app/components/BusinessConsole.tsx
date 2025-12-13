@@ -671,9 +671,14 @@ export default function BusinessConsole() {
             </button>
             {profileOpen && (
               <div className="space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 text-sm ring-1 ring-[var(--color-border-subtle)]">
-                <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]">
+                <a
+                  href="https://billing.stripe.com/p/login/aFa14odXR5gweH4gQRgA800"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]"
+                >
                   Billing
-                </button>
+                </a>
                 <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]">
                   Settings
                 </button>
