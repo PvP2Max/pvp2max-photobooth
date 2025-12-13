@@ -558,6 +558,7 @@ export async function createEvent(
     galleryPublic = false,
     eventDate,
     eventTime,
+    allowedSelections,
   }: {
     name: string;
     slug?: string;
@@ -577,6 +578,7 @@ export async function createEvent(
     galleryPublic?: boolean;
     eventDate?: string;
     eventTime?: string;
+    allowedSelections?: number;
   },
 ) {
   const index = await readTenantIndex();
@@ -612,6 +614,7 @@ export async function createEvent(
     galleryPublic,
     eventDate,
     eventTime,
+    allowedSelections,
   };
   business.events.push(event);
   await writeTenantIndex(index);
