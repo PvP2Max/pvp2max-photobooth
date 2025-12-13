@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import archiver from "archiver";
+import { uploadToR2, fetchFromR2, deleteFromR2 } from "./r2";
 import { TenantScope, scopedStorageRoot } from "./tenants";
 
 export type ProductionAttachment = {
   filename: string;
-  path: string;
+  r2Key: string;
+  url?: string | null;
   contentType: string;
   size: number;
 };
@@ -22,6 +25,9 @@ export type ProductionSet = {
   downloadCount?: number;
   lastDownloadedAt?: string;
   downloadEvents?: { at: string; ip?: string }[];
+  bundleKey?: string;
+  bundleUrl?: string | null;
+  bundleFilename?: string;
 };
 
 type ProductionIndex = {
@@ -75,21 +81,36 @@ export async function saveProduction(
   const downloadToken = randomUUID();
   const tokenExpiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString();
   const { dir } = productionPaths(scope);
-  const folder = path.join(dir, id);
-  await mkdir(folder, { recursive: true });
+  await mkdir(dir, { recursive: true });
 
   const savedAttachments: ProductionAttachment[] = [];
   for (const attachment of attachments) {
-    const target = path.join(folder, attachment.filename);
-    await writeFile(target, attachment.content);
-    const fileStat = await stat(target);
+    const key = `production/${id}/${attachment.filename}`;
+    const { url } = await uploadToR2({
+      key,
+      body: attachment.content,
+      contentType: attachment.contentType,
+      cacheControl: "public, max-age=604800",
+    });
     savedAttachments.push({
       filename: attachment.filename,
-      path: target,
+      r2Key: key,
+      url,
       contentType: attachment.contentType,
-      size: fileStat.size,
+      size: attachment.content.length,
     });
   }
+
+  // Bundle all attachments into a single zip for a one-click download.
+  const bundleFilename = "photos.zip";
+  const bundleBuffer = await buildZip(attachments);
+  const bundleKey = `production/${id}/${bundleFilename}`;
+  const { url: bundleUrl } = await uploadToR2({
+    key: bundleKey,
+    body: bundleBuffer,
+    contentType: "application/zip",
+    cacheControl: "public, max-age=604800",
+  });
 
   const record: ProductionSet = {
     id,
@@ -102,6 +123,9 @@ export async function saveProduction(
     eventId: scope.eventId,
     downloadCount: 0,
     downloadEvents: [],
+    bundleKey,
+    bundleUrl,
+    bundleFilename,
   };
   index.items.unshift(record);
   await writeIndex(index, scope);
@@ -119,18 +143,22 @@ export async function deleteProduction(scope: TenantScope, id: string) {
   const remaining = index.items.filter((item) => item.id !== id);
   const removed = index.items.find((item) => item.id === id);
   if (removed) {
-    const { dir } = productionPaths(scope);
-    await rm(path.join(dir, id), { recursive: true, force: true });
+    const keys = [
+      ...removed.attachments.map((a) => a.r2Key).filter(Boolean),
+      ...(removed.bundleKey ? [removed.bundleKey] : []),
+    ];
+    await deleteFromR2(keys);
   }
   await writeIndex({ items: remaining }, scope);
 }
 
 export async function deleteAllProduction(scope: TenantScope) {
   const index = await readIndex(scope);
-  const { dir } = productionPaths(scope);
-  for (const item of index.items) {
-    await rm(path.join(dir, item.id), { recursive: true, force: true });
-  }
+  const keys = index.items.flatMap((item) => [
+    ...item.attachments.map((a) => a.r2Key).filter(Boolean),
+    ...(item.bundleKey ? [item.bundleKey] : []),
+  ]);
+  await deleteFromR2(keys);
   await writeIndex({ items: [] }, scope);
 }
 
@@ -138,12 +166,31 @@ export async function getProductionAttachment(scope: TenantScope, id: string, fi
   const index = await readIndex(scope);
   const item = index.items.find((i) => i.id === id);
   if (!item) return null;
+  const isBundle = item.bundleFilename && filename === item.bundleFilename;
+  if (isBundle && item.bundleKey) {
+    const blob = await fetchFromR2(item.bundleKey);
+    return {
+      buffer: blob.buffer,
+      contentType: blob.contentType,
+      filename: item.bundleFilename,
+    };
+  }
   const attachment = item.attachments.find((a) => a.filename === filename);
   if (!attachment) return null;
-  const buffer = await readFile(attachment.path);
+  const legacyPath = (attachment as { path?: string }).path;
+  if (!attachment.r2Key && legacyPath) {
+    // Legacy local path fallback
+    const buffer = await readFile(legacyPath);
+    return {
+      buffer,
+      contentType: attachment.contentType,
+      filename: attachment.filename,
+    };
+  }
+  const blob = await fetchFromR2(attachment.r2Key);
   return {
-    buffer,
-    contentType: attachment.contentType,
+    buffer: blob.buffer,
+    contentType: blob.contentType || attachment.contentType,
     filename: attachment.filename,
   };
 }
@@ -200,10 +247,29 @@ export async function purgeExpiredProduction(scope: TenantScope) {
     }
   }
   if (expired.length > 0) {
-    const { dir } = productionPaths(scope);
     for (const item of expired) {
-      await rm(path.join(dir, item.id), { recursive: true, force: true });
+      const keys = [
+        ...item.attachments.map((a) => a.r2Key).filter(Boolean),
+        ...(item.bundleKey ? [item.bundleKey] : []),
+      ];
+      await deleteFromR2(keys);
     }
     await writeIndex({ items: keep }, scope);
   }
+}
+
+async function buildZip(files: { filename: string; content: Buffer }[]) {
+  return new Promise<Buffer>((resolve, reject) => {
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    const chunks: Buffer[] = [];
+    archive.on("error", reject);
+    archive.on("data", (data) => {
+      chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
+    });
+    archive.on("end", () => resolve(Buffer.concat(chunks)));
+    for (const file of files) {
+      archive.append(file.content, { name: file.filename });
+    }
+    archive.finalize().catch(reject);
+  });
 }

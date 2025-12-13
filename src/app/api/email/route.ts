@@ -265,14 +265,13 @@ export async function POST(request: NextRequest) {
     const origin =
       request.headers.get("origin") || process.env.APP_BASE_URL || "";
     const baseUrl = origin.replace(/\/$/, "");
-    const downloadLinks = attachments.map(
-      (attachment, idx) =>
-        `<li><a href="${baseUrl}/api/production/files/${productionId}/${encodeURIComponent(
-          attachment.filename,
-        )}?token=${production.downloadToken}&business=${context.scope.businessSlug}&event=${context.scope.eventSlug}" style="color:#67e8f9;text-decoration:none;">Photo ${
-          idx + 1
-        }: ${attachment.filename}</a></li>`,
-    );
+    const bundleName = production.bundleFilename || "photos.zip";
+    const bundleLink = `${baseUrl}/api/production/files/${productionId}/${encodeURIComponent(
+      bundleName,
+    )}?token=${production.downloadToken}&business=${context.scope.businessSlug}&event=${context.scope.eventSlug}`;
+    const downloadLinks = [
+      `<li><a href="${bundleLink}" style="color:#67e8f9;text-decoration:none;">Download all photos (zip)</a></li>`,
+    ];
 
     const watermarkNote = usage.watermark
       ? `<p style="margin:0 0 10px;color:#cbd5e1;font-size:12px;line-height:1.5;">This event is on the free tier, so a BoothOS watermark is present. Upgrade the event to remove it.</p>`

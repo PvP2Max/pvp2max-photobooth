@@ -212,7 +212,9 @@ export default function AdminPage() {
                       </button>
                       {item.downloadToken && (
                         <a
-                          href={`/api/production/archive?id=${item.id}&token=${PASSWORD}`}
+                          href={`/api/production/files/${item.id}/${encodeURIComponent(
+                            item.bundleFilename || "photos.zip",
+                          )}?token=${item.downloadToken ?? PASSWORD}`}
                           className="rounded-lg bg-[var(--color-surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
                         >
                           Download zip
