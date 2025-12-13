@@ -73,6 +73,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     allowAiBackgrounds: boolean;
     premiumFilters: boolean;
   }>({ allowAiBackgrounds: false, premiumFilters: false });
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   const activeFilter = useMemo(() => FILTERS.find((f) => f.id === filter)?.filter || "none", [filter]);
   const availableFilters = useMemo(() => {
@@ -120,7 +121,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         body: JSON.stringify({ businessSlug, eventSlug }),
       });
     } catch {
-      // ignore
+      setNeedsLogin(true);
     }
   }, [businessSlug, eventSlug]);
 
@@ -137,9 +138,11 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         });
       } else {
         setSession(null);
+        setNeedsLogin(true);
       }
     } catch {
       setSession(null);
+      setNeedsLogin(true);
     }
   }, []);
 
@@ -196,6 +199,32 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     setCaptured(null);
     setStatus(null);
     setError(null);
+  }
+
+  const nextParam =
+    typeof window !== "undefined"
+      ? encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+      : "";
+  const loginHref = nextParam ? `/login?next=${nextParam}` : "/login";
+
+  if (needsLogin) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] px-6 text-[var(--color-text)]">
+        <div className="w-full max-w-md space-y-4 rounded-2xl bg-[var(--color-surface)] p-6 text-center ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+          <h1 className="text-xl font-semibold">Sign in to access this event</h1>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Please sign in to the business account to unlock this event. After login you will be redirected
+            back here automatically.
+          </p>
+          <a
+            href={loginHref}
+            className="block w-full rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
+          >
+            Go to login
+          </a>
+        </div>
+      </main>
+    );
   }
 
   async function handleSend() {
