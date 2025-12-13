@@ -744,7 +744,7 @@ export default function BusinessConsole() {
                 <div className="grid gap-3 lg:grid-cols-2">
                   {activeEvents.map((event) => {
                     const usage = usageFor(event);
-                    const boothLink = linkFor("/event", session.business.slug, event.slug);
+                    const boothLink = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
                     const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
                     const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
                     const frontdeskLink = linkFor("/frontdesk", session.business.slug, event.slug);
