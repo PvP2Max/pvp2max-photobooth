@@ -39,6 +39,7 @@ function dataUrlToFile(dataUrl: string, name: string) {
 export default function BoothPage({ params }: { params: { slug: string } }) {
   const searchParams = useSearchParams();
   const businessSlug = searchParams.get("business") ?? "";
+  const accessCode = searchParams.get("key") ?? "";
   const eventSlug = params.slug;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -114,20 +115,26 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ businessSlug: businessParam, eventSlug: eventParam }),
+        body: JSON.stringify({
+          businessSlug: businessParam,
+          eventSlug: eventParam,
+          accessCode: accessCode || undefined,
+        }),
       });
     } catch {
       setNeedsLogin(true);
     }
-  }, [businessParam, eventParam]);
+  }, [businessParam, eventParam, accessCode]);
 
   const loadSession = useCallback(async () => {
     try {
       const qs = new URLSearchParams({
         business: businessParam,
         event: eventParam,
-      }).toString();
-      const res = await fetch(`/api/auth/event?${qs}`, { credentials: "include" });
+      });
+      if (accessCode) qs.set("key", accessCode);
+      const qsString = qs.toString();
+      const res = await fetch(`/api/auth/event?${qsString}`, { credentials: "include" });
       if (!res.ok) {
         setSession(null);
         setNeedsLogin(true);
