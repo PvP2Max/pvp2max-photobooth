@@ -48,7 +48,7 @@ export async function GET(
   return new NextResponse(file.buffer as unknown as BodyInit, {
     headers: {
       "Content-Type": file.contentType,
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(file.filename)}"`,
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(file.filename || "download")}"`,
       "Cache-Control": "no-store",
     },
   });
