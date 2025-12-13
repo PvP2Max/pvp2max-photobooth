@@ -225,7 +225,7 @@ function verifyPassword(password: string, salt: string, expectedHash: string) {
   return timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
 }
 
-function withEventDefaults(event: BoothEvent): BoothEvent {
+export function withEventDefaults(event: BoothEvent): BoothEvent {
   const plan = event.plan ?? "event-basic";
   const defaults = planDefaults(plan);
   return {
