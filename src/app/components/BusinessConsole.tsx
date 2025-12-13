@@ -747,7 +747,6 @@ export default function BusinessConsole() {
                     const boothLink = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
                     const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
                     const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
-                    const frontdeskLink = linkFor("/frontdesk", session.business.slug, event.slug);
                     return (
                       <div
                         key={event.id}
@@ -808,15 +807,6 @@ export default function BusinessConsole() {
                                 onQr={() => generateQr(photographerLink, `${event.name} photographer`)}
                                 showQr
                                 copied={copyStatus[`${event.slug}-photographer`] === true}
-                              />
-                              <LinkActions
-                                label="Front desk"
-                                url={frontdeskLink}
-                                copyKey={`${event.slug}-frontdesk`}
-                                onCopy={copyLink}
-                                onQr={() => generateQr(frontdeskLink, `${event.name} front desk`)}
-                                showQr
-                                copied={copyStatus[`${event.slug}-frontdesk`] === true}
                               />
                             </div>
                           ) : (

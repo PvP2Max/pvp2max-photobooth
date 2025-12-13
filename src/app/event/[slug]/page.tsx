@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import type { BackgroundOption } from "@/lib/backgrounds";
 
 type SessionResponse = {
   business: { id: string; name: string; slug: string };
@@ -10,109 +11,98 @@ type SessionResponse = {
     id: string;
     name: string;
     slug: string;
-    plan?: string;
-    allowBackgroundRemoval?: boolean;
-    allowAiBackgrounds?: boolean;
-    allowAiFilters?: boolean;
-    overlaysAll?: boolean;
-    premiumFilters?: boolean;
-    watermarkEnabled?: boolean;
-    smsEnabled?: boolean;
     mode?: "self-serve" | "photographer";
+    plan?: string;
+    allowedSelections?: number;
+    allowBackgroundRemoval?: boolean;
     paymentStatus?: "unpaid" | "pending" | "paid";
-    overlayTheme?: string;
   };
 };
 
-type Usage = {
-  photoCap: number | null;
-  photoUsed: number;
-  remainingPhotos: number | null;
-  aiCredits: number;
-  aiUsed: number;
-  remainingAi: number;
+type UploadPhoto = {
+  id: string;
+  cutoutUrl: string;
+  previewUrl?: string;
+  originalUrl?: string;
 };
 
-const FILTERS = [
-  { id: "none", label: "Clean", filter: "none" },
-  { id: "bw", label: "B&W", filter: "grayscale(1)" },
-  { id: "warm", label: "Warm Glow", filter: "contrast(1.05) saturate(1.1) sepia(0.12)" },
-  { id: "cool", label: "Cool", filter: "saturate(0.95) hue-rotate(-8deg)" },
-  { id: "matte", label: "Matte", filter: "saturate(0.9) brightness(0.97) contrast(0.96)" },
-  { id: "soft", label: "Soft Skin", filter: "blur(0px) brightness(1.04) contrast(0.98)" },
-];
+type BoothStage = "intro" | "live" | "countdown" | "review" | "processing" | "select" | "sent";
 
-const PREMIUM_FILTERS = [
-  { id: "vintage", label: "Vintage Film", filter: "sepia(0.35) contrast(1.05) saturate(0.9)" },
-  { id: "glam", label: "Glam", filter: "contrast(1.15) saturate(1.12) brightness(1.05)" },
-  { id: "neon", label: "Neon", filter: "saturate(1.4) hue-rotate(12deg) contrast(1.1)" },
-  { id: "dramatic", label: "Dramatic", filter: "contrast(1.2) saturate(1.15)" },
-  { id: "cinematic", label: "Cinematic", filter: "saturate(1.1) contrast(1.12) brightness(0.98)" },
-  { id: "noir", label: "Noir", filter: "grayscale(1) contrast(1.25) brightness(0.9)" },
-];
+function dataUrlToFile(dataUrl: string, name: string) {
+  const match = dataUrl.match(/^data:(.+);base64,(.*)$/);
+  if (!match) throw new Error("Invalid capture data");
+  const [, mime, data] = match;
+  const buffer = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+  return new File([buffer], name, { type: mime || "image/png" });
+}
 
 export default function BoothPage({ params }: { params: { slug: string } }) {
   const searchParams = useSearchParams();
   const businessSlug = searchParams.get("business") ?? "";
   const eventSlug = params.slug;
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [cameraReady, setCameraReady] = useState(false);
+  const [stage, setStage] = useState<BoothStage>("intro");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
-  const [filter, setFilter] = useState(FILTERS[0].id);
-  const [removeBackground, setRemoveBackground] = useState(true);
-  const [email, setEmail] = useState("");
+  const [cutoutUrl, setCutoutUrl] = useState<string | null>(null);
+  const [photoId, setPhotoId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  const [usage, setUsage] = useState<Usage | null>(null);
-  const [planFeatures, setPlanFeatures] = useState<{
-    allowAiBackgrounds: boolean;
-    premiumFilters: boolean;
-  }>({ allowAiBackgrounds: false, premiumFilters: false });
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [session, setSession] = useState<SessionResponse | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [email, setEmail] = useState("");
+  const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
+  const [selectedBackgrounds, setSelectedBackgrounds] = useState<Set<string>>(new Set());
+  const [loadingBackgrounds, setLoadingBackgrounds] = useState(false);
 
-  const activeFilter = useMemo(() => FILTERS.find((f) => f.id === filter)?.filter || "none", [filter]);
-  const availableFilters = useMemo(() => {
-    if (planFeatures.premiumFilters) return [...FILTERS, ...PREMIUM_FILTERS];
-    return FILTERS;
-  }, [planFeatures.premiumFilters]);
-  const backgroundRemovalEnabled = session?.event?.allowBackgroundRemoval ?? true;
+  const businessParam = useMemo(
+    () => businessSlug || searchParams.get("business") || "",
+    [businessSlug, searchParams],
+  );
+  const eventParam = eventSlug;
+  const selectionLimit = session?.event?.allowedSelections ?? 1;
+
+  const activeBackground = useMemo(() => {
+    const selected = [...selectedBackgrounds][0];
+    if (selected) return backgrounds.find((bg) => bg.id === selected) || backgrounds[0];
+    return backgrounds[0];
+  }, [backgrounds, selectedBackgrounds]);
+  const businessLabel = session?.business?.slug ?? businessParam ?? "Unknown";
+  const modeLabel = session?.event?.mode ?? "self-serve";
 
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 1600 }, height: { ideal: 900 } },
+        video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        setCameraReady(true);
       }
     } catch {
-      setError("Camera unavailable. Check permissions.");
+      setError("Camera unavailable. Check permissions and reload.");
     }
   }, []);
 
+  const stopCamera = useCallback(() => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach((t) => t.stop());
+  }, []);
+
   useEffect(() => {
-    startCamera();
-    const videoEl = videoRef.current;
-    // Hide global nav while in booth mode
     const header = document.querySelector("header");
     if (header) (header as HTMLElement).style.display = "none";
     return () => {
-      const tracks = (videoEl?.srcObject as MediaStream | null)?.getTracks() || [];
-      tracks.forEach((t) => t.stop());
+      stopCamera();
       if (header) (header as HTMLElement).style.display = "";
     };
-  }, [startCamera]);
-
-  const businessParam = useMemo(() => businessSlug || searchParams.get("business") || "", [businessSlug, searchParams]);
-  const eventParam = eventSlug;
+  }, [stopCamera]);
 
   const attemptAutoUnlock = useCallback(async () => {
     if (!businessParam || !eventParam) {
@@ -133,37 +123,52 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
 
   const loadSession = useCallback(async () => {
     try {
-      if (!businessParam || !eventParam) {
-        setSession(null);
-        setNeedsLogin(true);
-        return;
-      }
       const qs = new URLSearchParams({
         business: businessParam,
         event: eventParam,
       }).toString();
       const res = await fetch(`/api/auth/event?${qs}`, { credentials: "include" });
-      if (res.ok) {
-        const data = (await res.json()) as SessionResponse;
-        setSession(data);
-        setRemoveBackground(data.event.allowBackgroundRemoval ?? true);
-        setPlanFeatures({
-          allowAiBackgrounds: data.event.allowAiBackgrounds ?? false,
-          premiumFilters: data.event.premiumFilters ?? false,
-        });
-      } else {
+      if (!res.ok) {
         setSession(null);
         setNeedsLogin(true);
+        return;
       }
+      const data = (await res.json()) as SessionResponse;
+      setSession(data);
+      setNeedsLogin(false);
     } catch {
       setSession(null);
       setNeedsLogin(true);
     }
   }, [businessParam, eventParam]);
 
+  const loadBackgrounds = useCallback(async () => {
+    setLoadingBackgrounds(true);
+    try {
+      const res = await fetch("/api/backgrounds", { credentials: "include" });
+      const payload = (await res.json().catch(() => ({}))) as { backgrounds?: BackgroundOption[] };
+      if (res.ok && Array.isArray(payload.backgrounds)) {
+        setBackgrounds(payload.backgrounds);
+        if (payload.backgrounds.length === 1) {
+          setSelectedBackgrounds(new Set([payload.backgrounds[0].id]));
+        }
+      }
+    } catch {
+      // surface via error panel on demand
+    } finally {
+      setLoadingBackgrounds(false);
+    }
+  }, []);
+
   useEffect(() => {
     void attemptAutoUnlock().then(() => loadSession());
   }, [attemptAutoUnlock, loadSession]);
+
+  useEffect(() => {
+    if (session) {
+      void loadBackgrounds();
+    }
+  }, [session, loadBackgrounds]);
 
   function drawFrameToCanvas() {
     const video = videoRef.current;
@@ -171,25 +176,20 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     if (!video || !canvas) return null;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    const side = Math.min(video.videoWidth || 1280, video.videoHeight || 720) || 720;
-    // Square crop to keep 1:1 for frames/AI backgrounds
+    const side =
+      Math.min(video.videoWidth || 1280, video.videoHeight || 720) || video.videoWidth || 1080;
     canvas.width = side;
     canvas.height = side;
     const sx = ((video.videoWidth || side) - side) / 2;
     const sy = ((video.videoHeight || side) - side) / 2;
     ctx.filter = "none";
     ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
-    const dataUrl = canvas.toDataURL("image/png");
-    return dataUrl;
+    return canvas.toDataURL("image/png");
   }
 
-  function startCountdownAndCapture() {
-    if (!cameraReady) {
-      setError("Camera not ready yet.");
-      return;
-    }
+  function beginCountdown() {
     setError(null);
-    setStatus("Get ready...");
+    setStage("countdown");
     let counter = 3;
     setCountdown(counter);
     const timer = setInterval(() => {
@@ -197,23 +197,155 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       if (counter <= 0) {
         clearInterval(timer);
         setCountdown(null);
-        const dataUrl = drawFrameToCanvas();
-        if (dataUrl) {
-          setCaptured(dataUrl);
+        const frame = drawFrameToCanvas();
+        if (frame) {
+          setCaptured(frame);
+          setStage("review");
           setStatus("Review your shot");
         } else {
           setError("Failed to capture image.");
+          setStage("live");
         }
       } else {
         setCountdown(counter);
       }
-    }, 700);
+    }, 750);
   }
 
-  function resetCapture() {
+  function handleStart() {
+    setStage("live");
     setCaptured(null);
-    setStatus(null);
+    setCutoutUrl(null);
+    setPhotoId(null);
+    setStatus("Tap anywhere to snap your photo");
+    void startCamera();
+  }
+
+  function handleRetake() {
+    setCaptured(null);
+    setCutoutUrl(null);
+    setPhotoId(null);
+    setStatus("Tap anywhere to snap your photo");
+    setStage("live");
+  }
+
+  function toggleBackground(id: string) {
+    setSelectedBackgrounds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        return next;
+      }
+      if (selectionLimit && next.size >= selectionLimit) {
+        setStatus(`You can pick up to ${selectionLimit} background${selectionLimit > 1 ? "s" : ""}.`);
+        return prev;
+      }
+      next.add(id);
+      return next;
+    });
+  }
+
+  async function processCutout() {
+    if (!captured) {
+      setError("Take a photo first.");
+      return;
+    }
+    if (!email.trim()) {
+      setError("Enter an email before continuing.");
+      return;
+    }
+    setProcessing(true);
+    setStage("processing");
+    setStatus("Sending to MODNet…");
     setError(null);
+    try {
+      const file = dataUrlToFile(captured, "booth-capture.png");
+      const form = new FormData();
+      form.append("email", email.trim());
+      form.append("file", file);
+      form.append("booth", "1");
+      form.append("removeBackground", "true");
+      const res = await fetch("/api/photos", {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        photos?: UploadPhoto[];
+        error?: string;
+      };
+      if (!res.ok || !payload.photos?.length) {
+        throw new Error(payload.error || "Background removal failed.");
+      }
+      const photo = payload.photos[0];
+      const preview = photo.previewUrl || photo.cutoutUrl || photo.originalUrl;
+      if (!preview) {
+        throw new Error("MODNet returned without a preview.");
+      }
+      setPhotoId(photo.id);
+      setCutoutUrl(preview);
+      setStatus("Background removed. Choose your background.");
+      setStage("select");
+      if (backgrounds.length === 1 && selectedBackgrounds.size === 0) {
+        setSelectedBackgrounds(new Set([backgrounds[0].id]));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to process photo.";
+      setError(message);
+      setStage("review");
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function sendEmail() {
+    if (!photoId || !cutoutUrl) {
+      setError("Process your photo before sending.");
+      return;
+    }
+    const chosen =
+      selectedBackgrounds.size > 0
+        ? [...selectedBackgrounds]
+        : backgrounds.length === 1
+          ? [backgrounds[0].id]
+          : [];
+    if (chosen.length === 0) {
+      setError("Choose at least one background.");
+      return;
+    }
+    if (!email.trim()) {
+      setError("Enter an email to deliver the photos.");
+      return;
+    }
+    setSending(true);
+    setStatus("Sending your photos…");
+    setError(null);
+    try {
+      const body = {
+        clientEmail: email.trim(),
+        selections: chosen.map((backgroundId) => ({
+          photoId,
+          backgroundId,
+        })),
+      };
+      const res = await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to send email.");
+      }
+      setStatus("Sent! Check your email for the download link.");
+      setStage("sent");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to send right now.";
+      setError(message);
+    } finally {
+      setSending(false);
+    }
   }
 
   const nextParam =
@@ -242,202 +374,265 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     );
   }
 
-  async function handleSend() {
-    if (!captured) {
-      setError("Take a photo first.");
-      return;
-    }
-    if (!email) {
-      setError("Enter an email to deliver the photo.");
-      return;
-    }
-    if (usage?.remainingPhotos === 0) {
-      setError("Photo limit reached. Upgrade to continue.");
-      return;
-    }
-    setSending(true);
-    setError(null);
-    setStatus("Uploading...");
-    try {
-      const blob = await fetch(captured).then((r) => r.blob());
-      const file = new File([blob], "booth-capture.png", { type: "image/png" });
-      const form = new FormData();
-      form.append("email", email);
-      form.append("file", file);
-      form.append("removeBackground", removeBackground ? "true" : "false");
-      form.append("booth", "1");
-      form.append("filter", filter);
-      const res = await fetch("/api/photos", {
-        method: "POST",
-        body: form,
-        credentials: "include",
-      });
-      const payload = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        usage?: Usage;
-      };
-      if (!res.ok) {
-        setError(payload.error || "Failed to send photo.");
-        return;
-      }
-      setUsage(payload.usage ?? null);
-      setStatus("Sent! Check your email.");
-    } catch {
-      setError("Upload failed.");
-    } finally {
-      setSending(false);
-    }
-  }
-
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10">
-        <header className="flex flex-wrap items-center justify-between gap-3">
+    <main className="relative min-h-screen bg-[#05060a] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(56,189,248,0.12),transparent_30%),linear-gradient(180deg,rgba(10,12,18,0.9),rgba(10,12,18,0.96))]" />
+      <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
-              BoothOS Live Booth
-            </p>
-            <h1 className="text-3xl font-semibold">
-              {session?.event?.name || "Event"}{" "}
-              <span className="text-[var(--color-text-muted)]">/ {eventSlug}</span>
+            <p className="text-xs uppercase tracking-[0.3em] text-white/60">BoothOS Self-Serve</p>
+            <h1 className="text-2xl font-semibold">
+              {session?.event?.name ?? "Event"}{" "}
+              <span className="text-white/60">/ {eventSlug}</span>
             </h1>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Business: {session?.business?.slug || businessSlug || "Unknown"} • Plan:{" "}
-              {session?.event?.plan ?? "event-basic"} • Mode: {session?.event?.mode ?? "self-serve"}
-              {session?.event?.paymentStatus && ` • Payment: ${session.event.paymentStatus}`}
+            <p className="text-sm text-white/60">
+              Business: {businessLabel} • Mode: {modeLabel}{" "}
+              {session?.event?.paymentStatus && `• Payment: ${session.event.paymentStatus}`}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-            {usage && (
-              <span className="rounded-full bg-[var(--color-surface)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)]">
-                Photos used: {usage.photoUsed}
-                {usage.photoCap !== null ? ` / ${usage.photoCap}` : " (unlimited)"}
-              </span>
-            )}
-          </div>
-        </header>
-
-        <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
-          <div className="rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-            <div className="relative aspect-square overflow-hidden rounded-xl bg-black">
-              {!captured ? (
-                <video
-                  ref={videoRef}
-                  className="h-full w-full object-cover"
-                  style={{ filter: activeFilter }}
-                  playsInline
-                  muted
-                />
-              ) : (
-                <img
-                  src={captured}
-                  alt="Captured preview"
-                  className="h-full w-full object-cover"
-                  style={{ filter: activeFilter }}
-                />
-              )}
-              {countdown && (
-                <div className="absolute inset-0 flex items-center justify-center text-6xl font-semibold text-white drop-shadow-lg">
-                  {countdown}
-                </div>
-              )}
-              <canvas ref={canvasRef} className="hidden" />
+          {status && (
+            <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white ring-1 ring-white/15">
+              {status}
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {!captured ? (
+          )}
+        </div>
+
+        {error && (
+          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-100 ring-1 ring-red-500/30">
+            {error}
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="relative aspect-[3/4] overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d111b] to-[#0a0c12] ring-1 ring-white/10">
+            {!captured && (
+              <video
+                ref={videoRef}
+                className="absolute inset-0 h-full w-full object-cover"
+                playsInline
+                muted
+              />
+            )}
+            {captured && stage !== "processing" && stage !== "select" && (
+              <img
+                src={captured}
+                alt="Captured preview"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+            {(stage === "processing" || stage === "select" || stage === "sent") && activeBackground && (
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage: `url(${activeBackground.previewAsset || activeBackground.asset})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  filter: stage === "processing" ? "blur(4px)" : "none",
+                  transform: "scale(1.01)",
+                }}
+              />
+            )}
+            {(stage === "processing" || stage === "select" || stage === "sent") && cutoutUrl && (
+              <img
+                src={cutoutUrl}
+                alt="Cutout preview"
+                className="absolute inset-0 m-auto max-h-full max-w-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
+              />
+            )}
+
+            {stage === "intro" && (
+              <button
+                onClick={handleStart}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-center text-white backdrop-blur-sm transition hover:bg-black/50"
+              >
+                <span className="text-sm uppercase tracking-[0.4em] text-white/70">Booth ready</span>
+                <span className="text-3xl font-semibold">Tap to start</span>
+              </button>
+            )}
+
+            {(stage === "live" || stage === "countdown") && (
+              <button
+                onClick={beginCountdown}
+                className="absolute inset-0 flex items-center justify-center bg-black/35 text-center text-white transition hover:bg-black/25"
+              >
+                <div className="rounded-full bg-black/60 px-5 py-3 text-lg font-semibold text-white/90">
+                  {countdown ? countdown : "Tap to snap your photo"}
+                </div>
+              </button>
+            )}
+
+            {stage === "review" && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white">
+                  Looks good?
+                </div>
+              </div>
+            )}
+
+            {stage === "processing" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-center text-white">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                <p className="mt-3 text-sm text-white/70">Running background removal…</p>
+              </div>
+            )}
+
+            {stage === "sent" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-center text-white">
+                <div className="rounded-full bg-emerald-500/80 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30">
+                  Delivered
+                </div>
+                <p className="mt-2 text-sm text-white/80">Check your inbox for the download link.</p>
+              </div>
+            )}
+
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+
+          <div className="flex flex-col gap-4 rounded-3xl bg-white/5 p-4 ring-1 ring-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/60">Steps</p>
+                <p className="text-sm text-white/80">
+                  {stage === "intro" && "Tap to start the booth"}
+                  {stage === "live" && "Tap anywhere to start the countdown"}
+                  {stage === "countdown" && "Hold still… capturing next"}
+                  {stage === "review" && "Retake or continue to background removal"}
+                  {stage === "processing" && "Processing with MODNet"}
+                  {stage === "select" && "Pick your background(s) then send"}
+                  {stage === "sent" && "Delivered — start another?"}
+                </p>
+              </div>
+              {(stage === "review" || stage === "select" || stage === "sent") && (
                 <button
-                  onClick={startCountdownAndCapture}
-                  className="rounded-full bg-[var(--gradient-brand)] px-5 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)]"
-                >
-                  {cameraReady ? "Take photo" : "Loading camera..."}
-                </button>
-              ) : (
-                <button
-                  onClick={resetCapture}
-                  className="rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                  onClick={handleRetake}
+                  className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
                 >
                   Retake
                 </button>
               )}
-              <div className="flex flex-wrap gap-2">
-                {availableFilters.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setFilter(f.id)}
-                    className={`rounded-full px-3 py-1 text-xs ring-1 ${
-                      filter === f.id
-                        ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] ring-[var(--color-primary)]"
-                        : "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-[var(--color-border-subtle)]"
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
             </div>
-          </div>
 
-          <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-            <h2 className="text-lg font-semibold">Delivery</h2>
-            {status && (
-              <div className="rounded-xl bg-[var(--color-success-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]">
-                {status}
-              </div>
-            )}
-            {error && (
-              <div className="rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
-                {error}
-              </div>
-            )}
-            {usage?.remainingPhotos === 0 && (
-              <div className="rounded-xl bg-[var(--color-warning-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(251,191,36,0.35)]">
-                Photo limit reached for this event. Upgrade or top up to continue.
-              </div>
-            )}
-            <label className="block text-sm text-[var(--color-text-muted)]">
-              Guest email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="guest@example.com"
-                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-              />
-            </label>
-            <div className="grid grid-cols-1 gap-3 text-sm">
-              <label className="flex items-center gap-2">
+            <div className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+              <label className="text-sm text-white/70">
+                Guest email
                 <input
-                  type="checkbox"
-                  checked={removeBackground}
-                  disabled={!backgroundRemovalEnabled}
-                  onChange={(e) => setRemoveBackground(e.target.checked)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="guest@example.com"
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
                 />
-                Background removal (host-controlled)
               </label>
-              {!backgroundRemovalEnabled && (
-                <p className="text-[11px] text-[var(--color-text-soft)]">
-                  Background removal is disabled for this event; photos will send without cutouts.
-                </p>
-              )}
-              {planFeatures.allowAiBackgrounds && (
-                <div className="rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 text-[11px] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-                  <p className="font-semibold text-[var(--color-text)]">AI backgrounds enabled by your host</p>
-                  <p className="text-[var(--color-text-soft)]">
-                    This booth uses the pre-generated backgrounds/frames configured for the event. No prompts needed here.
-                  </p>
-                </div>
-              )}
+              <p className="text-xs text-white/50">
+                We’ll send the finished photo(s) as a single download link. Photos stay in R2, not on this
+                device.
+              </p>
             </div>
-            <button
-              onClick={handleSend}
-              disabled={sending}
-              className="w-full rounded-xl bg-[var(--gradient-brand)] px-4 py-3 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] disabled:opacity-60"
-            >
-              {sending ? "Sending..." : "Send photo"}
-            </button>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              Photos and credits are tracked per event. AI backgrounds consume credits when enabled.
-            </p>
+
+            {stage === "review" && (
+              <div className="flex flex-col gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+                <p className="text-sm font-semibold text-white">Happy with this photo?</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleRetake}
+                    className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                  >
+                    Retake
+                  </button>
+                  <button
+                    onClick={processCutout}
+                    disabled={processing}
+                    className="rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-black shadow-lg shadow-cyan-500/30 transition hover:brightness-105 disabled:opacity-60"
+                  >
+                    {processing ? "Processing…" : "Looks good — continue"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(stage === "select" || stage === "sent") && (
+              <div className="space-y-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-white">Choose background</p>
+                  {selectionLimit ? (
+                    <span className="text-xs text-white/50">
+                      Up to {selectionLimit} option{selectionLimit > 1 ? "s" : ""}
+                    </span>
+                  ) : null}
+                </div>
+                {loadingBackgrounds && (
+                  <p className="text-sm text-white/60">Loading backgrounds…</p>
+                )}
+                {!loadingBackgrounds && backgrounds.length === 0 && (
+                  <p className="text-sm text-white/60">
+                    No backgrounds configured for this event. Ask the host to enable them.
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {backgrounds.map((bg) => {
+                    const selected = selectedBackgrounds.has(bg.id);
+                    return (
+                      <button
+                        key={bg.id}
+                        onClick={() => toggleBackground(bg.id)}
+                        className={`group overflow-hidden rounded-xl border text-left transition ${
+                          selected
+                            ? "border-cyan-400/60 bg-white/10 shadow-lg shadow-cyan-500/20"
+                            : "border-white/10 bg-white/5 hover:border-white/20"
+                        }`}
+                      >
+                        <div
+                          className="aspect-video w-full bg-black/60"
+                          style={{
+                            backgroundImage: `url(${bg.previewAsset || bg.asset})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        <div className="flex items-center justify-between px-3 py-2">
+                          <div>
+                            <p className="text-sm font-semibold text-white">{bg.name}</p>
+                            <p className="text-[11px] text-white/60">{bg.category || "background"}</p>
+                          </div>
+                          <span
+                            className={`h-5 w-5 rounded-full border ${
+                              selected
+                                ? "border-cyan-300 bg-cyan-400/80"
+                                : "border-white/30 bg-black/30"
+                            }`}
+                            aria-hidden
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {stage === "select" && (
+              <button
+                onClick={sendEmail}
+                disabled={sending}
+                className="w-full rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-4 py-3 text-sm font-semibold text-black shadow-lg shadow-emerald-500/30 transition hover:brightness-105 disabled:opacity-60"
+              >
+                {sending ? "Sending…" : "Send to guest"}
+              </button>
+            )}
+
+            {stage === "sent" && (
+              <div className="flex flex-col gap-3">
+                <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-50 ring-1 ring-emerald-400/30">
+                  Sent! We’ll deliver a single download link with the selected backgrounds.
+                </div>
+                <button
+                  onClick={handleRetake}
+                  className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                >
+                  Start another
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
