@@ -24,7 +24,9 @@ function cookieOptions(expiresAt?: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request);
+  const { context, error, status } = await getEventContext(request, {
+    allowBusinessSession: true,
+  });
   if (!context) {
     return NextResponse.json(
       { error: error ?? "No active event session." },
