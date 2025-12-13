@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { getMediaFile } from "@/lib/storage";
@@ -43,9 +42,7 @@ export async function GET(
   const preview = request.nextUrl.searchParams.get("preview");
   const targetWidth = widthParam ? Math.min(parseInt(widthParam, 10) || 0, 2200) : null;
 
-  const baseBuffer = await readFile(file.path); // Buffer
-  const sharpInput = new Uint8Array(baseBuffer);
-  let buffer: Buffer = baseBuffer;
+  let buffer: Buffer = file.buffer;
 
   if (
     preview &&
@@ -55,7 +52,7 @@ export async function GET(
     !file.contentType.includes("svg")
   ) {
     try {
-      buffer = await sharp(sharpInput)
+      buffer = await sharp(buffer)
         .resize({ width: targetWidth, withoutEnlargement: true })
         .toBuffer();
     } catch (err) {

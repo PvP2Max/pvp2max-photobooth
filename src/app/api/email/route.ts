@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         const background = sharp(backgroundAsset.path).ensureAlpha();
         const [bgMeta, cutoutMeta] = await Promise.all([
           background.metadata(),
-          sharp(cutoutFile.path).metadata(),
+          sharp(cutoutFile.buffer).metadata(),
         ]);
         const bgWidth = bgMeta.width ?? 1600;
         const bgHeight = bgMeta.height ?? 900;
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
           Math.min(Math.max(rawY, 0), Math.max(bgHeight - targetHeight, 0)),
         );
 
-        const cutoutBuffer = await sharp(cutoutFile.path)
+        const cutoutBuffer = await sharp(cutoutFile.buffer)
           .ensureAlpha()
           .resize(
             Math.max(1, Math.round(targetWidth)),

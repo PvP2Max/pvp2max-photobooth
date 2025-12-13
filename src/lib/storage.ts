@@ -8,13 +8,16 @@ export type PhotoRecord = {
   id: string;
   email: string;
   originalName: string;
-  originalPath: string;
   originalContentType: string;
-  cutoutPath: string;
   cutoutContentType: string;
+  createdAt: string;
+  originalPath?: string;
+  cutoutPath?: string;
   previewPath?: string;
   previewContentType?: string;
-  createdAt: string;
+  originalUrl?: string;
+  cutoutUrl?: string;
+  previewUrl?: string;
   businessId?: string;
   eventId?: string;
   mode?: "self-serve" | "photographer";
@@ -34,13 +37,6 @@ export type PublicPhoto = {
 
 type IndexFile = {
   photos: PhotoRecord[];
-};
-
-const EXTENSION_BY_TYPE: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-  "image/avif": ".avif",
 };
 
 export function normalizeEmail(email: string) {
@@ -82,28 +78,36 @@ async function writeIndex(index: IndexFile, scope: TenantScope) {
   await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
 }
 
-function resolveExtension(contentType: string, fallback = ".png") {
-  return EXTENSION_BY_TYPE[contentType] ?? fallback;
-}
-
 function photoDir(scope: TenantScope, id: string) {
   const { photoDir } = photoPaths(scope);
   return path.join(photoDir, id);
 }
 
 function toPublicPhoto(record: PhotoRecord): PublicPhoto {
+  const cutoutUrl = record.cutoutUrl ?? `/api/media/${record.id}/cutout`;
+  const previewUrl =
+    record.previewUrl ??
+    record.cutoutUrl ??
+    (record.previewPath ? `/api/media/${record.id}/preview` : cutoutUrl);
+  const originalUrl =
+    record.originalUrl ??
+    (record.originalPath ? `/api/media/${record.id}/original` : cutoutUrl);
+
   return {
     id: record.id,
     email: record.email,
     originalName: record.originalName,
     createdAt: record.createdAt,
-    originalUrl: `/api/media/${record.id}/original`,
-    cutoutUrl: `/api/media/${record.id}/cutout`,
-    previewUrl: `/api/media/${record.id}/preview`,
+    originalUrl,
+    cutoutUrl,
+    previewUrl,
   };
 }
 
 async function ensureCutoutPreview(scope: TenantScope, record: PhotoRecord) {
+  if (record.previewUrl || record.cutoutUrl) {
+    return record;
+  }
   if (record.previewPath) {
     try {
       await stat(record.previewPath);
@@ -111,6 +115,9 @@ async function ensureCutoutPreview(scope: TenantScope, record: PhotoRecord) {
     } catch {
       // fall through and regenerate
     }
+  }
+  if (!record.cutoutPath) {
+    return record;
   }
   try {
     const previewPath = path.join(photoDir(scope, record.id), "cutout-preview.webp");
@@ -136,7 +143,7 @@ async function ensureCutoutPreview(scope: TenantScope, record: PhotoRecord) {
 export async function savePhoto({
   email,
   file,
-  cutout,
+  cutoutUrl,
   cutoutContentType,
   scope,
   overlayPack,
@@ -145,7 +152,7 @@ export async function savePhoto({
 }: {
   email: string;
   file: File;
-  cutout: Buffer;
+  cutoutUrl: string;
   cutoutContentType: string;
   scope: TenantScope;
   overlayPack?: string;
@@ -156,41 +163,17 @@ export async function savePhoto({
   const index = await readIndex(scope);
 
   const id = randomUUID();
-  const dir = photoDir(scope, id);
-  await mkdir(dir, { recursive: true });
-
-  const fileArrayBuffer = await file.arrayBuffer();
-  const originalContentType =
-    (file as Blob).type || "application/octet-stream";
-  const originalExtension = resolveExtension(originalContentType, ".bin");
-  const originalPath = path.join(dir, `original${originalExtension}`);
-  await writeFile(originalPath, Buffer.from(fileArrayBuffer));
-
-  const cutoutExtension = resolveExtension(cutoutContentType, ".png");
-  const cutoutPath = path.join(dir, `cutout${cutoutExtension}`);
-  await writeFile(cutoutPath, cutout);
-  const previewPath = path.join(dir, "cutout-preview.webp");
-  let previewContentType: string | undefined;
-  try {
-    await sharp(cutoutPath)
-      .resize({ width: 1200, withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toFile(previewPath);
-    previewContentType = "image/webp";
-  } catch (error) {
-    console.error("Failed to create cutout preview", { email, error });
-  }
+  const originalContentType = (file as Blob).type || "application/octet-stream";
 
   const record: PhotoRecord = {
     id,
     email: normalizedEmail,
     originalName: (file as File).name || "upload",
-    originalPath,
+    originalUrl: cutoutUrl,
+    cutoutUrl,
+    previewUrl: cutoutUrl,
     originalContentType,
-    cutoutPath,
     cutoutContentType,
-    previewPath: previewContentType ? previewPath : undefined,
-    previewContentType,
     createdAt: new Date().toISOString(),
     businessId: scope.businessId,
     eventId: scope.eventId,
@@ -228,6 +211,16 @@ export async function findPhotoById(scope: TenantScope, id: string) {
   return index.photos.find((photo) => photo.id === id);
 }
 
+async function loadRemote(url: string, fallbackType: string) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch media (${response.status})`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const contentType = response.headers.get("content-type") || fallbackType;
+  return { buffer: Buffer.from(arrayBuffer), contentType };
+}
+
 export async function getMediaFile(
   scope: TenantScope,
   id: string,
@@ -236,27 +229,48 @@ export async function getMediaFile(
   const record = await findPhotoById(scope, id);
   if (!record) return null;
 
-  if (variant === "original") {
-    return {
-      path: record.originalPath,
-      contentType: record.originalContentType,
-    };
-  }
-
-  if (variant === "preview") {
-    const ensured = await ensureCutoutPreview(scope, record);
-    if (ensured.previewPath && ensured.previewContentType) {
-      return {
-        path: ensured.previewPath,
-        contentType: ensured.previewContentType,
-      };
+  try {
+    if (variant === "original") {
+      if (record.originalUrl) {
+        return loadRemote(record.originalUrl, record.originalContentType || "application/octet-stream");
+      }
+      if (record.originalPath) {
+        const buffer = await readFile(record.originalPath);
+        return { buffer, contentType: record.originalContentType };
+      }
+      if (record.cutoutUrl) {
+        return loadRemote(record.cutoutUrl, record.cutoutContentType || "image/png");
+      }
+      if (record.cutoutPath) {
+        const buffer = await readFile(record.cutoutPath);
+        return { buffer, contentType: record.cutoutContentType };
+      }
+      return null;
     }
-  }
 
-  return {
-    path: record.cutoutPath,
-    contentType: record.cutoutContentType,
-  };
+    if (variant === "preview") {
+      if (record.previewUrl) {
+        return loadRemote(record.previewUrl, record.cutoutContentType || "image/png");
+      }
+      const ensured = await ensureCutoutPreview(scope, record);
+      if (ensured.previewPath && ensured.previewContentType) {
+        const buffer = await readFile(ensured.previewPath);
+        return { buffer, contentType: ensured.previewContentType };
+      }
+    }
+
+    if (record.cutoutUrl) {
+      return loadRemote(record.cutoutUrl, record.cutoutContentType || "image/png");
+    }
+    if (record.cutoutPath) {
+      const buffer = await readFile(record.cutoutPath);
+      return { buffer, contentType: record.cutoutContentType };
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to load media", { id, variant, error });
+    return null;
+  }
 }
 
 export async function removePhotos(scope: TenantScope, ids: string[]) {

@@ -52,15 +52,13 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const email = formData.get("email");
   const uploaded = formData.getAll("file");
-  const removeBgInput = formData.get("removeBackground");
-  const removeBg = removeBgInput === null ? true : removeBgInput === "true" || removeBgInput === "1";
   const aiPromptRaw = formData.get("aiPrompt");
   const wantsAiBackground =
     aiPromptRaw && typeof aiPromptRaw === "string" && aiPromptRaw.trim().length > 0;
   const overlayPack = formData.get("overlayPack");
   const filterUsed = formData.get("filter");
 
-  if (removeBg && !context.event.allowBackgroundRemoval) {
+  if (!context.event.allowBackgroundRemoval) {
     return NextResponse.json(
       { error: "Background removal is disabled for this event." },
       { status: 403 },
@@ -107,13 +105,11 @@ export async function POST(request: NextRequest) {
     }[] = [];
     for (const file of files) {
       try {
-        const cutout = removeBg
-          ? await removeBackground(file)
-          : { buffer: Buffer.from(await file.arrayBuffer()), contentType: (file as Blob).type || "image/png" };
+        const cutout = await removeBackground(file);
         const photo = await savePhoto({
           email,
           file,
-          cutout: cutout.buffer,
+          cutoutUrl: cutout.outputUrl,
           cutoutContentType: cutout.contentType,
           scope: context.scope,
           overlayPack: typeof overlayPack === "string" ? overlayPack : undefined,

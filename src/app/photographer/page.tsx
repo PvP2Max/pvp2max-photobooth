@@ -205,8 +205,8 @@ export default function PhotographerPage() {
               {uploading ? "Processing..." : "Upload & remove background"}
             </button>
             <p className="text-xs text-[var(--color-text-soft)]">
-              Files route to bgremover with the service token, then cut-outs stay local for the front desk until
-              delivery.
+              Files route to the MODNet bgremover (modnet.boothos.com) with the service token, then cut-outs stay
+              local for the front desk until delivery.
             </p>
             {checkins.length === 0 && (
               <div className="rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] px-3 py-2 text-xs text-[var(--color-text-muted)]">

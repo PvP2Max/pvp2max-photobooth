@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
@@ -39,6 +40,16 @@ export async function POST(request: NextRequest) {
     const { buffer, mime } = parseDataUrl(image);
     const file = new File([buffer], "capture.png", { type: mime || "image/png" });
     const cutout = await removeBackground(file);
+    const cutoutResponse = await fetch(cutout.outputUrl);
+    if (!cutoutResponse.ok) {
+      const detail = await cutoutResponse.text();
+      throw new Error(
+        `Failed to fetch cutout (${cutoutResponse.status}): ${detail.slice(0, 300)}`,
+      );
+    }
+    const cutoutBuffer = Buffer.from(await cutoutResponse.arrayBuffer());
+    const cutoutContentType =
+      cutoutResponse.headers.get("content-type") || cutout.contentType;
 
     const bgName = body.background?.trim() || DEFAULT_BG;
     const bgPath = path.join(defaultDir, bgName);
@@ -50,7 +61,7 @@ export async function POST(request: NextRequest) {
       bgBuffer = await fs.readFile(fallbackPath).catch(() => null);
     }
 
-    const cutoutImage = sharp(cutout.buffer);
+    const cutoutImage = sharp(cutoutBuffer);
     const meta = await cutoutImage.metadata();
     const width = meta.width ?? 1080;
     const height = meta.height ?? 1440;
@@ -73,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       image: `data:image/png;base64,${composited.toString("base64")}`,
-      cutout: `data:${cutout.contentType};base64,${cutout.buffer.toString("base64")}`,
+      cutout: `data:${cutoutContentType};base64,${cutoutBuffer.toString("base64")}`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to process background test.";
