@@ -22,6 +22,7 @@
     "stripe": "^17.1.0"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.4",
