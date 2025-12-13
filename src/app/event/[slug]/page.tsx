@@ -91,6 +91,8 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         }
       } catch {
         // ignore; kiosk links may rely solely on event keys
+      } finally {
+        if (!cancelled) setBusinessChecked(true);
       }
     })();
     return () => {
@@ -128,10 +130,8 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   }, [stopCamera]);
 
   const attemptAutoUnlock = useCallback(async () => {
-    if (!resolvedBusiness || !eventParam) {
-      setNeedsLogin(true);
-      return;
-    }
+    if (!businessChecked) return;
+    if (!resolvedBusiness || !eventParam) return;
     try {
       await fetch("/api/auth/event", {
         method: "POST",
@@ -144,12 +144,18 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         }),
       });
     } catch {
-      setNeedsLogin(true);
+      // ignore; loadSession will report auth status
     }
-  }, [resolvedBusiness, eventParam, accessCode]);
+  }, [resolvedBusiness, eventParam, accessCode, businessChecked]);
 
   const loadSession = useCallback(async () => {
+    if (!businessChecked) return;
     try {
+      if (!resolvedBusiness || !eventParam) {
+        setSession(null);
+        setNeedsLogin(true);
+        return;
+      }
       const qs = new URLSearchParams({
         business: resolvedBusiness,
         event: eventParam,
@@ -169,7 +175,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       setSession(null);
       setNeedsLogin(true);
     }
-  }, [businessParam, eventParam]);
+  }, [resolvedBusiness, eventParam, accessCode, businessChecked]);
 
   const loadBackgrounds = useCallback(async () => {
     setLoadingBackgrounds(true);
