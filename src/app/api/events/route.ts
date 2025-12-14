@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
     const events = context.business.events.map((e) => sanitizeEvent(withEventDefaults(e)));
     return NextResponse.json({
       events,
+      business: {
+        id: context.business.id,
+        name: context.business.name,
+        slug: context.business.slug,
+        subscriptionPlan: context.business.subscriptionPlan,
+        subscriptionStatus: context.business.subscriptionStatus,
+      },
       owner: {
         id: context.user.uid,
         email: context.user.email,
