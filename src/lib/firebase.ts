@@ -38,6 +38,8 @@ export function getFirebaseAdmin() {
         "Firebase credentials are not fully configured. Provide FIREBASE_* vars or GOOGLE_APPLICATION_CREDENTIALS/FIREBASE_SERVICE_ACCOUNT_JSON.",
       );
     }
+    // Avoid failures on undefined fields like overlayLogo.
+    getFirestore().settings({ ignoreUndefinedProperties: true });
   }
   initialized = true;
   return { auth: getAuth(), firestore: getFirestore() };
