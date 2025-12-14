@@ -102,6 +102,10 @@ export default function BusinessConsole() {
     events: [],
   });
   const [loading, setLoading] = useState(false);
+  const businessSlug =
+    process.env.NEXT_PUBLIC_DEFAULT_BUSINESS_SLUG ||
+    process.env.BOOTHOS_DEFAULT_BUSINESS_SLUG ||
+    "arctic-aura";
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
@@ -232,6 +236,37 @@ export default function BusinessConsole() {
     }
   }, [loading, session, router]);
 
+  useEffect(() => {
+    async function loadEvents() {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/events?business=${encodeURIComponent(businessSlug)}`, {
+          headers: { "x-boothos-business": businessSlug },
+          credentials: "include",
+        });
+        if (!res.ok) {
+          setSession(null);
+          setLoading(false);
+          return;
+        }
+        const data = (await res.json()) as {
+          events?: EventItem[];
+          business?: { id: string; name: string; slug: string };
+        };
+        setSession({
+          business: data.business ?? { id: "", name: businessSlug, slug: businessSlug },
+          events: data.events ?? [],
+        });
+      } catch (err) {
+        console.error(err);
+        setSession(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    void loadEvents();
+  }, [businessSlug]);
+
   function logout() {
     fetch("/api/auth/user", { method: "DELETE", credentials: "include" })
       .then(() => {
@@ -259,9 +294,12 @@ export default function BusinessConsole() {
       eventTime: newEventTime,
     };
     try {
-      const res = await fetch("/api/events", {
+      const res = await fetch(`/api/events?business=${encodeURIComponent(businessSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-boothos-business": businessSlug,
+        },
         credentials: "include",
         body: JSON.stringify(payload),
       });
@@ -296,9 +334,12 @@ export default function BusinessConsole() {
   async function rotateEventKey(eventSlug: string) {
     setIssuingKey((prev) => ({ ...prev, [eventSlug]: "Rotating…" }));
     try {
-      const res = await fetch("/api/events/key", {
+      const res = await fetch(`/api/events/key?business=${encodeURIComponent(businessSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-boothos-business": businessSlug,
+        },
         credentials: "include",
         body: JSON.stringify({ eventSlug }),
       });
@@ -316,9 +357,12 @@ export default function BusinessConsole() {
 
   async function closeEvent(eventSlug: string, status: "closed" | "live") {
     try {
-      const res = await fetch("/api/events/status", {
+      const res = await fetch(`/api/events/status?business=${encodeURIComponent(businessSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-boothos-business": businessSlug,
+        },
         credentials: "include",
         body: JSON.stringify({ eventSlug, status }),
       });
@@ -344,9 +388,12 @@ export default function BusinessConsole() {
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch("/api/events/delete", {
+      const res = await fetch(`/api/events/delete?business=${encodeURIComponent(businessSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-boothos-business": businessSlug,
+        },
         credentials: "include",
         body: JSON.stringify({ eventId }),
       });

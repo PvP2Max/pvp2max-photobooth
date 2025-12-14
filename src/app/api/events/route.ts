@@ -29,7 +29,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
   const events = context.business.events.map((e) => sanitizeEvent(withEventDefaults(e)));
-  return NextResponse.json({ events });
+  return NextResponse.json({
+    events,
+    business: {
+      id: context.business.id,
+      name: context.business.name,
+      slug: context.business.slug,
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
