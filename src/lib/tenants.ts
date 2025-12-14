@@ -98,7 +98,7 @@ type TenantIndex = {
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
 const TENANT_FILE = path.join(STORAGE_ROOT, "tenants.json");
 const ADMIN_TOKEN = process.env.BOOTHOS_ADMIN_TOKEN ?? "ArcticAuraDesigns";
-const FIRESTORE_BUSINESSES = "businesses";
+const FIRESTORE_USERS = "users";
 
 function planDefaults(plan: BoothEventPlan | undefined) {
   switch (plan) {
@@ -177,70 +177,31 @@ function getFirestoreDb() {
   return firestore ?? getFirestore();
 }
 
-async function fetchBusinessByIdFromFirestore(id: string) {
-  if (!id) return null;
-  const db = getFirestoreDb();
-  const doc = await db.collection(FIRESTORE_BUSINESSES).doc(id).get();
-  if (!doc.exists) return null;
-  const bizData = doc.data() as Partial<BoothBusiness>;
-  const eventsSnap = await doc.ref.collection("events").get();
-  const events: BoothEvent[] = eventsSnap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
-  const business: BoothBusiness = {
-    id: doc.id,
-    name: bizData.name ?? "",
-    slug: bizData.slug ?? "",
-    createdAt: bizData.createdAt ?? new Date().toISOString(),
-    subscriptionId: bizData.subscriptionId,
-    subscriptionPlan: bizData.subscriptionPlan,
-    subscriptionStatus: bizData.subscriptionStatus ?? "canceled",
-    ownerUid: bizData.ownerUid,
-    events,
-  };
-  return business;
+function userEventsCollection(uid: string) {
+  return getFirestoreDb().collection(FIRESTORE_USERS).doc(uid).collection("events");
 }
 
-async function fetchBusinessFromFirestore(slug: string) {
-  if (!slug) return null;
-  const db = getFirestoreDb();
-  const snap = await db.collection(FIRESTORE_BUSINESSES).where("slug", "==", slug).limit(1).get();
+async function listUserEvents(uid: string) {
+  if (!uid) return [];
+  const snap = await userEventsCollection(uid).get();
+  return snap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
+}
+
+async function fetchEventBySlug(uid: string, slug: string) {
+  if (!uid || !slug) return null;
+  const snap = await userEventsCollection(uid).where("slug", "==", slug).limit(1).get();
   if (snap.empty) return null;
-  const bizDoc = snap.docs[0];
-  const bizData = bizDoc.data() as Partial<BoothBusiness>;
-  const eventsSnap = await bizDoc.ref.collection("events").get();
-  const events: BoothEvent[] = eventsSnap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
-  const business: BoothBusiness = {
-    id: bizDoc.id,
-    name: bizData.name ?? "",
-    slug: bizData.slug ?? slug,
-    createdAt: bizData.createdAt ?? new Date().toISOString(),
-    subscriptionId: bizData.subscriptionId,
-    subscriptionPlan: bizData.subscriptionPlan,
-    subscriptionStatus: bizData.subscriptionStatus ?? "canceled",
-    ownerUid: bizData.ownerUid,
-    events,
-  };
-  return business;
+  return withEventDefaults(snap.docs[0].data() as BoothEvent);
 }
 
-async function upsertBusinessFirestore(business: BoothBusiness) {
-  const db = getFirestoreDb();
-  const { events, ...rest } = business;
-  await db.collection(FIRESTORE_BUSINESSES).doc(business.id).set(rest, { merge: true });
+async function upsertEventFirestore(uid: string, event: BoothEvent) {
+  if (!uid || !event.id) return;
+  await userEventsCollection(uid).doc(event.id).set(event, { merge: true });
 }
 
-async function upsertEventFirestore(business: BoothBusiness, event: BoothEvent) {
-  const db = getFirestoreDb();
-  await db
-    .collection(FIRESTORE_BUSINESSES)
-    .doc(business.id)
-    .collection("events")
-    .doc(event.id)
-    .set(event, { merge: true });
-}
-
-async function deleteEventFromFirestore(businessId: string, eventId: string) {
-  const db = getFirestoreDb();
-  await db.collection(FIRESTORE_BUSINESSES).doc(businessId).collection("events").doc(eventId).delete();
+async function deleteEventFromFirestore(uid: string, eventId: string) {
+  if (!uid || !eventId) return;
+  await userEventsCollection(uid).doc(eventId).delete();
 }
 
 async function resolveEmailsToUids(emails: string[]) {
@@ -456,25 +417,12 @@ export async function findBusinessById(id: string) {
 }
 
 export async function deleteEventById(businessId: string, eventId: string) {
-  const index = await readTenantIndex();
-  const fsBiz = await fetchBusinessByIdFromFirestore(businessId);
-  const biz = fsBiz ?? index.businesses.find((b) => b.id === businessId);
-  if (!biz) return false;
-  const target = (biz.events ?? []).find((e) => e.id === eventId);
-  biz.events = (biz.events ?? []).filter((e) => e.id !== eventId);
-  if (target) {
-    await removeEventStorage(biz.slug, target.slug);
-  }
-  if (fsBiz) {
-    await upsertBusinessFirestore(biz);
-    await deleteEventFromFirestore(businessId, eventId);
-  }
-  const fileBiz = index.businesses.find((b) => b.id === businessId);
-  if (fileBiz) {
-    fileBiz.events = biz.events ?? [];
-    await writeTenantIndex(index);
-  }
-  return Boolean(target);
+  const events = await listUserEvents(businessId);
+  const target = events.find((e) => e.id === eventId);
+  if (!target) return false;
+  await deleteEventFromFirestore(businessId, eventId);
+  await removeEventStorage(businessId, target.slug);
+  return true;
 }
 
 export async function createBusiness({
@@ -506,7 +454,7 @@ export async function createBusiness({
 }
 
 export async function createEvent(
-  businessId: string,
+  _businessId: string,
   ownerUid: string,
   {
     name,
@@ -552,13 +500,10 @@ export async function createEvent(
     reviewEmails?: string[];
   },
 ) {
-  const fsBusiness = await fetchBusinessByIdFromFirestore(businessId);
-  const index = await readTenantIndex();
-  const fileBusiness = index.businesses.find((b) => b.id === businessId);
-  const business = fsBusiness ?? fileBusiness;
-  if (!business) throw new Error("Business not found");
+  const uid = ownerUid;
+  const events = await listUserEvents(uid);
   let safeSlug = slugify(slug || name, randomUUID());
-  const existingSlugs = new Set((business.events || []).map((e) => e.slug));
+  const existingSlugs = new Set(events.map((e) => e.slug));
   while (existingSlugs.has(safeSlug)) {
     safeSlug = slugify(`${safeSlug}-${Math.floor(Math.random() * 9999)}`, randomUUID());
   }
@@ -593,13 +538,7 @@ export async function createEvent(
     ownerUid,
     roles,
   };
-  business.events = [...(business.events ?? []), event];
-  if (fileBusiness) {
-    fileBusiness.events = business.events;
-    await writeTenantIndex(index);
-  }
-  await upsertBusinessFirestore(business);
-  await upsertEventFirestore(business, event);
+  await upsertEventFirestore(uid, event);
   return { event };
 }
 
@@ -628,19 +567,8 @@ export async function findEventBySlugs(
 ): Promise<EventContext | null> {
   const normalizedBiz = slugify(businessSlug, businessSlug);
   const normalizedEvent = slugify(eventSlug, eventSlug);
-  const fsBiz = await fetchBusinessFromFirestore(normalizedBiz);
-  const sourceBiz = fsBiz ?? (await findBusinessBySlug(normalizedBiz));
-  const biz = sourceBiz ?? null;
-  if (!biz) return null;
-  const event = (biz.events ?? []).find((e) => e.slug === normalizedEvent);
-  if (!event) return null;
-  if (!eventIsActive(event)) return null;
-  return {
-    business: biz,
-    event,
-    scope: toScope(biz, event),
-    roles: { owner: false, photographer: false, review: false },
-  };
+  // User-centric: businessSlug is ignored; use caller's UID in getEventContext.
+  return null;
 }
 
 export function scopedStorageRoot(scope: TenantScope) {
@@ -743,78 +671,54 @@ export function eventRequiresPayment(event: BoothEvent, business?: BoothBusiness
 export async function getEventContext(
   request: NextRequest,
 ): Promise<{ context?: EventContext; error?: string; status?: number }> {
-  await ensureTenantStorage();
   const user = await verifyBearer(request);
   if (!user) {
     return { error: "Unauthorized", status: 401 };
   }
-  const businessSlug =
-    request.headers.get("x-boothos-business") ||
-    request.nextUrl.searchParams.get("business") ||
-    "";
   const eventSlug =
     request.headers.get("x-boothos-event") ||
     request.nextUrl.searchParams.get("event") ||
+    request.nextUrl.searchParams.get("slug") ||
     "";
-  if (!businessSlug || !eventSlug) {
-    return { error: "Missing business or event", status: 400 };
+  if (!eventSlug) {
+    return { error: "Missing event", status: 400 };
   }
-  const ctx = await findEventBySlugs(businessSlug, eventSlug);
-  if (!ctx) {
-    return { error: "Event not found", status: 404 };
-  }
-  const roles = roleForEvent(ctx.event, user.uid);
-  if (!roles.owner && !roles.photographer && !roles.review) {
-    return { error: "Forbidden", status: 403 };
-  }
+  const events = await listUserEvents(user.uid);
+  const event = events.find((e) => e.slug === slugify(eventSlug, eventSlug));
+  if (!event) return { error: "Event not found", status: 404 };
+  const business: BoothBusiness = {
+    id: user.uid,
+    name: "My BoothOS",
+    slug: user.uid,
+    ownerUid: user.uid,
+    createdAt: event.createdAt ?? new Date().toISOString(),
+    events,
+  };
+  const roles = roleForEvent(event, user.uid);
   return {
     context: {
-      business: ctx.business,
-      event: ctx.event,
-      scope: ctx.scope,
+      business,
+      event,
+      scope: toScope(business, event),
       roles,
     },
   };
 }
 
 export async function getBusinessContext(request: NextRequest) {
-  await ensureTenantStorage();
   const user = await verifyBearer(request);
   if (!user) return null;
-  const businessSlug =
-    request.headers.get("x-boothos-business") ||
-    request.nextUrl.searchParams.get("business") ||
-    process.env.BOOTHOS_DEFAULT_BUSINESS_SLUG ||
-    process.env.NEXT_PUBLIC_DEFAULT_BUSINESS_SLUG ||
-    "";
-  if (!businessSlug) return null;
-  const fsBiz = await fetchBusinessFromFirestore(businessSlug);
-  if (fsBiz && (!fsBiz.ownerUid || fsBiz.ownerUid === user.uid || fsBiz.ownerUid === "seed-owner")) {
-    return { business: fsBiz, user };
-  }
-  const index = await readTenantIndex();
-  const business = index.businesses.find(
-    (b) =>
-      b.slug === businessSlug &&
-      (!b.ownerUid || b.ownerUid === user.uid || b.ownerUid === "seed-owner"),
-  );
-  if (business) return { business, user };
-
-  // Auto-create business if none exists (user-owned)
-  const newBiz: BoothBusiness = {
-    id: randomUUID(),
-    name: process.env.BOOTHOS_DEFAULT_BUSINESS_NAME || businessSlug,
-    slug: businessSlug,
-    createdAt: new Date().toISOString(),
+  const events = await listUserEvents(user.uid);
+  const business: BoothBusiness = {
+    id: user.uid,
+    name: "My BoothOS",
+    slug: user.uid,
     ownerUid: user.uid,
-    events: [],
+    createdAt: new Date().toISOString(),
+    events,
     subscriptionStatus: "canceled",
   };
-  await upsertBusinessFirestore(newBiz);
-  // Mirror to file index for legacy reads
-  index.businesses.push(newBiz);
-  await writeTenantIndex(index);
-  return { business: newBiz, user };
+  return { business, user };
 }
 
 export function isAdminRequest(request: NextRequest) {
@@ -830,22 +734,12 @@ export async function updateEventStatus(
   eventId: string,
   status: BoothEvent["status"],
 ) {
-  const index = await readTenantIndex();
-  const fsBiz = await fetchBusinessByIdFromFirestore(businessId);
-  const business = fsBiz ?? index.businesses.find((b) => b.id === businessId);
-  if (!business) throw new Error("Business not found");
-  const event = (business.events ?? []).find((e) => e.id === eventId);
+  const events = await listUserEvents(businessId);
+  const event = events.find((e) => e.id === eventId);
   if (!event) throw new Error("Event not found");
-  event.status = status;
-  if (fsBiz) await upsertEventFirestore(business, event);
-  const fileBiz = index.businesses.find((b) => b.id === businessId);
-  if (fileBiz) {
-    fileBiz.events = (fileBiz.events ?? []).map((ev) =>
-      ev.id === eventId ? { ...ev, status } : ev,
-    );
-    await writeTenantIndex(index);
-  }
-  return event;
+  const updated = { ...event, status };
+  await upsertEventFirestore(businessId, updated);
+  return updated;
 }
 
 export async function updateEventConfig(
@@ -853,23 +747,11 @@ export async function updateEventConfig(
   eventId: string,
   updates: Partial<BoothEvent>,
 ) {
-  const index = await readTenantIndex();
-  const fsBiz = await fetchBusinessByIdFromFirestore(businessId);
-  const business = fsBiz ?? index.businesses.find((b) => b.id === businessId);
-  if (!business) throw new Error("Business not found");
-  const event = (business.events ?? []).find((e) => e.id === eventId);
+  const events = await listUserEvents(businessId);
+  const event = events.find((e) => e.id === eventId);
   if (!event) throw new Error("Event not found");
-  Object.assign(event, updates);
-  business.events = (business.events ?? []).map((ev) =>
-    ev.id === eventId ? withEventDefaults(ev) : ev,
-  );
-  const updated = (business.events ?? []).find((ev) => ev.id === eventId)!;
-  if (fsBiz) await upsertEventFirestore(business, updated);
-  const fileBiz = index.businesses.find((b) => b.id === businessId);
-  if (fileBiz) {
-    fileBiz.events = business.events ?? [];
-    await writeTenantIndex(index);
-  }
+  const updated = withEventDefaults({ ...event, ...updates });
+  await upsertEventFirestore(businessId, updated);
   return updated;
 }
 
@@ -896,24 +778,15 @@ export async function incrementEventUsage(
   scope: TenantScope,
   { photos = 0, aiCredits = 0 }: { photos?: number; aiCredits?: number },
 ) {
-  const index = await readTenantIndex();
-  const fsBiz = await fetchBusinessByIdFromFirestore(scope.businessId);
-  const business = fsBiz ?? index.businesses.find((b) => b.id === scope.businessId);
-  if (!business) throw new Error("Business not found");
-  const event = (business.events ?? []).find((e) => e.id === scope.eventId);
+  const events = await listUserEvents(scope.businessId);
+  const event = events.find((e) => e.id === scope.eventId);
   if (!event) throw new Error("Event not found");
-  event.photoUsed = Math.max(0, (event.photoUsed ?? 0) + photos);
-  event.aiUsed = Math.max(0, (event.aiUsed ?? 0) + aiCredits);
-  business.events = (business.events ?? []).map((ev) =>
-    ev.id === event.id ? withEventDefaults(ev) : ev,
-  );
-  const updated = (business.events ?? []).find((ev) => ev.id === event.id)!;
-  if (fsBiz) await upsertEventFirestore(business, updated);
-  const fileBiz = index.businesses.find((b) => b.id === scope.businessId);
-  if (fileBiz) {
-    fileBiz.events = business.events ?? [];
-    await writeTenantIndex(index);
-  }
+  const updated = withEventDefaults({
+    ...event,
+    photoUsed: Math.max(0, (event.photoUsed ?? 0) + photos),
+    aiUsed: Math.max(0, (event.aiUsed ?? 0) + aiCredits),
+  });
+  await upsertEventFirestore(scope.businessId, updated);
   return { event: updated, usage: eventUsage(updated) };
 }
 
@@ -925,29 +798,16 @@ export async function updateEventRolesByEmails(
     reviewEmails = [],
   }: { photographerEmails?: string[]; reviewEmails?: string[] },
 ) {
-  const normalizedBiz = slugify(businessSlug, businessSlug);
   const normalizedEvent = slugify(eventSlug, eventSlug);
-  const fsBiz = await fetchBusinessFromFirestore(normalizedBiz);
-  const index = await readTenantIndex();
-  const fileBiz = index.businesses.find((b) => b.slug === normalizedBiz);
-  const business = fsBiz ?? fileBiz;
-  if (!business) throw new Error("Business not found");
-  const event = (business.events ?? []).find((e) => e.slug === normalizedEvent);
+  const ownerUid = businessSlug; // now user-centric; businessSlug carries uid from caller context
+  const events = await listUserEvents(ownerUid);
+  const event = events.find((e) => e.slug === normalizedEvent);
   if (!event) throw new Error("Event not found");
-
   const photographer = await resolveEmailsToUids(photographerEmails);
   const review = await resolveEmailsToUids(reviewEmails);
   event.roles = { photographer, review };
 
-  if (fsBiz) {
-    await upsertEventFirestore(business, event);
-  }
-  if (fileBiz) {
-    fileBiz.events = (fileBiz.events ?? []).map((ev) =>
-      ev.slug === normalizedEvent ? { ...ev, roles: event.roles } : ev,
-    );
-    await writeTenantIndex(index);
-  }
+  await upsertEventFirestore(ownerUid, event);
 
   return event;
 }
