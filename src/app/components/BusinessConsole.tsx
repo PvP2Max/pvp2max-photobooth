@@ -128,6 +128,9 @@ export default function BusinessConsole() {
   const [selectionEmails, setSelectionEmails] = useState<Record<string, string>>({});
   const [selectionLinks, setSelectionLinks] = useState<Record<string, string>>({});
   const [selectionStatus, setSelectionStatus] = useState<Record<string, string>>({});
+  const [photographerInputs, setPhotographerInputs] = useState<Record<string, string>>({});
+  const [reviewInputs, setReviewInputs] = useState<Record<string, string>>({});
+  const [rolesStatus, setRolesStatus] = useState<Record<string, string>>({});
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [qrLink, setQrLink] = useState<string | null>(null);
   const [qrLabel, setQrLabel] = useState<string | null>(null);
@@ -408,6 +411,50 @@ export default function BusinessConsole() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not delete event.";
       setError(msg);
+    }
+  }
+
+  async function saveRoles(eventSlug: string) {
+    const photogRaw = photographerInputs[eventSlug] || "";
+    const reviewRaw = reviewInputs[eventSlug] || "";
+    const photographerEmails = photogRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const reviewEmails = reviewRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    setRolesStatus((prev) => ({ ...prev, [eventSlug]: "Saving…" }));
+    try {
+      const res = await fetch(`/api/events/roles?business=${encodeURIComponent(businessSlug)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-boothos-business": businessSlug,
+        },
+        credentials: "include",
+        body: JSON.stringify({ eventSlug, photographerEmails, reviewEmails }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { event?: EventItem; error?: string };
+      if (!res.ok || data.error || !data.event) {
+        setRolesStatus((prev) => ({ ...prev, [eventSlug]: data.error || "Failed" }));
+        return;
+      }
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              events: prev.events.map((e) =>
+                e.slug === eventSlug ? { ...e, roles: data.event?.roles ?? {} } : e,
+              ),
+            }
+          : prev,
+      );
+      setRolesStatus((prev) => ({ ...prev, [eventSlug]: "Saved" }));
+    } catch (err) {
+      console.error(err);
+      setRolesStatus((prev) => ({ ...prev, [eventSlug]: "Failed" }));
     }
   }
 
@@ -775,6 +822,7 @@ export default function BusinessConsole() {
                     const boothLink = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
                     const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
                     const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
+                    const backgroundsLink = linkFor("/backgrounds", session.business.slug, event.slug);
                     return (
                       <div
                         key={event.id}
@@ -827,29 +875,47 @@ export default function BusinessConsole() {
                                 showQr
                                 copied={copyStatus[`${event.slug}-checkin`] === true}
                               />
-                              <LinkActions
-                                label="Photographer"
-                                url={photographerLink}
-                                copyKey={`${event.slug}-photographer`}
-                                onCopy={copyLink}
-                                onQr={() => generateQr(photographerLink, `${event.name} photographer`)}
-                                showQr
-                                copied={copyStatus[`${event.slug}-photographer`] === true}
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-2">
-                              <LinkActions
-                                label="Booth link"
-                                url={boothLink}
-                                copyKey={`${event.slug}-booth`}
-                                onCopy={copyLink}
-                                onQr={() => generateQr(boothLink, `${event.name} booth`)}
-                                showQr
-                                copied={copyStatus[`${event.slug}-booth`] === true}
-                              />
-                            </div>
-                          )}
+                          <LinkActions
+                            label="Photographer"
+                            url={photographerLink}
+                            copyKey={`${event.slug}-photographer`}
+                            onCopy={copyLink}
+                            onQr={() => generateQr(photographerLink, `${event.name} photographer`)}
+                            showQr
+                            copied={copyStatus[`${event.slug}-photographer`] === true}
+                          />
+                          <LinkActions
+                            label="Background manager"
+                            url={backgroundsLink}
+                            copyKey={`${event.slug}-backgrounds`}
+                            onCopy={copyLink}
+                            onQr={() => generateQr(backgroundsLink, `${event.name} backgrounds`)}
+                            showQr
+                            copied={copyStatus[`${event.slug}-backgrounds`] === true}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <LinkActions
+                            label="Booth link"
+                            url={boothLink}
+                            copyKey={`${event.slug}-booth`}
+                            onCopy={copyLink}
+                            onQr={() => generateQr(boothLink, `${event.name} booth`)}
+                            showQr
+                            copied={copyStatus[`${event.slug}-booth`] === true}
+                          />
+                          <LinkActions
+                            label="Background manager"
+                            url={backgroundsLink}
+                            copyKey={`${event.slug}-backgrounds`}
+                            onCopy={copyLink}
+                            onQr={() => generateQr(backgroundsLink, `${event.name} backgrounds`)}
+                            showQr
+                            copied={copyStatus[`${event.slug}-backgrounds`] === true}
+                          />
+                        </div>
+                      )}
                         </div>
 
                         <div className="flex flex-wrap gap-2 text-xs">
@@ -882,7 +948,65 @@ export default function BusinessConsole() {
                         </div>
 
                         {event.mode === "photographer" && (
-                          <div className="space-y-2 text-xs text-[var(--color-text-muted)]">
+                          <div className="space-y-3 text-xs text-[var(--color-text-muted)]">
+                            <div className="rounded-xl bg-[var(--color-bg-subtle)] p-3 ring-1 ring-[var(--color-border-subtle)]">
+                              <p className="text-[var(--color-text)] font-semibold">Access</p>
+                              <div className="mt-2 grid gap-2">
+                                <label className="flex flex-col gap-1">
+                                  Photographer emails (comma separated)
+                                  <input
+                                    type="text"
+                                    value={photographerInputs[event.slug] || ""}
+                                    onChange={(e) =>
+                                      setPhotographerInputs((prev) => ({
+                                        ...prev,
+                                        [event.slug]: e.target.value,
+                                      }))
+                                    }
+                                    className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                                    placeholder="photo@example.com, second@example.com"
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1">
+                                  Review emails (comma separated)
+                                  <input
+                                    type="text"
+                                    value={reviewInputs[event.slug] || ""}
+                                    onChange={(e) =>
+                                      setReviewInputs((prev) => ({
+                                        ...prev,
+                                        [event.slug]: e.target.value,
+                                      }))
+                                    }
+                                    className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
+                                    placeholder="review@example.com"
+                                  />
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => saveRoles(event.slug)}
+                                    className="rounded-full bg-[var(--gradient-brand)] px-3 py-2 text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
+                                  >
+                                    {rolesStatus[event.slug] ?? "Save access"}
+                                  </button>
+                                  {rolesStatus[event.slug] && (
+                                    <span className="text-[var(--color-text-muted)]">
+                                      {rolesStatus[event.slug]}
+                                    </span>
+                                  )}
+                                </div>
+                                {event.roles && (
+                                  <div className="text-[var(--color-text-muted)]">
+                                    <p>
+                                      Photographers:{" "}
+                                      {(event.roles.photographer ?? []).join(", ") || "None"}
+                                    </p>
+                                    <p>Review: {(event.roles.review ?? []).join(", ") || "None"}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
                             <label className="flex flex-col gap-2">
                               Selection email
                               <input
