@@ -24,49 +24,55 @@ function parsePlan(input: unknown): BoothEventPlan {
 }
 
 export async function GET(request: NextRequest) {
-  const context = await getBusinessContext(request);
-  if (!context?.business || !context.user) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  try {
+    const context = await getBusinessContext(request);
+    if (!context?.business || !context.user) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
+    const events = context.business.events.map((e) => sanitizeEvent(withEventDefaults(e)));
+    return NextResponse.json({
+      events,
+      owner: {
+        id: context.user.uid,
+        email: context.user.email,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to load events.";
+    console.error("List events failed:", message, error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  const events = context.business.events.map((e) => sanitizeEvent(withEventDefaults(e)));
-  return NextResponse.json({
-    events,
-    owner: {
-      id: context.user.uid,
-      email: context.user.email,
-    },
-  });
 }
 
 export async function POST(request: NextRequest) {
-  const context = await getBusinessContext(request);
-  if (!context?.business || !context.user) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-  }
-
-  const body = (await request.json().catch(() => null)) as
-    | {
-        name?: string;
-        plan?: BoothEventPlan;
-        mode?: "self-serve" | "photographer";
-        allowedSelections?: number;
-        allowBackgroundRemoval?: boolean;
-        allowAiBackgrounds?: boolean;
-        allowAiFilters?: boolean;
-        deliverySms?: boolean;
-        galleryPublic?: boolean;
-        overlayTheme?: string;
-        eventDate?: string;
-        eventTime?: string;
-      }
-    | null;
-
-  const name = body?.name?.toString().trim();
-  if (!name) {
-    return NextResponse.json({ error: "Event name is required." }, { status: 400 });
-  }
-
   try {
+    const context = await getBusinessContext(request);
+    if (!context?.business || !context.user) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
+
+    const body = (await request.json().catch(() => null)) as
+      | {
+          name?: string;
+          plan?: BoothEventPlan;
+          mode?: "self-serve" | "photographer";
+          allowedSelections?: number;
+          allowBackgroundRemoval?: boolean;
+          allowAiBackgrounds?: boolean;
+          allowAiFilters?: boolean;
+          deliverySms?: boolean;
+          galleryPublic?: boolean;
+          overlayTheme?: string;
+          eventDate?: string;
+          eventTime?: string;
+        }
+      | null;
+
+    const name = body?.name?.toString().trim();
+    if (!name) {
+      return NextResponse.json({ error: "Event name is required." }, { status: 400 });
+    }
+
     const { event } = await createEvent(context.user.uid, context.user.uid, {
       name,
       mode: (body?.mode as "self-serve" | "photographer") ?? "self-serve",
