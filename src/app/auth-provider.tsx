@@ -12,12 +12,30 @@ export default function AuthProvider() {
 
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const maybeUrl =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input instanceof Request
+              ? input.url
+              : "";
+
+      // Only inject token for same-origin calls (our APIs). Avoid third-party hosts like Firebase.
+      const isSameOrigin =
+        maybeUrl.startsWith("/") ||
+        (!!maybeUrl && maybeUrl.startsWith(window.location.origin));
+
+      if (!isSameOrigin) {
+        return originalFetch(input as any, init);
+      }
+
       const token = currentToken || (await auth.currentUser?.getIdToken?.());
       const headers = new Headers(init?.headers || {});
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
-      return originalFetch(input, { ...init, headers });
+      return originalFetch(input as any, { ...init, headers });
     };
 
     const unsub = onAuthStateChanged(auth, async (user) => {
