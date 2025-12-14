@@ -26,12 +26,16 @@ export default function AuthProvider() {
         maybeUrl.startsWith("/") ||
         (!!maybeUrl && maybeUrl.startsWith(window.location.origin));
 
+      const headers = new Headers(init?.headers || {});
+
       if (!isSameOrigin) {
-        return originalFetch(input as any, init);
+        // Prevent leaking our ID token to third parties; strip any Authorization.
+        headers.delete("authorization");
+        headers.delete("Authorization");
+        return originalFetch(input as any, { ...init, headers });
       }
 
       const token = currentToken || (await auth.currentUser?.getIdToken?.());
-      const headers = new Headers(init?.headers || {});
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
