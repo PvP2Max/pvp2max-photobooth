@@ -404,8 +404,6 @@ export async function listBusinesses(): Promise<BoothBusiness[]> {
 }
 
 export async function findBusinessBySlug(slug: string) {
-  const fsBiz = await fetchBusinessFromFirestore(slugify(slug, slug));
-  if (fsBiz) return fsBiz;
   const index = await readTenantIndex();
   return index.businesses.find((b) => b.slug === slugify(slug, slug));
 }
