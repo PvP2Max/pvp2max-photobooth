@@ -1,5 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 
 let app: FirebaseApp | null = null;
 
@@ -28,6 +28,9 @@ export function getFirebaseClient() {
         messagingSenderId,
         storageBucket,
       });
+      // Keep sessions around (e.g., 14-day local persistence).
+      const auth = getAuth(app);
+      void setPersistence(auth, browserLocalPersistence).catch(() => {});
     }
   }
   return { app: app!, auth: getAuth(app!) };

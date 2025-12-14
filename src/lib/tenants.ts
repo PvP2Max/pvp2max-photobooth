@@ -557,9 +557,10 @@ export async function createEvent(
   const fileBusiness = index.businesses.find((b) => b.id === businessId);
   const business = fsBusiness ?? fileBusiness;
   if (!business) throw new Error("Business not found");
-  const safeSlug = slugify(slug || name, randomUUID());
-  if ((business.events || []).some((e) => e.slug === safeSlug)) {
-    throw new Error("Event slug already exists for this business.");
+  let safeSlug = slugify(slug || name, randomUUID());
+  const existingSlugs = new Set((business.events || []).map((e) => e.slug));
+  while (existingSlugs.has(safeSlug)) {
+    safeSlug = slugify(`${safeSlug}-${Math.floor(Math.random() * 9999)}`, randomUUID());
   }
   const defaults = planDefaults(plan);
   const roles = {
