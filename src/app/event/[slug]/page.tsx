@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import type { BackgroundOption } from "@/lib/backgrounds";
 
 type SessionResponse = {
@@ -36,10 +36,11 @@ function dataUrlToFile(dataUrl: string, name: string) {
   return new File([buffer], name, { type: mime || "image/png" });
 }
 
-export default function BoothPage({ params }: { params: { slug: string } }) {
+export default function BoothPage() {
   const searchParams = useSearchParams();
+  const params = useParams<{ slug: string }>();
   const businessSlug = searchParams.get("business") ?? "";
-  const eventSlug = params.slug;
+  const eventSlug = params?.slug ?? "";
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
