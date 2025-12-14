@@ -766,7 +766,6 @@ export async function updateBusinessSubscription(
   business.subscriptionStatus = subscriptionStatus ?? business.subscriptionStatus ?? "canceled";
   business.subscriptionPlan = subscriptionPlan ?? business.subscriptionPlan;
   await writeTenantIndex(index);
-  await upsertBusinessFirestore(business);
   return business;
 }
 
