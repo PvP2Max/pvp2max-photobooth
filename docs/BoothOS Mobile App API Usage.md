@@ -59,11 +59,11 @@ Adjust to match your Firestore collection layout once defined.
 All requests include: `Authorization: Bearer <id_token>`, plus JSON unless noted.
 
 ### List events (owner or authorized)
-`GET /api/events`
-- Returns events you own or are authorized on (server will filter by uid).
+`GET /api/events?business=<business-slug>`
+- Returns Firestore-backed events for the business that your Firebase ID token is authorized for (owner or assigned role).
 
 ### Create event (owner)
-`POST /api/events`
+`POST /api/events?business=<business-slug>`
 ```json
 {
   "name": "Test Event",
@@ -76,7 +76,7 @@ All requests include: `Authorization: Bearer <id_token>`, plus JSON unless noted
 - For iOS creation, deep-link to web checkout for paid plans; after payment, poll/list events.
 
 ### Assign roles (owner)
-`POST /api/events/roles`
+`POST /api/events/roles?business=<business-slug>`
 ```json
 {
   "eventSlug": "test-event",
@@ -84,7 +84,7 @@ All requests include: `Authorization: Bearer <id_token>`, plus JSON unless noted
   "reviewEmails": ["review@example.com"]
 }
 ```
-- Backend resolves emails to Firebase UIDs and stores them on the event.
+- Backend resolves emails to Firebase UIDs and stores them on the event (Firestore).
 
 ### Upload photo (photographer role or owner)
 `POST /api/photos` (multipart)

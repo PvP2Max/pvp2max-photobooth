@@ -177,6 +177,28 @@ function getFirestoreDb() {
   return firestore ?? getFirestore();
 }
 
+async function fetchBusinessByIdFromFirestore(id: string) {
+  if (!id) return null;
+  const db = getFirestoreDb();
+  const doc = await db.collection(FIRESTORE_BUSINESSES).doc(id).get();
+  if (!doc.exists) return null;
+  const bizData = doc.data() as Partial<BoothBusiness>;
+  const eventsSnap = await doc.ref.collection("events").get();
+  const events: BoothEvent[] = eventsSnap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
+  const business: BoothBusiness = {
+    id: doc.id,
+    name: bizData.name ?? "",
+    slug: bizData.slug ?? "",
+    createdAt: bizData.createdAt ?? new Date().toISOString(),
+    subscriptionId: bizData.subscriptionId,
+    subscriptionPlan: bizData.subscriptionPlan,
+    subscriptionStatus: bizData.subscriptionStatus ?? "canceled",
+    ownerUid: bizData.ownerUid,
+    events,
+  };
+  return business;
+}
+
 async function fetchBusinessFromFirestore(slug: string) {
   if (!slug) return null;
   const db = getFirestoreDb();
@@ -435,15 +457,23 @@ export async function findBusinessById(id: string) {
 
 export async function deleteEventById(businessId: string, eventId: string) {
   const index = await readTenantIndex();
-  const biz = index.businesses.find((b) => b.id === businessId);
+  const fsBiz = await fetchBusinessByIdFromFirestore(businessId);
+  const biz = fsBiz ?? index.businesses.find((b) => b.id === businessId);
   if (!biz) return false;
-  const target = biz.events.find((e) => e.id === eventId);
-  biz.events = biz.events.filter((e) => e.id !== eventId);
+  const target = (biz.events ?? []).find((e) => e.id === eventId);
+  biz.events = (biz.events ?? []).filter((e) => e.id !== eventId);
   if (target) {
     await removeEventStorage(biz.slug, target.slug);
   }
-  await writeTenantIndex(index);
-  await deleteEventFromFirestore(businessId, eventId);
+  if (fsBiz) {
+    await upsertBusinessFirestore(biz);
+    await deleteEventFromFirestore(businessId, eventId);
+  }
+  const fileBiz = index.businesses.find((b) => b.id === businessId);
+  if (fileBiz) {
+    fileBiz.events = biz.events ?? [];
+    await writeTenantIndex(index);
+  }
   return Boolean(target);
 }
 
@@ -522,11 +552,13 @@ export async function createEvent(
     reviewEmails?: string[];
   },
 ) {
+  const fsBusiness = await fetchBusinessByIdFromFirestore(businessId);
   const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === businessId);
+  const fileBusiness = index.businesses.find((b) => b.id === businessId);
+  const business = fsBusiness ?? fileBusiness;
   if (!business) throw new Error("Business not found");
   const safeSlug = slugify(slug || name, randomUUID());
-  if (business.events.some((e) => e.slug === safeSlug)) {
+  if ((business.events || []).some((e) => e.slug === safeSlug)) {
     throw new Error("Event slug already exists for this business.");
   }
   const defaults = planDefaults(plan);
@@ -560,8 +592,11 @@ export async function createEvent(
     ownerUid,
     roles,
   };
-  business.events.push(event);
-  await writeTenantIndex(index);
+  business.events = [...(business.events ?? []), event];
+  if (fileBusiness) {
+    fileBusiness.events = business.events;
+    await writeTenantIndex(index);
+  }
   await upsertBusinessFirestore(business);
   await upsertEventFirestore(business, event);
   return { event };
@@ -590,10 +625,13 @@ export async function findEventBySlugs(
   businessSlug: string,
   eventSlug: string,
 ): Promise<EventContext | null> {
-  const index = await readTenantIndex();
-  const biz = index.businesses.find((b) => b.slug === slugify(businessSlug, businessSlug));
+  const normalizedBiz = slugify(businessSlug, businessSlug);
+  const normalizedEvent = slugify(eventSlug, eventSlug);
+  const fsBiz = await fetchBusinessFromFirestore(normalizedBiz);
+  const sourceBiz = fsBiz ?? (await findBusinessBySlug(normalizedBiz));
+  const biz = sourceBiz ?? null;
   if (!biz) return null;
-  const event = biz.events.find((e) => e.slug === slugify(eventSlug, eventSlug));
+  const event = (biz.events ?? []).find((e) => e.slug === normalizedEvent);
   if (!event) return null;
   if (!eventIsActive(event)) return null;
   return {
@@ -775,13 +813,20 @@ export async function updateEventStatus(
   status: BoothEvent["status"],
 ) {
   const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === businessId);
+  const fsBiz = await fetchBusinessByIdFromFirestore(businessId);
+  const business = fsBiz ?? index.businesses.find((b) => b.id === businessId);
   if (!business) throw new Error("Business not found");
-  const event = business.events.find((e) => e.id === eventId);
+  const event = (business.events ?? []).find((e) => e.id === eventId);
   if (!event) throw new Error("Event not found");
   event.status = status;
-  await writeTenantIndex(index);
-  await upsertEventFirestore(business, event);
+  if (fsBiz) await upsertEventFirestore(business, event);
+  const fileBiz = index.businesses.find((b) => b.id === businessId);
+  if (fileBiz) {
+    fileBiz.events = (fileBiz.events ?? []).map((ev) =>
+      ev.id === eventId ? { ...ev, status } : ev,
+    );
+    await writeTenantIndex(index);
+  }
   return event;
 }
 
@@ -791,17 +836,22 @@ export async function updateEventConfig(
   updates: Partial<BoothEvent>,
 ) {
   const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === businessId);
+  const fsBiz = await fetchBusinessByIdFromFirestore(businessId);
+  const business = fsBiz ?? index.businesses.find((b) => b.id === businessId);
   if (!business) throw new Error("Business not found");
-  const event = business.events.find((e) => e.id === eventId);
+  const event = (business.events ?? []).find((e) => e.id === eventId);
   if (!event) throw new Error("Event not found");
   Object.assign(event, updates);
-  business.events = business.events.map((ev) =>
+  business.events = (business.events ?? []).map((ev) =>
     ev.id === eventId ? withEventDefaults(ev) : ev,
   );
-  await writeTenantIndex(index);
-  const updated = business.events.find((ev) => ev.id === eventId)!;
-  await upsertEventFirestore(business, updated);
+  const updated = (business.events ?? []).find((ev) => ev.id === eventId)!;
+  if (fsBiz) await upsertEventFirestore(business, updated);
+  const fileBiz = index.businesses.find((b) => b.id === businessId);
+  if (fileBiz) {
+    fileBiz.events = business.events ?? [];
+    await writeTenantIndex(index);
+  }
   return updated;
 }
 
@@ -829,17 +879,57 @@ export async function incrementEventUsage(
   { photos = 0, aiCredits = 0 }: { photos?: number; aiCredits?: number },
 ) {
   const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === scope.businessId);
+  const fsBiz = await fetchBusinessByIdFromFirestore(scope.businessId);
+  const business = fsBiz ?? index.businesses.find((b) => b.id === scope.businessId);
   if (!business) throw new Error("Business not found");
-  const event = business.events.find((e) => e.id === scope.eventId);
+  const event = (business.events ?? []).find((e) => e.id === scope.eventId);
   if (!event) throw new Error("Event not found");
   event.photoUsed = Math.max(0, (event.photoUsed ?? 0) + photos);
   event.aiUsed = Math.max(0, (event.aiUsed ?? 0) + aiCredits);
-  business.events = business.events.map((ev) =>
+  business.events = (business.events ?? []).map((ev) =>
     ev.id === event.id ? withEventDefaults(ev) : ev,
   );
-  await writeTenantIndex(index);
-  const updated = business.events.find((ev) => ev.id === event.id)!;
-  await upsertEventFirestore(business, updated);
+  const updated = (business.events ?? []).find((ev) => ev.id === event.id)!;
+  if (fsBiz) await upsertEventFirestore(business, updated);
+  const fileBiz = index.businesses.find((b) => b.id === scope.businessId);
+  if (fileBiz) {
+    fileBiz.events = business.events ?? [];
+    await writeTenantIndex(index);
+  }
   return { event: updated, usage: eventUsage(updated) };
+}
+
+export async function updateEventRolesByEmails(
+  businessSlug: string,
+  eventSlug: string,
+  {
+    photographerEmails = [],
+    reviewEmails = [],
+  }: { photographerEmails?: string[]; reviewEmails?: string[] },
+) {
+  const normalizedBiz = slugify(businessSlug, businessSlug);
+  const normalizedEvent = slugify(eventSlug, eventSlug);
+  const fsBiz = await fetchBusinessFromFirestore(normalizedBiz);
+  const index = await readTenantIndex();
+  const fileBiz = index.businesses.find((b) => b.slug === normalizedBiz);
+  const business = fsBiz ?? fileBiz;
+  if (!business) throw new Error("Business not found");
+  const event = (business.events ?? []).find((e) => e.slug === normalizedEvent);
+  if (!event) throw new Error("Event not found");
+
+  const photographer = await resolveEmailsToUids(photographerEmails);
+  const review = await resolveEmailsToUids(reviewEmails);
+  event.roles = { photographer, review };
+
+  if (fsBiz) {
+    await upsertEventFirestore(business, event);
+  }
+  if (fileBiz) {
+    fileBiz.events = (fileBiz.events ?? []).map((ev) =>
+      ev.slug === normalizedEvent ? { ...ev, roles: event.roles } : ev,
+    );
+    await writeTenantIndex(index);
+  }
+
+  return event;
 }

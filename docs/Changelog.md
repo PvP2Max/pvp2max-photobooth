@@ -1,5 +1,10 @@
 # Photobooth Changelog
 
+## 2025-12-14
+- Moved businesses/events persistence to Firestore (seeded default also synced). Event CRUD now reads/writes through Firestore and `/api/events` returns business info.
+- Added owner-only role assignment endpoint `/api/events/roles` that resolves emails to Firebase UIDs and stores photographer/review roles on events.
+- Dashboard/API calls now send business slugs; seed owner is allowed for seeded data. Mobile apps can consume Firestore-backed events directly.
+
 ## 2025-12-13
 - Rebuilt the self-serve booth page with a full-screen, tap-to-start flow: countdown capture, review/retake, MODNet processing, background picker, and single email delivery (R2-hosted download link). No nav bar is shown while running the booth.
 - Booth background picker now respects the event’s allowed backgrounds and selection cap; single-background events auto-select the only option.
