@@ -97,8 +97,11 @@ function overlayLabel(theme?: string) {
 
 export default function BusinessConsole() {
   const router = useRouter();
-  const [session, setSession] = useState<BusinessSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<BusinessSession | null>({
+    business: { id: "", name: "", slug: "" },
+    events: [],
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
