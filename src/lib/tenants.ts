@@ -446,7 +446,6 @@ export async function createBusiness({
   };
   index.businesses.push(business);
   await writeTenantIndex(index);
-   await upsertBusinessFirestore(business);
   return { business };
 }
 
