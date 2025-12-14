@@ -32,14 +32,14 @@ export default function AuthProvider() {
         // Prevent leaking our ID token to third parties; strip any Authorization.
         headers.delete("authorization");
         headers.delete("Authorization");
-        return originalFetch(input as any, { ...init, headers });
+        return originalFetch(input, { ...init, headers });
       }
 
       const token = currentToken || (await auth.currentUser?.getIdToken?.());
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
-      return originalFetch(input as any, { ...init, headers });
+      return originalFetch(input, { ...init, headers });
     };
 
     const unsub = onAuthStateChanged(auth, async (user) => {
