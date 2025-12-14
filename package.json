@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "NEXT_DISABLE_LIGHTNINGCSS=1 TAILWIND_DISABLE_LIGHTNINGCSS=1 next build",
+    "build": "NEXT_DISABLE_LIGHTNINGCSS=1 TAILWIND_DISABLE_LIGHTNINGCSS=1 next build --no-turbo",
     "start": "next start",
     "lint": "eslint"
   },
