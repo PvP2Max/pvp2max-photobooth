@@ -129,27 +129,6 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
     };
   }, [stopCamera]);
 
-  const attemptAutoUnlock = useCallback(async () => {
-    if (!businessChecked) return;
-    if (!resolvedBusiness || !eventParam) {
-      setNeedsLogin(true);
-      return;
-    }
-    try {
-      await fetch("/api/auth/event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          businessSlug: resolvedBusiness,
-          eventSlug: eventParam,
-        }),
-      });
-    } catch {
-      setNeedsLogin(true);
-    }
-  }, [resolvedBusiness, eventParam, businessChecked]);
-
   const loadSession = useCallback(async () => {
     if (!businessChecked) return;
     try {
@@ -197,8 +176,8 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   }, []);
 
   useEffect(() => {
-    void attemptAutoUnlock().then(() => loadSession());
-  }, [attemptAutoUnlock, loadSession]);
+    void loadSession();
+  }, [loadSession]);
 
   useEffect(() => {
     if (session) {
