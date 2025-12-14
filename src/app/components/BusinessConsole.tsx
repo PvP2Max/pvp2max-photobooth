@@ -42,6 +42,7 @@ type EventItem = {
   eventTime?: string;
   allowedSelections?: number;
   paymentStatus?: "unpaid" | "pending" | "paid";
+  roles?: { photographer?: string[]; review?: string[] };
 };
 
 type ProductionItem = {
