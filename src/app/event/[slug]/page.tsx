@@ -39,7 +39,6 @@ function dataUrlToFile(dataUrl: string, name: string) {
 export default function BoothPage({ params }: { params: { slug: string } }) {
   const searchParams = useSearchParams();
   const businessSlug = searchParams.get("business") ?? "";
-  const accessCode = searchParams.get("key") ?? "";
   const eventSlug = params.slug;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -61,6 +60,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
   const [selectedBackgrounds, setSelectedBackgrounds] = useState<Set<string>>(new Set());
   const [loadingBackgrounds, setLoadingBackgrounds] = useState(false);
   const [businessSession, setBusinessSession] = useState<{ slug: string } | null>(null);
+  const [businessChecked, setBusinessChecked] = useState(false);
 
   const businessParam = useMemo(
     () => businessSlug || searchParams.get("business") || "",
@@ -131,7 +131,10 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
 
   const attemptAutoUnlock = useCallback(async () => {
     if (!businessChecked) return;
-    if (!resolvedBusiness || !eventParam) return;
+    if (!resolvedBusiness || !eventParam) {
+      setNeedsLogin(true);
+      return;
+    }
     try {
       await fetch("/api/auth/event", {
         method: "POST",
@@ -140,13 +143,12 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         body: JSON.stringify({
           businessSlug: resolvedBusiness,
           eventSlug: eventParam,
-          accessCode: accessCode || undefined,
         }),
       });
     } catch {
-      // ignore; loadSession will report auth status
+      setNeedsLogin(true);
     }
-  }, [resolvedBusiness, eventParam, accessCode, businessChecked]);
+  }, [resolvedBusiness, eventParam, businessChecked]);
 
   const loadSession = useCallback(async () => {
     if (!businessChecked) return;
@@ -160,7 +162,6 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
         business: resolvedBusiness,
         event: eventParam,
       });
-      if (accessCode) qs.set("key", accessCode);
       const qsString = qs.toString();
       const res = await fetch(`/api/auth/event?${qsString}`, { credentials: "include" });
       if (!res.ok) {
@@ -175,7 +176,7 @@ export default function BoothPage({ params }: { params: { slug: string } }) {
       setSession(null);
       setNeedsLogin(true);
     }
-  }, [resolvedBusiness, eventParam, accessCode, businessChecked]);
+  }, [resolvedBusiness, eventParam, businessChecked]);
 
   const loadBackgrounds = useCallback(async () => {
     setLoadingBackgrounds(true);
