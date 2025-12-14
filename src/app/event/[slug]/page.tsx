@@ -52,7 +52,6 @@ export default function BoothPage() {
   const [photoId, setPhotoId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [needsLogin, setNeedsLogin] = useState(false);
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [processing, setProcessing] = useState(false);
   const [sending, setSending] = useState(false);
@@ -60,8 +59,6 @@ export default function BoothPage() {
   const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
   const [selectedBackgrounds, setSelectedBackgrounds] = useState<Set<string>>(new Set());
   const [loadingBackgrounds, setLoadingBackgrounds] = useState(false);
-  const [businessChecked, setBusinessChecked] = useState(true);
-
   const businessParam = useMemo(
     () => businessSlug || searchParams.get("business") || "",
     [businessSlug, searchParams],
@@ -108,11 +105,10 @@ export default function BoothPage() {
   }, [stopCamera]);
 
   const loadSession = useCallback(async () => {
-    if (!businessChecked) return;
     try {
       if (!resolvedBusiness || !eventParam) {
         setSession(null);
-        setNeedsLogin(true);
+        setError("Missing event link details.");
         return;
       }
       const qs = new URLSearchParams({
@@ -123,17 +119,18 @@ export default function BoothPage() {
       const res = await fetch(`/api/auth/event?${qsString}`, { credentials: "include" });
       if (!res.ok) {
         setSession(null);
-        setNeedsLogin(true);
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(payload.error || "Event not found or unavailable.");
         return;
       }
       const data = (await res.json()) as SessionResponse;
       setSession(data);
-      setNeedsLogin(false);
+      setError(null);
     } catch {
       setSession(null);
-      setNeedsLogin(true);
+      setError("Unable to load event details.");
     }
-  }, [resolvedBusiness, eventParam, businessChecked]);
+  }, [resolvedBusiness, eventParam]);
 
   const loadBackgrounds = useCallback(async () => {
     setLoadingBackgrounds(true);
@@ -339,32 +336,6 @@ export default function BoothPage() {
     } finally {
       setSending(false);
     }
-  }
-
-  const nextParam =
-    typeof window !== "undefined"
-      ? encodeURIComponent(`${window.location.pathname}${window.location.search}`)
-      : "";
-  const loginHref = nextParam ? `/login?next=${nextParam}` : "/login";
-
-  if (needsLogin) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] px-6 text-[var(--color-text)]">
-        <div className="w-full max-w-md space-y-4 rounded-2xl bg-[var(--color-surface)] p-6 text-center ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
-          <h1 className="text-xl font-semibold">Sign in to access this event</h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Please sign in to the business account to unlock this event. After login you will be redirected
-            back here automatically.
-          </p>
-          <a
-            href={loginHref}
-            className="block w-full rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-          >
-            Go to login
-          </a>
-        </div>
-      </main>
-    );
   }
 
   return (
