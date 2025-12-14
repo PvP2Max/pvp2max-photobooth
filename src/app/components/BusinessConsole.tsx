@@ -103,10 +103,7 @@ export default function BusinessConsole() {
     events: [],
   });
   const [loading, setLoading] = useState(false);
-  const businessSlug =
-    process.env.NEXT_PUBLIC_DEFAULT_BUSINESS_SLUG ||
-    process.env.BOOTHOS_DEFAULT_BUSINESS_SLUG ||
-    "arctic-aura";
+  const businessSlug = "";
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
@@ -244,10 +241,7 @@ export default function BusinessConsole() {
     async function loadEvents() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/events?business=${encodeURIComponent(businessSlug)}`, {
-          headers: { "x-boothos-business": businessSlug },
-          credentials: "include",
-        });
+        const res = await fetch(`/api/events`, { credentials: "include" });
         if (!res.ok) {
           setSession(null);
           setLoading(false);
@@ -258,7 +252,7 @@ export default function BusinessConsole() {
           business?: { id: string; name: string; slug: string };
         };
         setSession({
-          business: data.business ?? { id: "", name: businessSlug, slug: businessSlug },
+          business: data.business ?? { id: "", name: "My BoothOS", slug: "" },
           events: data.events ?? [],
         });
       } catch (err) {
@@ -298,11 +292,10 @@ export default function BusinessConsole() {
       eventTime: newEventTime,
     };
     try {
-      const res = await fetch(`/api/events?business=${encodeURIComponent(businessSlug)}`, {
+      const res = await fetch(`/api/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-boothos-business": businessSlug,
         },
         credentials: "include",
         body: JSON.stringify(payload),
