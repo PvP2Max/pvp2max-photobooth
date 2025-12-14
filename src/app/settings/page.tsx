@@ -10,7 +10,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const session: { business?: { name?: string; slug?: string }; user?: { email?: string } } | null =
-    null;
+    { business: undefined, user: undefined };
 
   async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
