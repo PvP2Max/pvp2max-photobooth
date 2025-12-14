@@ -1,14 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type Session = {
-  business?: { name: string; slug: string };
-  user?: { email: string };
-};
+import { useState } from "react";
 
 export default function SettingsPage() {
-  const [session, setSession] = useState<Session | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
