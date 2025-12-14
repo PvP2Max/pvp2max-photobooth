@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { getFirebaseClient } from "@/lib/firebase-client";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -20,19 +22,12 @@ export default function LoginForm() {
     setError(null);
     setLoading(true);
     try {
-      const endpoint = registering ? "/api/auth/register" : "/api/auth/business";
-      const payload = registering
-        ? { email, password, businessName, businessSlug, eventName, eventSlug }
-        : { email, password };
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Sign in failed.");
+      const { auth } = getFirebaseClient();
+      if (registering) {
+        // Create user in Firebase; business/event seeding should be done via owner APIs after login.
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
       }
       router.replace("/dashboard");
     } catch (err) {
@@ -92,51 +87,8 @@ export default function LoginForm() {
               onChange={(e) => setRegistering(e.target.checked)}
               className="h-4 w-4"
             />
-            Create account (seeds business + first event)
+            Create Firebase account
           </label>
-
-          {registering && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-sm text-[var(--color-text-muted)]">
-                Business name
-                <input
-                  required
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-[var(--color-text-muted)]">
-                Business slug
-                <input
-                  required
-                  value={businessSlug}
-                  onChange={(e) => setBusinessSlug(e.target.value)}
-                  placeholder="your-company"
-                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-[var(--color-text-muted)]">
-                Event name
-                <input
-                  required
-                  value={eventName}
-                  onChange={(e) => setEventName(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-[var(--color-text-muted)]">
-                Event slug
-                <input
-                  required
-                  value={eventSlug}
-                  onChange={(e) => setEventSlug(e.target.value)}
-                  placeholder="holiday-2025"
-                  className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                />
-              </label>
-            </div>
-          )}
 
           <div className="flex flex-wrap items-center gap-3">
             <button

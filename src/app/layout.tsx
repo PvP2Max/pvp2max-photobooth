@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppShellHeader from "./app-shell-header";
+import AuthProvider from "./auth-provider";
 
 export const metadata: Metadata = {
   title: "BoothOS | Arctic Aura Designs",
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <AuthProvider />
         <AppShellHeader />
         {children}
       </body>
