@@ -784,6 +784,8 @@ export async function getBusinessContext(request: NextRequest) {
   const businessSlug =
     request.headers.get("x-boothos-business") ||
     request.nextUrl.searchParams.get("business") ||
+    process.env.BOOTHOS_DEFAULT_BUSINESS_SLUG ||
+    process.env.NEXT_PUBLIC_DEFAULT_BUSINESS_SLUG ||
     "";
   if (!businessSlug) return null;
   const fsBiz = await fetchBusinessFromFirestore(businessSlug);
@@ -796,8 +798,23 @@ export async function getBusinessContext(request: NextRequest) {
       b.slug === businessSlug &&
       (!b.ownerUid || b.ownerUid === user.uid || b.ownerUid === "seed-owner"),
   );
-  if (!business) return null;
-  return { business, user };
+  if (business) return { business, user };
+
+  // Auto-create business if none exists (user-owned)
+  const newBiz: BoothBusiness = {
+    id: randomUUID(),
+    name: process.env.BOOTHOS_DEFAULT_BUSINESS_NAME || businessSlug,
+    slug: businessSlug,
+    createdAt: new Date().toISOString(),
+    ownerUid: user.uid,
+    events: [],
+    subscriptionStatus: "canceled",
+  };
+  await upsertBusinessFirestore(newBiz);
+  // Mirror to file index for legacy reads
+  index.businesses.push(newBiz);
+  await writeTenantIndex(index);
+  return { business: newBiz, user };
 }
 
 export function isAdminRequest(request: NextRequest) {
