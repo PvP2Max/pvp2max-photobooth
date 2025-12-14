@@ -4,6 +4,7 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { getFirebaseAdmin } from "@/lib/firebase";
 import { verifyBearer, roleForEvent, type AuthenticatedUser } from "./auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 export type BoothEventPlan =
   | "free"
@@ -97,6 +98,7 @@ type TenantIndex = {
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
 const TENANT_FILE = path.join(STORAGE_ROOT, "tenants.json");
 const ADMIN_TOKEN = process.env.BOOTHOS_ADMIN_TOKEN ?? "ArcticAuraDesigns";
+const FIRESTORE_BUSINESSES = "businesses";
 
 function planDefaults(plan: BoothEventPlan | undefined) {
   switch (plan) {
@@ -168,6 +170,55 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         galleryZipEnabled: false,
       };
   }
+}
+
+function getFirestoreDb() {
+  const { firestore } = getFirebaseAdmin();
+  return firestore ?? getFirestore();
+}
+
+async function fetchBusinessFromFirestore(slug: string) {
+  if (!slug) return null;
+  const db = getFirestoreDb();
+  const snap = await db.collection(FIRESTORE_BUSINESSES).where("slug", "==", slug).limit(1).get();
+  if (snap.empty) return null;
+  const bizDoc = snap.docs[0];
+  const bizData = bizDoc.data() as Partial<BoothBusiness>;
+  const eventsSnap = await bizDoc.ref.collection("events").get();
+  const events: BoothEvent[] = eventsSnap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
+  const business: BoothBusiness = {
+    id: bizDoc.id,
+    name: bizData.name ?? "",
+    slug: bizData.slug ?? slug,
+    createdAt: bizData.createdAt ?? new Date().toISOString(),
+    subscriptionId: bizData.subscriptionId,
+    subscriptionPlan: bizData.subscriptionPlan,
+    subscriptionStatus: bizData.subscriptionStatus ?? "canceled",
+    ownerUid: bizData.ownerUid,
+    events,
+  };
+  return business;
+}
+
+async function upsertBusinessFirestore(business: BoothBusiness) {
+  const db = getFirestoreDb();
+  const { events, ...rest } = business;
+  await db.collection(FIRESTORE_BUSINESSES).doc(business.id).set(rest, { merge: true });
+}
+
+async function upsertEventFirestore(business: BoothBusiness, event: BoothEvent) {
+  const db = getFirestoreDb();
+  await db
+    .collection(FIRESTORE_BUSINESSES)
+    .doc(business.id)
+    .collection("events")
+    .doc(event.id)
+    .set(event, { merge: true });
+}
+
+async function deleteEventFromFirestore(businessId: string, eventId: string) {
+  const db = getFirestoreDb();
+  await db.collection(FIRESTORE_BUSINESSES).doc(businessId).collection("events").doc(eventId).delete();
 }
 
 async function resolveEmailsToUids(emails: string[]) {
@@ -306,6 +357,10 @@ async function ensureTenantStorage() {
       ],
     };
     await writeFile(TENANT_FILE, JSON.stringify(seed, null, 2), "utf8");
+    // Also seed Firestore
+    const seededBiz = seed.businesses[0];
+    await upsertBusinessFirestore(seededBiz);
+    await upsertEventFirestore(seededBiz, seededBiz.events[0]);
   }
 }
 
@@ -367,6 +422,8 @@ export async function listBusinesses(): Promise<BoothBusiness[]> {
 }
 
 export async function findBusinessBySlug(slug: string) {
+  const fsBiz = await fetchBusinessFromFirestore(slugify(slug, slug));
+  if (fsBiz) return fsBiz;
   const index = await readTenantIndex();
   return index.businesses.find((b) => b.slug === slugify(slug, slug));
 }
@@ -386,6 +443,7 @@ export async function deleteEventById(businessId: string, eventId: string) {
     await removeEventStorage(biz.slug, target.slug);
   }
   await writeTenantIndex(index);
+  await deleteEventFromFirestore(businessId, eventId);
   return Boolean(target);
 }
 
@@ -413,6 +471,7 @@ export async function createBusiness({
   };
   index.businesses.push(business);
   await writeTenantIndex(index);
+   await upsertBusinessFirestore(business);
   return { business };
 }
 
@@ -503,6 +562,8 @@ export async function createEvent(
   };
   business.events.push(event);
   await writeTenantIndex(index);
+  await upsertBusinessFirestore(business);
+  await upsertEventFirestore(business, event);
   return { event };
 }
 
@@ -685,6 +746,11 @@ export async function getBusinessContext(request: NextRequest) {
     request.headers.get("x-boothos-business") ||
     request.nextUrl.searchParams.get("business") ||
     "";
+  if (!businessSlug) return null;
+  const fsBiz = await fetchBusinessFromFirestore(businessSlug);
+  if (fsBiz && (!fsBiz.ownerUid || fsBiz.ownerUid === user.uid || fsBiz.ownerUid === "seed-owner")) {
+    return { business: fsBiz, user };
+  }
   const index = await readTenantIndex();
   const business = index.businesses.find(
     (b) =>
@@ -715,6 +781,7 @@ export async function updateEventStatus(
   if (!event) throw new Error("Event not found");
   event.status = status;
   await writeTenantIndex(index);
+  await upsertEventFirestore(business, event);
   return event;
 }
 
@@ -733,7 +800,9 @@ export async function updateEventConfig(
     ev.id === eventId ? withEventDefaults(ev) : ev,
   );
   await writeTenantIndex(index);
-  return business.events.find((ev) => ev.id === eventId)!;
+  const updated = business.events.find((ev) => ev.id === eventId)!;
+  await upsertEventFirestore(business, updated);
+  return updated;
 }
 
 export async function updateBusinessSubscription(
@@ -751,6 +820,7 @@ export async function updateBusinessSubscription(
   business.subscriptionStatus = subscriptionStatus ?? business.subscriptionStatus ?? "canceled";
   business.subscriptionPlan = subscriptionPlan ?? business.subscriptionPlan;
   await writeTenantIndex(index);
+  await upsertBusinessFirestore(business);
   return business;
 }
 
@@ -770,5 +840,6 @@ export async function incrementEventUsage(
   );
   await writeTenantIndex(index);
   const updated = business.events.find((ev) => ev.id === event.id)!;
+  await upsertEventFirestore(business, updated);
   return { event: updated, usage: eventUsage(updated) };
 }

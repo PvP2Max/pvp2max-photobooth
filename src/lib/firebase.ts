@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp, type ServiceAccount } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 let initialized = false;
 
@@ -21,5 +22,5 @@ export function getFirebaseAdmin() {
     initializeApp({ credential: cert(serviceAccount) });
   }
   initialized = true;
-  return { auth: getAuth() };
+  return { auth: getAuth(), firestore: getFirestore() };
 }
