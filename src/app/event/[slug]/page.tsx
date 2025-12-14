@@ -60,15 +60,14 @@ export default function BoothPage() {
   const [backgrounds, setBackgrounds] = useState<BackgroundOption[]>([]);
   const [selectedBackgrounds, setSelectedBackgrounds] = useState<Set<string>>(new Set());
   const [loadingBackgrounds, setLoadingBackgrounds] = useState(false);
-  const [businessSession, setBusinessSession] = useState<{ slug: string } | null>(null);
-  const [businessChecked, setBusinessChecked] = useState(false);
+  const [businessChecked, setBusinessChecked] = useState(true);
 
   const businessParam = useMemo(
     () => businessSlug || searchParams.get("business") || "",
     [businessSlug, searchParams],
   );
   const eventParam = eventSlug;
-  const resolvedBusiness = businessParam || businessSession?.slug || "";
+  const resolvedBusiness = businessParam;
   const selectionLimit = session?.event?.allowedSelections ?? 1;
 
   const activeBackground = useMemo(() => {
@@ -78,28 +77,6 @@ export default function BoothPage() {
   }, [backgrounds, selectedBackgrounds]);
   const businessLabel = session?.business?.slug ?? resolvedBusiness ?? "Unknown";
   const modeLabel = session?.event?.mode ?? "self-serve";
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/auth/business", { credentials: "include" });
-        if (!cancelled && res.ok) {
-          const data = (await res.json()) as { business?: { slug?: string } };
-          if (data.business?.slug) {
-            setBusinessSession({ slug: data.business.slug });
-          }
-        }
-      } catch {
-        // ignore; kiosk links may rely solely on event keys
-      } finally {
-        if (!cancelled) setBusinessChecked(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const startCamera = useCallback(async () => {
     try {
