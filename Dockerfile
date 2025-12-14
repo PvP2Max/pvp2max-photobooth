@@ -1,9 +1,7 @@
-FROM oven/bun:1.1 AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-COPY package.json ./
-# Intentionally install without the repo lockfile inside the container to avoid
-# version mismatches with bun.lock; local dev can still use bun.lock.
-RUN bun install --no-progress
+COPY package.json package-lock.json ./
+RUN npm ci --no-progress
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
