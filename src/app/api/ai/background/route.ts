@@ -7,9 +7,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => ({}))) as { prompt?: string; kind?: "background" | "frame" };
   const prompt = body.prompt?.toString().trim();

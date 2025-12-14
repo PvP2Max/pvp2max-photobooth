@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
+  if (!context.roles.owner && !context.roles.review) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const email = request.nextUrl.searchParams.get("email");
   if (!email) {
     return NextResponse.json(
@@ -35,6 +38,9 @@ export async function POST(request: NextRequest) {
   const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner && !context.roles.photographer) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const currentUsage = eventUsage(context.event);
   if (eventRequiresPayment(context.event, context.business)) {

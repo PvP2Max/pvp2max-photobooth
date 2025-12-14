@@ -25,7 +25,7 @@ function parsePlan(input: unknown): BoothEventPlan {
 
 export async function GET(request: NextRequest) {
   const context = await getBusinessContext(request);
-  if (!context?.business) {
+  if (!context?.business || !context.user) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
   const events = context.business.events.map((e) => sanitizeEvent(withEventDefaults(e)));
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const context = await getBusinessContext(request);
-  if (!context?.business) {
+  if (!context?.business || !context.user) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { event, accessCode } = await createEvent(context.business.id, {
+    const { event } = await createEvent(context.business.id, context.user.uid, {
       name,
       mode: (body?.mode as "self-serve" | "photographer") ?? "self-serve",
       plan: parsePlan(body?.plan),
@@ -75,11 +75,12 @@ export async function POST(request: NextRequest) {
       eventTime: body?.eventTime,
       allowedSelections:
         typeof body?.allowedSelections === "number" ? body.allowedSelections : undefined,
+      photographerEmails: [],
+      reviewEmails: [],
     });
 
     return NextResponse.json({
       event: sanitizeEvent(withEventDefaults(event)),
-      accessKey: accessCode,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create event.";

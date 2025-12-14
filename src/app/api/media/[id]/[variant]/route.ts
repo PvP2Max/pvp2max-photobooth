@@ -14,6 +14,13 @@ export async function GET(
   if (!eventContext) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
+  if (
+    !eventContext.roles.owner &&
+    !eventContext.roles.photographer &&
+    !eventContext.roles.review
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const { id, variant } = await context.params;
   if (!id || !variant) {
     return NextResponse.json(

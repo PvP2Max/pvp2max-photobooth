@@ -6,6 +6,7 @@ import {
   updateEventConfig,
   updateBusinessSubscription,
   createEvent,
+  findBusinessById,
 } from "@/lib/tenants";
 
 export const runtime = "nodejs";
@@ -103,7 +104,9 @@ async function createPaidEventFromMetadata(businessId: string, plan: BoothEventP
     };
     if (!parsed?.name) return;
     const defaults = applyPlanDefaults(plan);
-    const { event } = await createEvent(businessId, {
+    const business = await findBusinessById(businessId);
+    const ownerUid = business?.ownerUid ?? "seed-owner";
+    const { event } = await createEvent(businessId, ownerUid, {
       name: parsed.name,
       status: parsed.status === "closed" ? "closed" : "live",
       mode: parsed.mode ?? "self-serve",

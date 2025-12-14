@@ -2,31 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { findProductionById } from "@/lib/production";
 import { sendMail } from "@/lib/mailer";
 import { rateLimiter, requestKey } from "@/lib/rate-limit";
-import { getBusinessContext, getEventContext, isAdminRequest } from "@/lib/tenants";
+import { getEventContext, isAdminRequest } from "@/lib/tenants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   const isAdmin = isAdminRequest(request);
-  const businessSession = await getBusinessContext(request);
-  if (!isAdmin && !businessSession?.business) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
   const rate = rateLimiter(`admin-resend-${requestKey(request.headers)}`, 20, 60_000);
   if (!rate.allowed) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
-  const { context, error, status } = await getEventContext(request, {
-    allowUnauthedHeader: true,
-    allowBusinessSession: true,
-  });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json(
       { error: error ?? "Event scope is required." },
       { status: status ?? 401 },
     );
+  }
+  if (!isAdmin && !context.roles.owner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as {

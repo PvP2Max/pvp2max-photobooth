@@ -16,7 +16,7 @@ export async function GET(
   }
 
   const admin = isAdminRequest(request);
-  const event = await getEventContext(request, { allowUnauthedHeader: true });
+  const event = await getEventContext(request);
   if (!event.context) {
     return NextResponse.json(
       { error: event.error ?? "Missing event scope for download." },

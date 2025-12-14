@@ -52,6 +52,9 @@ export async function POST(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
+  if (!context.roles.owner && !context.roles.review) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const usage = eventUsage(context.event);
   try {
     const body = (await request.json()) as {

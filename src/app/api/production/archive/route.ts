@@ -12,12 +12,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { context, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json(
       { error: error ?? "Event scope is required for archive downloads." },
       { status: status ?? 401 },
     );
+  }
+  if (!context.roles.owner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const usage = eventUsage(context.event);
   if (!usage.galleryZipEnabled && !isAdminRequest(request)) {

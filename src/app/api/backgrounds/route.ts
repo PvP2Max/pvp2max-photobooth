@@ -11,9 +11,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner && !context.roles.photographer) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const allowedIds = context.event.allowedBackgroundIds ?? null;
   const backgrounds = await listBackgrounds(context.scope, allowedIds);
@@ -21,9 +24,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner && !context.roles.photographer) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (context.event.mode !== "photographer") {
     return NextResponse.json(
@@ -72,9 +78,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => null)) as { allowedIds?: string[] } | null;
   if (!body?.allowedIds || !Array.isArray(body.allowedIds)) {
@@ -91,9 +100,12 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request, { allowBusinessSession: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => null)) as {
     id?: string;

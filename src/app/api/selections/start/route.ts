@@ -7,9 +7,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const { context, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
+  }
+  if (!context.roles.owner && !context.roles.photographer && !context.roles.review) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => ({}))) as { email?: string; sendEmail?: boolean };
   const email = body.email?.toString().trim().toLowerCase();

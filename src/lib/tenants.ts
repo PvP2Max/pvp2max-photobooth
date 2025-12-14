@@ -1,7 +1,9 @@
-import { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest } from "next/server";
+import { getFirebaseAdmin } from "@/lib/firebase";
+import { verifyBearer, roleForEvent, type AuthenticatedUser } from "./auth";
 
 export type BoothEventPlan =
   | "free"
@@ -16,9 +18,13 @@ export type BoothEvent = {
   name: string;
   slug: string;
   mode: "self-serve" | "photographer";
-  accessHash: string;
-  accessHint: string;
   status: "draft" | "live" | "closed";
+  ownerUid: string;
+  roles?: {
+    photographer?: string[];
+    review?: string[];
+  };
+  accessHint?: string;
   startsAt?: string;
   endsAt?: string;
   createdAt: string;
@@ -56,13 +62,12 @@ export type BoothBusiness = {
   id: string;
   name: string;
   slug: string;
-  apiKeyHash: string;
-  apiKeyHint: string;
   createdAt: string;
   events: BoothEvent[];
   subscriptionId?: string;
   subscriptionStatus?: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
   subscriptionPlan?: BoothEventPlan;
+  ownerUid?: string;
 };
 
 export type TenantScope = {
@@ -78,7 +83,11 @@ export type EventContext = {
   business: BoothBusiness;
   event: BoothEvent;
   scope: TenantScope;
-  expiresAt?: string;
+  roles: {
+    owner: boolean;
+    photographer: boolean;
+    review: boolean;
+  };
 };
 
 type TenantIndex = {
@@ -87,22 +96,7 @@ type TenantIndex = {
 
 const STORAGE_ROOT = path.join(process.cwd(), "storage");
 const TENANT_FILE = path.join(STORAGE_ROOT, "tenants.json");
-const SESSION_COOKIE_NAME = "boothos_session";
-const BUSINESS_SESSION_COOKIE_NAME = "boothos_business";
-const USER_SESSION_COOKIE_NAME = "boothos_user";
 const ADMIN_TOKEN = process.env.BOOTHOS_ADMIN_TOKEN ?? "ArcticAuraDesigns";
-const SESSION_SECRET = process.env.BOOTHOS_SESSION_SECRET ?? "boothos-dev-session-secret";
-const SESSION_TTL_HOURS = Number(process.env.BOOTHOS_SESSION_TTL_HOURS ?? "12");
-const USERS_FILE = path.join(STORAGE_ROOT, "users.json");
-
-export type BoothUser = {
-  id: string;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-  businessId: string;
-  createdAt: string;
-};
 
 function planDefaults(plan: BoothEventPlan | undefined) {
   switch (plan) {
@@ -176,6 +170,23 @@ function planDefaults(plan: BoothEventPlan | undefined) {
   }
 }
 
+async function resolveEmailsToUids(emails: string[]) {
+  if (emails.length === 0) return [];
+  const { auth } = getFirebaseAdmin();
+  const results: string[] = [];
+  for (const email of emails) {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) continue;
+    try {
+      const user = await auth.getUserByEmail(normalized);
+      results.push(user.uid);
+    } catch {
+      // ignore missing users
+    }
+  }
+  return Array.from(new Set(results));
+}
+
 export function applyPlanDefaults(plan: BoothEventPlan) {
   const defaults = planDefaults(plan);
   return {
@@ -203,26 +214,6 @@ function slugify(input: string, fallback: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || fallback;
-}
-
-function hashSecret(secret: string) {
-  return createHash("sha256").update(secret).digest("hex");
-}
-
-function secretHint(secret: string) {
-  const trimmed = secret.trim();
-  return trimmed.slice(-4) || "????";
-}
-
-function hashPassword(password: string, salt?: string) {
-  const useSalt = salt ?? randomUUID().replace(/-/g, "");
-  const hash = pbkdf2Sync(password, useSalt, 5000, 64, "sha512").toString("hex");
-  return { hash, salt: useSalt };
-}
-
-function verifyPassword(password: string, salt: string, expectedHash: string) {
-  const { hash } = hashPassword(password, salt);
-  return timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
 }
 
 export function withEventDefaults(event: BoothEvent): BoothEvent {
@@ -270,20 +261,14 @@ async function ensureTenantStorage() {
       process.env.BOOTHOS_DEFAULT_BUSINESS_SLUG ?? "arctic-aura",
       "arctic-aura",
     );
-    const businessKey =
-      process.env.BOOTHOS_DEFAULT_BUSINESS_KEY ??
-      process.env.BOOTHOS_DEFAULT_EVENT_KEY ??
-      "boothos-default-business-key";
-
     const eventName = process.env.BOOTHOS_DEFAULT_EVENT_NAME ?? "General Event";
     const eventSlug = slugify(
       process.env.BOOTHOS_DEFAULT_EVENT_SLUG ?? "default",
       "default",
     );
-    const eventKey =
-      process.env.BOOTHOS_DEFAULT_EVENT_KEY ?? "boothos-default-event-key";
     const defaultPlan = "event-basic" as BoothEventPlan;
     const defaults = planDefaults(defaultPlan);
+    const seedOwner = "seed-owner";
 
     const seed: TenantIndex = {
       businesses: [
@@ -291,17 +276,14 @@ async function ensureTenantStorage() {
           id: randomUUID(),
           name: businessName,
           slug: businessSlug,
-          apiKeyHash: hashSecret(businessKey),
-          apiKeyHint: secretHint(businessKey),
           createdAt: new Date().toISOString(),
+          ownerUid: seedOwner,
           events: [
             {
               id: randomUUID(),
               name: eventName,
               slug: eventSlug,
               mode: "self-serve",
-              accessHash: hashSecret(eventKey),
-              accessHint: secretHint(eventKey),
               status: "live",
               createdAt: new Date().toISOString(),
               plan: defaultPlan,
@@ -309,6 +291,8 @@ async function ensureTenantStorage() {
               photoUsed: 0,
               aiCredits: defaults.aiCredits,
               aiUsed: 0,
+              ownerUid: seedOwner,
+              roles: {},
               allowBackgroundRemoval: true,
               allowAiBackgrounds: false,
               allowAiFilters: false,
@@ -322,27 +306,6 @@ async function ensureTenantStorage() {
       ],
     };
     await writeFile(TENANT_FILE, JSON.stringify(seed, null, 2), "utf8");
-  }
-}
-
-async function ensureUserStorage(defaultBusinessId: string) {
-  await mkdir(STORAGE_ROOT, { recursive: true });
-  try {
-    await readFile(USERS_FILE, "utf8");
-    return;
-  } catch {
-    const email = process.env.BOOTHOS_DEFAULT_USER_EMAIL ?? "founder@arcticauradesigns.com";
-    const password = process.env.BOOTHOS_DEFAULT_USER_PASSWORD ?? "change-me";
-    const hashed = hashPassword(password);
-    const user: BoothUser = {
-      id: randomUUID(),
-      email: email.toLowerCase(),
-      passwordHash: hashed.hash,
-      passwordSalt: hashed.salt,
-      businessId: defaultBusinessId,
-      createdAt: new Date().toISOString(),
-    };
-    await writeFile(USERS_FILE, JSON.stringify({ users: [user] }, null, 2), "utf8");
   }
 }
 
@@ -393,25 +356,6 @@ async function readTenantIndex(): Promise<TenantIndex> {
   return parsed;
 }
 
-async function readUsers(): Promise<BoothUser[]> {
-  await ensureTenantStorage();
-  const rawTenants = await readFile(TENANT_FILE, "utf8");
-  const tenantData = JSON.parse(rawTenants) as TenantIndex;
-  const defaultBusinessId = tenantData.businesses[0]?.id;
-  await ensureUserStorage(defaultBusinessId ?? randomUUID());
-  try {
-    const raw = await readFile(USERS_FILE, "utf8");
-    const parsed = JSON.parse(raw) as { users: BoothUser[] };
-    return parsed.users ?? [];
-  } catch {
-    return [];
-  }
-}
-
-async function writeUsers(users: BoothUser[]) {
-  await writeFile(USERS_FILE, JSON.stringify({ users }, null, 2), "utf8");
-}
-
 async function writeTenantIndex(index: TenantIndex) {
   await writeFile(TENANT_FILE, JSON.stringify(index, null, 2), "utf8");
 }
@@ -420,58 +364,6 @@ export { writeTenantIndex };
 export async function listBusinesses(): Promise<BoothBusiness[]> {
   const index = await readTenantIndex();
   return index.businesses;
-}
-
-export async function findUserByEmail(email: string) {
-  const users = await readUsers();
-  return users.find((u) => u.email === email.toLowerCase());
-}
-
-export async function createUser({
-  email,
-  password,
-  businessId,
-}: {
-  email: string;
-  password: string;
-  businessId: string;
-}) {
-  const users = await readUsers();
-  if (users.find((u) => u.email === email.toLowerCase())) {
-    throw new Error("User already exists");
-  }
-  const hashed = hashPassword(password);
-  const user: BoothUser = {
-    id: randomUUID(),
-    email: email.toLowerCase(),
-    passwordHash: hashed.hash,
-    passwordSalt: hashed.salt,
-    businessId,
-    createdAt: new Date().toISOString(),
-  };
-  users.push(user);
-  await writeUsers(users);
-  return user;
-}
-
-export async function verifyUserCredentials(email: string, password: string) {
-  const user = await findUserByEmail(email);
-  if (!user) return null;
-  const valid = verifyPassword(password, user.passwordSalt, user.passwordHash);
-  return valid ? user : null;
-}
-
-export async function updateUserPasswordById(userId: string, currentPassword: string, newPassword: string) {
-  const users = await readUsers();
-  const user = users.find((u) => u.id === userId);
-  if (!user) throw new Error("User not found.");
-  const valid = verifyPassword(currentPassword, user.passwordSalt, user.passwordHash);
-  if (!valid) throw new Error("Current password is incorrect.");
-  const hashed = hashPassword(newPassword);
-  user.passwordHash = hashed.hash;
-  user.passwordSalt = hashed.salt;
-  await writeUsers(users);
-  return { id: user.id, email: user.email };
 }
 
 export async function findBusinessBySlug(slug: string) {
@@ -500,15 +392,14 @@ export async function deleteEventById(businessId: string, eventId: string) {
 export async function createBusiness({
   name,
   slug,
-  apiKey,
+  ownerUid,
 }: {
   name: string;
   slug?: string;
-  apiKey?: string;
+  ownerUid: string;
 }) {
   const index = await readTenantIndex();
   const safeSlug = slugify(slug || name, randomUUID());
-  const secret = apiKey || randomUUID().replace(/-/g, "");
   if (index.businesses.some((b) => b.slug === safeSlug)) {
     throw new Error("Business slug already exists.");
   }
@@ -516,33 +407,21 @@ export async function createBusiness({
     id: randomUUID(),
     name,
     slug: safeSlug,
-    apiKeyHash: hashSecret(secret),
-    apiKeyHint: secretHint(secret),
+    ownerUid,
     createdAt: new Date().toISOString(),
     events: [],
   };
   index.businesses.push(business);
   await writeTenantIndex(index);
-  return { business, apiKey: secret };
-}
-
-export async function rotateBusinessKey(businessId: string) {
-  const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === businessId);
-  if (!business) throw new Error("Business not found");
-  const apiKey = randomUUID().replace(/-/g, "");
-  business.apiKeyHash = hashSecret(apiKey);
-  business.apiKeyHint = secretHint(apiKey);
-  await writeTenantIndex(index);
-  return { business, apiKey };
+  return { business };
 }
 
 export async function createEvent(
   businessId: string,
+  ownerUid: string,
   {
     name,
     slug,
-    accessCode,
     status = "live",
     mode = "self-serve",
     plan = "event-basic",
@@ -559,10 +438,11 @@ export async function createEvent(
     eventDate,
     eventTime,
     allowedSelections,
+    photographerEmails,
+    reviewEmails,
   }: {
     name: string;
     slug?: string;
-    accessCode?: string;
     status?: BoothEvent["status"];
     mode?: BoothEvent["mode"];
     plan?: BoothEventPlan;
@@ -579,24 +459,27 @@ export async function createEvent(
     eventDate?: string;
     eventTime?: string;
     allowedSelections?: number;
+    photographerEmails?: string[];
+    reviewEmails?: string[];
   },
 ) {
   const index = await readTenantIndex();
   const business = index.businesses.find((b) => b.id === businessId);
   if (!business) throw new Error("Business not found");
   const safeSlug = slugify(slug || name, randomUUID());
-  const code = accessCode || randomUUID().replace(/-/g, "");
   if (business.events.some((e) => e.slug === safeSlug)) {
     throw new Error("Event slug already exists for this business.");
   }
   const defaults = planDefaults(plan);
+  const roles = {
+    photographer: await resolveEmailsToUids(photographerEmails || []),
+    review: await resolveEmailsToUids(reviewEmails || []),
+  };
   const event: BoothEvent = {
     id: randomUUID(),
     name,
     slug: safeSlug,
     mode,
-    accessHash: hashSecret(code),
-    accessHint: secretHint(code),
     status,
     createdAt: new Date().toISOString(),
     plan,
@@ -615,10 +498,12 @@ export async function createEvent(
     eventDate,
     eventTime,
     allowedSelections,
+    ownerUid,
+    roles,
   };
   business.events.push(event);
   await writeTenantIndex(index);
-  return { event, accessCode: code };
+  return { event };
 }
 
 function toScope(business: BoothBusiness, event: BoothEvent): TenantScope {
@@ -650,38 +535,12 @@ export async function findEventBySlugs(
   const event = biz.events.find((e) => e.slug === slugify(eventSlug, eventSlug));
   if (!event) return null;
   if (!eventIsActive(event)) return null;
-  return { business: biz, event, scope: toScope(biz, event) };
-}
-
-async function findEventByIds(
-  businessId: string,
-  eventId: string,
-): Promise<EventContext | null> {
-  const index = await readTenantIndex();
-  const biz = index.businesses.find((b) => b.id === businessId);
-  if (!biz) return null;
-  const event = biz.events.find((e) => e.id === eventId);
-  if (!event || !eventIsActive(event)) return null;
-  return { business: biz, event, scope: toScope(biz, event) };
-}
-
-export async function verifyEventAccess({
-  businessSlug,
-  eventSlug,
-  accessCode,
-}: {
-  businessSlug: string;
-  eventSlug: string;
-  accessCode: string;
-}): Promise<EventContext | null> {
-  const context = await findEventBySlugs(businessSlug, eventSlug);
-  if (!context) return null;
-  const hashed = hashSecret(accessCode);
-  const expected = context.event.accessHash;
-  if (!timingSafeEqual(Buffer.from(hashed), Buffer.from(expected))) {
-    return null;
-  }
-  return context;
+  return {
+    business: biz,
+    event,
+    scope: toScope(biz, event),
+    roles: { owner: false, photographer: false, review: false },
+  };
 }
 
 export function scopedStorageRoot(scope: TenantScope) {
@@ -698,8 +557,8 @@ export function sanitizeBusiness(business: BoothBusiness) {
     id: business.id,
     name: business.name,
     slug: business.slug,
-    apiKeyHint: business.apiKeyHint,
     createdAt: business.createdAt,
+    ownerUid: business.ownerUid,
     subscriptionStatus: business.subscriptionStatus,
     subscriptionPlan: business.subscriptionPlan,
   };
@@ -713,7 +572,6 @@ export function sanitizeEvent(event: BoothEvent) {
     status: event.status,
     startsAt: event.startsAt,
     endsAt: event.endsAt,
-    accessHint: event.accessHint,
     createdAt: event.createdAt,
     plan: event.plan,
     photoCap: event.photoCap,
@@ -734,11 +592,9 @@ export function sanitizeEvent(event: BoothEvent) {
     paymentStatus: event.paymentStatus,
     allowedBackgroundIds: event.allowedBackgroundIds,
     allowedFrameIds: event.allowedFrameIds,
+    ownerUid: event.ownerUid,
+    roles: event.roles ?? {},
   };
-}
-
-export function sanitizeEventWithSecret(event: BoothEvent) {
-  return { ...sanitizeEvent(event), accessHash: undefined };
 }
 
 export function eventUsage(event: BoothEvent) {
@@ -782,157 +638,16 @@ export function eventRequiresPayment(event: BoothEvent, business?: BoothBusiness
   return false;
 }
 
-export function createSessionToken(scope: TenantScope) {
-  const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
-  const payload = Buffer.from(
-    JSON.stringify({
-      bid: scope.businessId,
-      eid: scope.eventId,
-      exp,
-    }),
-  ).toString("base64url");
-  const signature = createHmac("sha256", SESSION_SECRET)
-    .update(payload)
-    .digest("base64url");
-  return { token: `${payload}.${signature}`, expiresAt: new Date(exp).toISOString() };
-}
-
-export async function contextFromSessionToken(token: string): Promise<EventContext | null> {
-  if (!token || !token.includes(".")) return null;
-  const [body, signature] = token.split(".");
-  const expected = createHmac("sha256", SESSION_SECRET)
-    .update(body)
-    .digest("base64url");
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return null;
-  }
-  let payload: { bid: string; eid: string; exp?: number };
-  try {
-    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
-      bid: string;
-      eid: string;
-      exp?: number;
-    };
-  } catch {
-    return null;
-  }
-  if (!payload.bid || !payload.eid) return null;
-  if (payload.exp && payload.exp < Date.now()) return null;
-  const context = await findEventByIds(payload.bid, payload.eid);
-  if (!context) return null;
-  return { ...context, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
-}
-
-export function createUserSessionToken(user: BoothUser) {
-  const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
-  const payload = Buffer.from(
-    JSON.stringify({
-      uid: user.id,
-      bid: user.businessId,
-      exp,
-    }),
-  ).toString("base64url");
-  const signature = createHmac("sha256", SESSION_SECRET)
-    .update(payload)
-    .digest("base64url");
-  return { token: `${payload}.${signature}`, expiresAt: new Date(exp).toISOString() };
-}
-
-async function userFromSessionToken(token: string): Promise<{ user: BoothUser; expiresAt?: string } | null> {
-  if (!token || !token.includes(".")) return null;
-  const [body, signature] = token.split(".");
-  const expected = createHmac("sha256", SESSION_SECRET)
-    .update(body)
-    .digest("base64url");
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return null;
-  }
-  let payload: { uid: string; bid?: string; exp?: number };
-  try {
-    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
-      uid: string;
-      bid?: string;
-      exp?: number;
-    };
-  } catch {
-    return null;
-  }
-  if (!payload.uid) return null;
-  if (payload.exp && payload.exp < Date.now()) return null;
-  const users = await readUsers();
-  const user = users.find((u) => u.id === payload.uid);
-  if (!user) return null;
-  return { user, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
-}
-
-export function createBusinessSessionToken(business: BoothBusiness) {
-  const exp = Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000;
-  const payload = Buffer.from(
-    JSON.stringify({
-      bid: business.id,
-      exp,
-    }),
-  ).toString("base64url");
-  const signature = createHmac("sha256", SESSION_SECRET)
-    .update(payload)
-    .digest("base64url");
-  return { token: `${payload}.${signature}`, expiresAt: new Date(exp).toISOString() };
-}
-
-async function businessFromSessionToken(token: string): Promise<{ business: BoothBusiness; expiresAt?: string } | null> {
-  if (!token || !token.includes(".")) return null;
-  const [body, signature] = token.split(".");
-  const expected = createHmac("sha256", SESSION_SECRET)
-    .update(body)
-    .digest("base64url");
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return null;
-  }
-  let payload: { bid: string; exp?: number };
-  try {
-    payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
-      bid: string;
-      exp?: number;
-    };
-  } catch {
-    return null;
-  }
-  if (!payload.bid) return null;
-  if (payload.exp && payload.exp < Date.now()) return null;
-  const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === payload.bid);
-  if (!business) return null;
-  return { business, expiresAt: payload.exp ? new Date(payload.exp).toISOString() : undefined };
-}
-
-export async function verifyBusinessAccess({
-  businessSlug,
-  apiKey,
-}: {
-  businessSlug: string;
-  apiKey: string;
-}) {
-  const business = await findBusinessBySlug(businessSlug);
-  if (!business) return null;
-  const hashed = hashSecret(apiKey);
-  if (!timingSafeEqual(Buffer.from(hashed), Buffer.from(business.apiKeyHash))) return null;
-  return business;
-}
+// Session cookies/key auth removed; Firebase ID tokens are now required.
 
 export async function getEventContext(
   request: NextRequest,
-  options?: { allowUnauthedHeader?: boolean; allowBusinessSession?: boolean },
 ): Promise<{ context?: EventContext; error?: string; status?: number }> {
   await ensureTenantStorage();
-
-  const cookieToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  if (cookieToken) {
-    const context = await contextFromSessionToken(cookieToken);
-    if (context) return { context };
+  const user = await verifyBearer(request);
+  if (!user) {
+    return { error: "Unauthorized", status: 401 };
   }
-
-  const businessSession = await getBusinessContext(request);
-
   const businessSlug =
     request.headers.get("x-boothos-business") ||
     request.nextUrl.searchParams.get("business") ||
@@ -941,38 +656,41 @@ export async function getEventContext(
     request.headers.get("x-boothos-event") ||
     request.nextUrl.searchParams.get("event") ||
     "";
-  const accessCode =
-    request.headers.get("x-boothos-key") ||
-    request.headers.get("x-event-key") ||
-    request.nextUrl.searchParams.get("key") ||
-    "";
-
-  if (businessSlug && eventSlug && accessCode) {
-    const verified = await verifyEventAccess({
-      businessSlug,
-      eventSlug,
-      accessCode,
-    });
-    if (verified) return { context: verified };
-    return { error: "Unauthorized event access.", status: 401 };
+  if (!businessSlug || !eventSlug) {
+    return { error: "Missing business or event", status: 400 };
   }
-
-  if (options?.allowBusinessSession && businessSession?.business && businessSlug && eventSlug) {
-    const ctx = await findEventBySlugs(businessSlug, eventSlug);
-    if (ctx && ctx.business.id === businessSession.business.id) {
-      return { context: { ...ctx, expiresAt: businessSession.expiresAt } };
-    }
+  const ctx = await findEventBySlugs(businessSlug, eventSlug);
+  if (!ctx) {
+    return { error: "Event not found", status: 404 };
   }
-
-  if (options?.allowUnauthedHeader && businessSlug && eventSlug) {
-    const ctx = await findEventBySlugs(businessSlug, eventSlug);
-    if (ctx) return { context: ctx };
+  const roles = roleForEvent(ctx.event, user.uid);
+  if (!roles.owner && !roles.photographer && !roles.review) {
+    return { error: "Forbidden", status: 403 };
   }
-
   return {
-    error: "Missing event session. Authenticate with an event key.",
-    status: 401,
+    context: {
+      business: ctx.business,
+      event: ctx.event,
+      scope: ctx.scope,
+      roles,
+    },
   };
+}
+
+export async function getBusinessContext(request: NextRequest) {
+  await ensureTenantStorage();
+  const user = await verifyBearer(request);
+  if (!user) return null;
+  const businessSlug =
+    request.headers.get("x-boothos-business") ||
+    request.nextUrl.searchParams.get("business") ||
+    "";
+  const index = await readTenantIndex();
+  const business = index.businesses.find(
+    (b) => b.slug === businessSlug && (!b.ownerUid || b.ownerUid === user.uid),
+  );
+  if (!business) return null;
+  return { business, user };
 }
 
 export function isAdminRequest(request: NextRequest) {
@@ -981,54 +699,7 @@ export function isAdminRequest(request: NextRequest) {
   return header === ADMIN_TOKEN || query === ADMIN_TOKEN;
 }
 
-export const sessionCookieName = SESSION_COOKIE_NAME;
 export const adminToken = ADMIN_TOKEN;
-
-export async function getBusinessContext(request: NextRequest) {
-  const userCookie = request.cookies.get(USER_SESSION_COOKIE_NAME)?.value;
-  if (userCookie) {
-    const userSession = await userFromSessionToken(userCookie);
-    if (userSession?.user) {
-      const index = await readTenantIndex();
-      const business = index.businesses.find((b) => b.id === userSession.user.businessId);
-      if (business) {
-        return { business, user: userSession.user, expiresAt: userSession.expiresAt };
-      }
-    }
-  }
-
-  const cookieToken = request.cookies.get(BUSINESS_SESSION_COOKIE_NAME)?.value;
-  if (cookieToken) {
-    const session = await businessFromSessionToken(cookieToken);
-    if (session) return session;
-  }
-
-  const headerSlug = request.headers.get("x-boothos-business");
-  const headerKey = request.headers.get("x-boothos-business-key");
-  if (headerSlug && headerKey) {
-    const business = await verifyBusinessAccess({
-      businessSlug: headerSlug,
-      apiKey: headerKey,
-    });
-    if (business) return { business };
-  }
-  return null;
-}
-
-export const businessSessionCookieName = BUSINESS_SESSION_COOKIE_NAME;
-
-export async function rotateEventAccess(businessId: string, eventId: string) {
-  const index = await readTenantIndex();
-  const business = index.businesses.find((b) => b.id === businessId);
-  if (!business) throw new Error("Business not found");
-  const event = business.events.find((e) => e.id === eventId);
-  if (!event) throw new Error("Event not found");
-  const code = randomUUID().replace(/-/g, "");
-  event.accessHash = hashSecret(code);
-  event.accessHint = secretHint(code);
-  await writeTenantIndex(index);
-  return { event, accessCode: code };
-}
 
 export async function updateEventStatus(
   businessId: string,

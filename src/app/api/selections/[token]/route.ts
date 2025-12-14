@@ -12,7 +12,7 @@ export async function GET(
   context: { params: Promise<{ token: string }> },
 ) {
   const token = (await context.params).token;
-  const { context: evt, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  const { context: evt, error, status } = await getEventContext(request);
   if (!evt) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
@@ -39,7 +39,7 @@ export async function POST(
   context: { params: Promise<{ token: string }> },
 ) {
   const token = (await context.params).token;
-  const { context: evt, error, status } = await getEventContext(request, { allowUnauthedHeader: true });
+  const { context: evt, error, status } = await getEventContext(request);
   if (!evt) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
