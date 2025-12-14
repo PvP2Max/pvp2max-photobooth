@@ -16,15 +16,6 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/auth/business", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data: Session & { error?: string }) => {
-        if (!data.error) setSession(data);
-      })
-      .catch(() => {});
-  }, []);
-
   async function handlePasswordChange(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);

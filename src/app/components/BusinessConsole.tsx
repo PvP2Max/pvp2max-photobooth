@@ -224,28 +224,6 @@ export default function BusinessConsole() {
   }, [session]);
 
   useEffect(() => {
-    async function fetchSession() {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/auth/business", { credentials: "include" });
-        if (!res.ok) {
-          setSession(null);
-          setLoading(false);
-          return;
-        }
-        const data = (await res.json()) as BusinessSession;
-        setSession(data);
-      } catch (err) {
-        console.error(err);
-        setSession(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    void fetchSession();
-  }, []);
-
-  useEffect(() => {
     if (!loading && !session) {
       router.replace("/login");
     }

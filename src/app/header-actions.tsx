@@ -11,20 +11,6 @@ type SessionResponse = {
 export default function HeaderActions() {
   const [session, setSession] = useState<SessionResponse | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    fetch("/api/auth/business", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data: SessionResponse & { error?: string }) => {
-        if (!isMounted) return;
-        if (!data.error) setSession(data);
-      })
-      .catch(() => {});
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   if (!session?.business) {
     return (
       <Link
