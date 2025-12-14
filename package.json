@@ -25,6 +25,8 @@
     "stripe": "^17.1.0"
   },
   "devDependencies": {
+    "@img/sharp-libvips-linux-x64": "^1.2.4",
+    "@img/sharp-linux-x64": "^0.34.5",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/archiver": "^7.0.0",
