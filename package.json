@@ -25,6 +25,7 @@
     "stripe": "^17.1.0"
   },
   "devDependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/archiver": "^7.0.0",
     "@types/node": "^20",
