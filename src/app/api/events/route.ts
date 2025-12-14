@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { event } = await createEvent(context.business.id, context.user.uid, {
+    const { event } = await createEvent(context.user.uid, context.user.uid, {
       name,
       mode: (body?.mode as "self-serve" | "photographer") ?? "self-serve",
       plan: parsePlan(body?.plan),
@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create event.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Create event failed:", message, error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
