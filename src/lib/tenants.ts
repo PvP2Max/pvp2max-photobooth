@@ -340,10 +340,9 @@ async function ensureTenantStorage() {
       ],
     };
     await writeFile(TENANT_FILE, JSON.stringify(seed, null, 2), "utf8");
-    // Also seed Firestore
+    // Also seed Firestore (user-centric; store under seed owner uid)
     const seededBiz = seed.businesses[0];
-    await upsertBusinessFirestore(seededBiz);
-    await upsertEventFirestore(seededBiz, seededBiz.events[0]);
+    await upsertEventFirestore(seededBiz.ownerUid ?? "seed-owner", seededBiz.events[0]);
   }
 }
 
