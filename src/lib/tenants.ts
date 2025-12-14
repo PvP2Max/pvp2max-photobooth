@@ -181,7 +181,7 @@ function userEventsCollection(uid: string) {
   return getFirestoreDb().collection(FIRESTORE_USERS).doc(uid).collection("events");
 }
 
-async function listUserEvents(uid: string) {
+export async function listUserEvents(uid: string) {
   if (!uid) return [];
   const snap = await userEventsCollection(uid).get();
   return snap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
