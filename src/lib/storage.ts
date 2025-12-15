@@ -5,6 +5,8 @@ import sharp from "sharp";
 import { uploadToR2 } from "./r2";
 import { TenantScope, scopedStorageRoot } from "./tenants";
 
+const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
+
 export type PhotoRecord = {
   id: string;
   email: string;
@@ -186,14 +188,13 @@ export async function savePhoto({
   // Upload the cutout to our R2 bucket (so we control retention), falling back to service URL on failure.
   try {
     const { buffer, contentType } = await loadRemote(cutoutUrl, cutoutContentType);
-    const key = [
-      "boothos",
+    const keyParts = [
+      R2_PREFIX,
       scope.businessId || "unknown-biz",
       scope.eventId || "unknown-event",
       `${id}-cutout.png`,
-    ]
-      .filter(Boolean)
-      .join("/");
+    ].filter(Boolean);
+    const key = keyParts.join("/");
     const uploaded = await uploadToR2({
       key,
       body: buffer,
