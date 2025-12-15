@@ -5,6 +5,8 @@ import archiver from "archiver";
 import { uploadToR2, fetchFromR2, deleteFromR2 } from "./r2";
 import { TenantScope, scopedStorageRoot } from "./tenants";
 
+const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
+
 export type ProductionAttachment = {
   filename: string;
   r2Key: string;
@@ -85,7 +87,7 @@ export async function saveProduction(
 
   const savedAttachments: ProductionAttachment[] = [];
   for (const attachment of attachments) {
-    const key = `production/${id}/${attachment.filename}`;
+    const key = [R2_PREFIX, "production", id, attachment.filename].filter(Boolean).join("/");
     const { url } = await uploadToR2({
       key,
       body: attachment.content,
@@ -104,7 +106,7 @@ export async function saveProduction(
   // Bundle all attachments into a single zip for a one-click download.
   const bundleFilename = "photos.zip";
   const bundleBuffer = await buildZip(attachments);
-  const bundleKey = `production/${id}/${bundleFilename}`;
+  const bundleKey = [R2_PREFIX, "production", id, bundleFilename].filter(Boolean).join("/");
   const { url: bundleUrl } = await uploadToR2({
     key: bundleKey,
     body: bundleBuffer,

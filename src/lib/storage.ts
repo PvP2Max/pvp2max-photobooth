@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { uploadToR2 } from "./r2";
 import { TenantScope, scopedStorageRoot } from "./tenants";
-
-const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
 
 export type PhotoRecord = {
   id: string;
@@ -184,32 +181,6 @@ export async function savePhoto({
     filterUsed,
     mode,
   };
-
-  // Upload the cutout to our R2 bucket (so we control retention), falling back to service URL on failure.
-  try {
-    const { buffer, contentType } = await loadRemote(cutoutUrl, cutoutContentType);
-    const keyParts = [
-      R2_PREFIX,
-      scope.businessId || "unknown-biz",
-      scope.eventId || "unknown-event",
-      `${id}-cutout.png`,
-    ].filter(Boolean);
-    const key = keyParts.join("/");
-    const uploaded = await uploadToR2({
-      key,
-      body: buffer,
-      contentType: contentType || "image/png",
-      cacheControl: "public, max-age=31536000, immutable",
-    });
-    if (uploaded.url) {
-      record.cutoutUrl = uploaded.url;
-      record.previewUrl = uploaded.url;
-      record.originalUrl = uploaded.url;
-      record.cutoutContentType = contentType || "image/png";
-    }
-  } catch (error) {
-    console.error("Failed to mirror cutout to R2, using service URL", { error });
-  }
 
   index.photos.push(record);
   await writeIndex(index, scope);
