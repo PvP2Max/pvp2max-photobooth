@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  if (!context.roles.owner && !context.roles.photographer && !context.roles.review) {
+  if (!context.roles.owner && !context.roles.collaborator) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => ({}))) as { email?: string; sendEmail?: boolean };
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   }
   const token = await createSelectionToken(context.scope, email);
   const baseUrl = process.env.APP_BASE_URL || request.headers.get("origin") || "";
-  const shareUrl = `${baseUrl}/select/${token.token}?business=${context.scope.businessSlug}&event=${context.scope.eventSlug}`;
+  const shareUrl = `${baseUrl}/select/${token.token}?owner=${context.scope.ownerUid}&event=${context.scope.eventSlug}`;
 
   let emailed: boolean | undefined;
   if (body.sendEmail !== false) {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         <div style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;padding:22px;background:#0f172a;">
           <div style="max-width:640px;margin:0 auto;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;background:#0b1022;">
             <div style="padding:22px 24px;">
-              <p style="margin:0 0 6px;color:#67e8f9;letter-spacing:0.18em;font-size:11px;text-transform:uppercase;">${context.business.name}</p>
+              <p style="margin:0 0 6px;color:#67e8f9;letter-spacing:0.18em;font-size:11px;text-transform:uppercase;">BoothOS</p>
               <h1 style="margin:0 0 10px;color:#fff;font-size:22px;">Choose your photos from ${context.event.name}</h1>
               <p style="margin:0 0 12px;color:#cbd5e1;font-size:13px;line-height:1.5;">
                 Tap the button below to view the photos your photographer uploaded. Pick your favorites and they will be delivered automatically.

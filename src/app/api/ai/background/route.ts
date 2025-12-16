@@ -2,11 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateAiBackground } from "@/lib/ai-backgrounds";
 import { addBackground } from "@/lib/backgrounds";
 import { getEventContext, incrementEventUsage, eventRequiresPayment } from "@/lib/tenants";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limit = rateLimit(ip, { windowMs: 60000, max: 5 });
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
@@ -22,7 +32,7 @@ export async function POST(request: NextRequest) {
   if (!context.event.allowAiBackgrounds) {
     return NextResponse.json({ error: "AI backgrounds not enabled for this event." }, { status: 403 });
   }
-  if (eventRequiresPayment(context.event, context.business)) {
+  if (eventRequiresPayment(context.event, context.subscription)) {
     return NextResponse.json(
       { error: "Complete event payment before generating AI backgrounds." },
       { status: 402 },

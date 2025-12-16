@@ -7,6 +7,7 @@ import {
   updateBusinessSubscription,
   createEvent,
   findBusinessById,
+  updateUserSubscription,
 } from "@/lib/tenants";
 
 export const runtime = "nodejs";
@@ -44,8 +45,13 @@ export async function POST(request: NextRequest) {
         } else if (plan && businessId && session.metadata?.eventPayload) {
           await createPaidEventFromMetadata(businessId, plan, session.metadata.eventPayload);
         }
-        if (plan === "photographer-monthly" && businessId) {
+        if (plan === "photographer-subscription" && businessId) {
           await markSubscription(businessId, session.subscription as string, "active", plan);
+          // Set initial AI credits for photographer subscription
+          await updateUserSubscription(businessId, {
+            aiCreditsRemaining: 10,
+            aiCreditsResetAt: new Date().toISOString(),
+          });
         }
         break;
       }
@@ -59,7 +65,14 @@ export async function POST(request: NextRequest) {
         };
         const businessId = sub.metadata?.businessId;
         if (businessId) {
-          await markSubscription(businessId, sub.id, sub.status, "photographer-monthly");
+          await markSubscription(businessId, sub.id, sub.status, "photographer-subscription");
+          // Reset AI credits on invoice.paid (monthly renewal)
+          if (event.type === "invoice.paid" && sub.status === "active") {
+            await updateUserSubscription(businessId, {
+              aiCreditsRemaining: 10,
+              aiCreditsResetAt: new Date().toISOString(),
+            });
+          }
         }
         break;
       }
@@ -67,7 +80,7 @@ export async function POST(request: NextRequest) {
         const sub = event.data.object as { metadata?: Record<string, string> };
         const businessId = sub.metadata?.businessId;
         if (businessId) {
-          await markSubscription(businessId, undefined, "canceled", "photographer-monthly");
+          await markSubscription(businessId, undefined, "canceled", "photographer-subscription");
         }
         break;
       }
@@ -106,7 +119,7 @@ async function createPaidEventFromMetadata(businessId: string, plan: BoothEventP
     const defaults = applyPlanDefaults(plan);
     const business = await findBusinessById(businessId);
     const ownerUid = business?.ownerUid ?? "seed-owner";
-    const { event } = await createEvent(businessId, ownerUid, {
+    const { event } = await createEvent(ownerUid, {
       name: parsed.name,
       status: parsed.status === "closed" ? "closed" : "live",
       mode: parsed.mode ?? "self-serve",

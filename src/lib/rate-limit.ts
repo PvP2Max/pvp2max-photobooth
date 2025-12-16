@@ -1,17 +1,42 @@
-const buckets = new Map<string, { count: number; reset: number }>();
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-export function rateLimiter(key: string, limit = 30, windowMs = 60_000) {
+type RateLimitConfig = {
+  windowMs: number;  // Time window in ms
+  max: number;       // Max requests per window
+};
+
+export function rateLimit(ip: string, config: RateLimitConfig): { success: boolean; retryAfter?: number } {
   const now = Date.now();
-  const bucket = buckets.get(key);
-  if (!bucket || bucket.reset < now) {
-    buckets.set(key, { count: 1, reset: now + windowMs });
-    return { allowed: true, remaining: limit - 1 };
+  const key = ip;
+  const existing = rateLimitMap.get(key);
+
+  if (!existing || now > existing.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + config.windowMs });
+    return { success: true };
   }
-  if (bucket.count >= limit) {
-    return { allowed: false, remaining: 0 };
+
+  if (existing.count >= config.max) {
+    const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+    return { success: false, retryAfter };
   }
-  bucket.count += 1;
-  return { allowed: true, remaining: limit - bucket.count };
+
+  existing.count++;
+  return { success: true };
+}
+
+export function getClientIp(request: Request): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip')
+    || 'unknown';
+}
+
+// Legacy compatibility functions for existing code
+export function rateLimiter(key: string, limit = 30, windowMs = 60_000) {
+  const result = rateLimit(key, { windowMs, max: limit });
+  return {
+    allowed: result.success,
+    remaining: result.success ? limit - 1 : 0,
+  };
 }
 
 export function requestKey(headers: Headers) {

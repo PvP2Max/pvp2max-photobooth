@@ -15,52 +15,53 @@ const plans: Plan[] = [
     price: "$0 / event",
     tagline: "Test the booth or run small events.",
     bullets: [
-      "Up to 50 photos",
+      "Up to 10 photos",
       "Self-service booth mode",
       "Basic overlays",
-      "No AI background removal",
-      "BoothOS branding on photos",
+      "No AI features",
+      "BoothOS watermark on photos",
     ],
     cta: "Start Free",
   },
   {
-    name: "Limited",
+    name: "Basic",
     price: "$10 / event",
     tagline: "Perfect for small parties.",
     bullets: [
-      "Up to 100 photos",
-      "AI background removal on default BoothOS backgrounds",
-      "Email delivery",
-      "Basic host gallery",
-    ],
-    cta: "Choose Limited",
-  },
-  {
-    name: "Basic",
-    price: "$20 / event",
-    tagline: "Unlimited photos for busy events.",
-    bullets: [
-      "Unlimited photos",
-      "AI background removal on default BoothOS backgrounds",
+      "Up to 50 photos",
+      "AI background removal",
       "Email delivery",
       "Host gallery with ZIP download",
-      "No watermarks on photos",
+      "No watermarks",
     ],
     cta: "Choose Basic",
-    highlight: true,
   },
   {
     name: "Pro",
-    price: "$30 / event",
-    tagline: "For hosts who want full control and custom branding.",
+    price: "$20 / event",
+    tagline: "Great for medium-sized events.",
     bullets: [
-      "Unlimited photos",
-      "AI background removal on default or custom backgrounds",
+      "Up to 100 photos",
+      "AI background removal",
       "Email & SMS delivery",
-      "Custom overlays and branding",
       "Host gallery with ZIP download",
+      "Premium filters",
     ],
     cta: "Choose Pro",
+    highlight: true,
+  },
+  {
+    name: "Unlimited",
+    price: "$30 / event",
+    tagline: "For hosts who want full control and AI features.",
+    bullets: [
+      "Unlimited photos",
+      "AI background removal",
+      "10 AI credits for backgrounds & filters",
+      "Email & SMS delivery",
+      "Host gallery with ZIP download",
+    ],
+    cta: "Choose Unlimited",
   },
 ];
 
@@ -108,25 +109,96 @@ export default function PricingPage() {
         ))}
       </div>
 
-      <div className="space-y-4 rounded-3xl bg-[var(--color-surface-elevated)] p-6 ring-1 ring-[var(--color-border-subtle)]">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold">Photographer Mode</h2>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Offer on-site selection and instant delivery as part of your photo packages.
-              Photographer Mode starts at $100 per event or $250 per month for unlimited events.
-            </p>
-          </div>
-          <Link
-            href="/photographers"
-            className="inline-flex w-fit items-center justify-center rounded-full bg-[var(--color-surface)] px-4 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-          >
-            Learn about Photographer Mode
-          </Link>
+      <div className="space-y-6 rounded-3xl bg-[var(--color-surface-elevated)] p-6 ring-1 ring-[var(--color-border-subtle)]">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold">Photographer Plans</h2>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Offer on-site selection and instant delivery as part of your photo packages.
+            Perfect for professional photographers and event businesses.
+          </p>
         </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+            <div className="space-y-1">
+              <p className="text-lg font-semibold text-[var(--color-text)]">Photographer Event</p>
+              <p className="text-sm text-[var(--color-primary-soft)]">$100 / event</p>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                One-time event purchase with full features.
+              </p>
+            </div>
+            <ul className="space-y-2 text-sm text-[var(--color-text-muted)]">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Unlimited photos</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>10 AI credits (backgrounds & filters)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Add collaborators to event</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Photographer mode with guest selection</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Email & SMS delivery</span>
+              </li>
+            </ul>
+            <Link
+              href="/get-started"
+              className="mt-auto inline-flex w-fit items-center justify-center rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
+            >
+              Choose Event Plan
+            </Link>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+            <div className="space-y-1">
+              <p className="text-lg font-semibold text-[var(--color-text)]">Photographer Subscription</p>
+              <p className="text-sm text-[var(--color-primary-soft)]">$250 / month</p>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                Monthly subscription for unlimited events.
+              </p>
+            </div>
+            <ul className="space-y-2 text-sm text-[var(--color-text-muted)]">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Unlimited events per month</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>10 AI credits/month (shared across events)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Add collaborators to events</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Photographer mode with guest selection</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+                <span>Email & SMS delivery</span>
+              </li>
+            </ul>
+            <Link
+              href="/get-started"
+              className="mt-auto inline-flex w-fit items-center justify-center rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
+            >
+              Choose Subscription
+            </Link>
+          </div>
+        </div>
+
         <p className="text-sm text-[var(--color-text-muted)]">
           Most traditional photo booth rentals cost between $400 and $1,000 per event. With BoothOS,
-          you only pay per event and a one-time gear cost.
+          you only pay per event or get unlimited events with a monthly subscription.
         </p>
       </div>
     </div>

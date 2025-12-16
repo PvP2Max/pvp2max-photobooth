@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getFirebaseAdmin } from "./firebase";
-import { BoothEvent } from "./tenants";
+import { BoothEvent, TenantScope } from "./tenants";
 
 export type AuthenticatedUser = {
   uid: string;
@@ -9,13 +9,10 @@ export type AuthenticatedUser = {
 
 export type EventAccess = {
   event: BoothEvent;
-  businessId: string;
-  businessSlug: string;
-  businessName: string;
+  scope: TenantScope;
   roles: {
     owner: boolean;
-    photographer: boolean;
-    review: boolean;
+    collaborator: boolean;  // Can upload photos AND send deliveries
   };
 };
 
@@ -34,12 +31,15 @@ export async function verifyBearer(request: NextRequest): Promise<AuthenticatedU
 }
 
 export function roleForEvent(event: BoothEvent, uid: string) {
-  const photographer = event.roles?.photographer?.includes(uid) ?? false;
-  const review = event.roles?.review?.includes(uid) ?? false;
   const owner = event.ownerUid === uid;
+  // Check new collaborator role
+  const collaborator = event.roles?.collaborator?.includes(uid) ?? false;
+  // Also check legacy roles for backwards compatibility
+  const legacyPhotographer = (event.roles as { photographer?: string[] })?.photographer?.includes(uid) ?? false;
+  const legacyReview = (event.roles as { review?: string[] })?.review?.includes(uid) ?? false;
+
   return {
     owner,
-    photographer: owner || photographer,
-    review: owner || review,
+    collaborator: owner || collaborator || legacyPhotographer || legacyReview,
   };
 }

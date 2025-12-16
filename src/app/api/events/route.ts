@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  BoothEvent,
   BoothEventPlan,
   createEvent,
   sanitizeEvent,
@@ -11,16 +12,25 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function parsePlan(input: unknown): BoothEventPlan {
-  const value = (input as string | undefined)?.toString() ?? "event-basic";
+  const value = (input as string | undefined)?.toString() ?? "basic";
   const allowed: BoothEventPlan[] = [
     "free",
-    "event-basic",
-    "event-unlimited",
-    "event-ai",
-    "photographer-single",
-    "photographer-monthly",
+    "basic",
+    "pro",
+    "unlimited",
+    "photographer-event",
+    "photographer-subscription",
   ];
-  return allowed.includes(value as BoothEventPlan) ? (value as BoothEventPlan) : "event-basic";
+  // Legacy plan name mapping
+  const legacyMap: Record<string, BoothEventPlan> = {
+    "event-basic": "basic",
+    "event-unlimited": "pro",
+    "event-ai": "unlimited",
+    "photographer-single": "photographer-event",
+    "photographer-monthly": "photographer-subscription",
+  };
+  const mapped = legacyMap[value] || value;
+  return allowed.includes(mapped as BoothEventPlan) ? (mapped as BoothEventPlan) : "basic";
 }
 
 export async function GET(request: NextRequest) {
@@ -29,7 +39,7 @@ export async function GET(request: NextRequest) {
     if (!context?.business || !context.user) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
-    const events = context.business.events.map((e) => sanitizeEvent(withEventDefaults(e)));
+    const events = context.business.events.map((e: BoothEvent) => sanitizeEvent(withEventDefaults(e)));
     return NextResponse.json({
       events,
       business: {
@@ -80,7 +90,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Event name is required." }, { status: 400 });
     }
 
-    const { event } = await createEvent(context.user.uid, context.user.uid, {
+    const { event } = await createEvent(context.user.uid, {
       name,
       mode: (body?.mode as "self-serve" | "photographer") ?? "self-serve",
       plan: parsePlan(body?.plan),
@@ -94,8 +104,7 @@ export async function POST(request: NextRequest) {
       eventTime: body?.eventTime,
       allowedSelections:
         typeof body?.allowedSelections === "number" ? body.allowedSelections : undefined,
-      photographerEmails: [],
-      reviewEmails: [],
+      collaboratorEmails: [],
     });
 
     return NextResponse.json({

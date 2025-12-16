@@ -68,15 +68,15 @@ export default function CheckinPage() {
             <p className="text-sm uppercase tracking-[0.25em] text-[var(--color-text-soft)]">Guest check-in</p>
             <h1 className="text-3xl font-semibold">Collect name + email before shooting</h1>
             <p className="text-sm text-[var(--color-text-muted)]">
-              Check guests in here so the photographer can pick their email from a dropdown. Front desk still
+              Check guests in here so the photographer can pick their email from a dropdown. The review station
               types the email manually to keep addresses private at the counter.
             </p>
             <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-muted)]">
               <Link href="/photographer" className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface)]">
                 Go to photographer lane
               </Link>
-              <Link href="/frontdesk" className="rounded-full bg-[var(--color-surface)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface-elevated)]">
-                Go to front desk
+              <Link href="/review" className="rounded-full bg-[var(--color-surface)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface-elevated)]">
+                Go to review
               </Link>
             </div>
           </div>

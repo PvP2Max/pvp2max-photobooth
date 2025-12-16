@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  if (!context.roles.owner && !context.roles.photographer) {
+  if (!context.roles.owner && !context.roles.collaborator) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const allowedIds = context.event.allowedBackgroundIds ?? null;
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  if (!context.roles.owner && !context.roles.photographer) {
+  if (!context.roles.owner && !context.roles.collaborator) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (context.event.mode !== "photographer") {
@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (category === "frame" && context.event.plan !== "event-ai") {
+  if (category === "frame" && context.event.plan !== "unlimited" && context.event.plan !== "photographer-event" && context.event.plan !== "photographer-subscription") {
     return NextResponse.json(
-      { error: "Frame uploads require the AI event plan ($30)." },
+      { error: "Frame uploads require the unlimited or photographer plan." },
       { status: 403 },
     );
   }
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "allowedIds array is required." }, { status: 400 });
   }
   await (await import("@/lib/tenants")).updateEventConfig(
-    context.scope.businessId,
+    context.scope.ownerUid,
     context.scope.eventId,
     {
       allowedBackgroundIds: body.allowedIds,

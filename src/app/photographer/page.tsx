@@ -127,8 +127,8 @@ export default function PhotographerPage() {
               Upload & auto-remove backgrounds
             </h1>
             <p className="text-sm text-[var(--color-text-muted)]">
-              Check guests in first, then pick their email from the dropdown so uploads stay grouped for the
-              front desk.
+              Check guests in first, then pick their email from the dropdown so uploads stay grouped for
+              review.
             </p>
             <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-muted)]">
               <Link
@@ -206,7 +206,7 @@ export default function PhotographerPage() {
             </button>
             <p className="text-xs text-[var(--color-text-soft)]">
               Files route to the MODNet bgremover (modnet.boothos.com) with the service token, then cut-outs stay
-              local for the front desk until delivery.
+              local for review until delivery.
             </p>
             {checkins.length === 0 && (
               <div className="rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] px-3 py-2 text-xs text-[var(--color-text-muted)]">

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       size: a.size,
     })),
   }));
-  return NextResponse.json({ items: sanitized, event: context.scope.eventSlug, business: context.scope.businessSlug });
+  return NextResponse.json({ items: sanitized, event: context.scope.eventSlug, owner: context.scope.ownerUid });
 }
 
 export async function DELETE(request: NextRequest) {

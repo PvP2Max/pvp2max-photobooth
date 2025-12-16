@@ -25,7 +25,7 @@ type BackgroundRecord = {
   previewFilename?: string;
   previewContentType?: string;
   createdAt: string;
-  businessId?: string;
+  ownerUid?: string;
   eventId?: string;
   category?: "background" | "frame";
 };
@@ -223,7 +223,7 @@ export async function addBackground(
     previewFilename,
     previewContentType,
     createdAt: new Date().toISOString(),
-    businessId: scope.businessId,
+    ownerUid: scope.ownerUid,
     eventId: scope.eventId,
     category,
   };

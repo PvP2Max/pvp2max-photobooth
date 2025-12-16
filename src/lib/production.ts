@@ -22,7 +22,7 @@ export type ProductionSet = {
   downloadToken: string;
   tokenExpiresAt: string;
   attachments: ProductionAttachment[];
-  businessId?: string;
+  ownerUid?: string;
   eventId?: string;
   downloadCount?: number;
   lastDownloadedAt?: string;
@@ -121,7 +121,7 @@ export async function saveProduction(
     downloadToken,
     tokenExpiresAt,
     attachments: savedAttachments,
-    businessId: scope.businessId,
+    ownerUid: scope.ownerUid,
     eventId: scope.eventId,
     downloadCount: 0,
     downloadEvents: [],

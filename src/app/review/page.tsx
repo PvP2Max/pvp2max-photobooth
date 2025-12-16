@@ -2,30 +2,17 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BackgroundOption } from "@/lib/backgrounds";
 import EventAccessGate from "../event-access";
-
-type Photo = {
-  id: string;
-  email: string;
-  originalName: string;
-  createdAt: string;
-  originalUrl: string;
-  cutoutUrl: string;
-  previewUrl?: string;
-};
-
-type Transform = { scale: number; offsetX: number; offsetY: number };
-
-type Slot = {
-  id: string;
-  backgroundId?: string;
-  preview?: string;
-  transform?: Transform;
-  matchBackground?: boolean;
-};
-
-type BackgroundState = BackgroundOption & { isCustom?: boolean };
+import PhotoGrid from "../components/review/PhotoGrid";
+import SlotManager from "../components/review/SlotManager";
+import BackgroundSelector from "../components/review/BackgroundSelector";
+import TransformControls from "../components/review/TransformControls";
+import type {
+  Photo,
+  Transform,
+  Slot,
+  BackgroundState,
+} from "../components/review/types";
 
 const PREVIEW_MAX_WIDTH = 1280;
 const PREVIEW_MAX_HEIGHT = 720;
@@ -514,7 +501,7 @@ export default function FrontdeskPage() {
       setMessage("Your photos are on the way!");
       // Soft reset after success.
       setTimeout(() => {
-        window.location.href = "/frontdesk";
+        window.location.href = "/review";
       }, 5000);
     } catch (err) {
       const msg =
@@ -537,7 +524,7 @@ export default function FrontdeskPage() {
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
         <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-12">
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold">Front desk</h1>
+            <h1 className="text-3xl font-semibold">Review</h1>
             <p className="text-sm text-[var(--color-text-muted)]">
               Simple, step-by-step flow for guests on an iPad.
             </p>
@@ -621,49 +608,13 @@ export default function FrontdeskPage() {
                   Next: choose backgrounds
                 </button>
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {photos.map((photo) => {
-                  const isSelected = selectedPhotos.has(photo.id);
-                  return (
-                    <article
-                      key={photo.id}
-                      className="flex flex-col gap-2 rounded-2xl bg-slate-900/60 p-3 ring-1 ring-white/5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-white">
-                            {photo.originalName}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            Uploaded {formatDate(photo.createdAt)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => togglePhoto(photo.id)}
-                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                            isSelected
-                              ? "bg-emerald-400/20 text-emerald-100 ring-1 ring-emerald-300/50"
-                              : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10"
-                          }`}
-                        >
-                          {isSelected ? "Selected" : "Select"}
-                        </button>
-                      </div>
-                      <div className="overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/5">
-                        <Image
-                          src={photo.previewUrl || withPreview(photo.cutoutUrl, 900)}
-                          alt={`Cutout for ${photo.originalName}`}
-                          width={1200}
-                          height={800}
-                          unoptimized
-                          loading="lazy"
-                          className="h-48 w-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
-                        />
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+              <PhotoGrid
+                photos={photos}
+                selectedPhotos={selectedPhotos}
+                onTogglePhoto={togglePhoto}
+                withPreview={withPreview}
+                formatDate={formatDate}
+              />
             </section>
           )}
 
@@ -709,82 +660,32 @@ export default function FrontdeskPage() {
                       Add background slot
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(selectionMap[currentPhoto.id] ?? []).map((slot) => {
-                      const backgroundName = backgrounds.find(
-                        (bg) => bg.id === slot.backgroundId,
-                      )?.name;
-                      const active = slot.id === currentSlotId;
-                      return (
-                        <button
-                          key={slot.id}
-                          onClick={() => setCurrentSlotId(slot.id)}
-                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                            active
-                              ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
-                              : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
-                          }`}
-                        >
-                          {backgroundName || "Slot"} {slot.preview ? "✓" : ""}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-[11px] text-[var(--color-text-muted)]">
-                    {(() => {
-                      const slots = selectionMap[currentPhoto.id] ?? [];
-                      const activeSlot =
-                        slots.find((s) => s.id === currentSlotId) || slots[0];
-                      if (!activeSlot) return null;
-                      return (
-                        <>
-                          <button
-                            className="rounded-full bg-[rgba(155,92,255,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(155,92,255,0.35)] text-[var(--color-text)]"
-                            onClick={() => duplicateSlot(currentPhoto.id, activeSlot.id)}
-                          >
-                            Duplicate slot
-                          </button>
-                          {slots.length > 1 && (
-                            <button
-                              className="rounded-full bg-[rgba(249,115,115,0.14)] px-3 py-1 font-semibold ring-1 ring-[rgba(249,115,115,0.35)] text-[var(--color-text)]"
-                              onClick={() => removeSlot(currentPhoto.id, activeSlot.id)}
-                            >
-                              Remove slot
-                            </button>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {backgrounds.map((background) => {
-                      const activeSlot =
-                        selectionMap[currentPhoto.id]?.find((s) => s.id === currentSlotId) ||
-                        selectionMap[currentPhoto.id]?.[0];
-                      const isSelected =
-                        activeSlot?.backgroundId === background.id;
-                      return (
-                        <button
-                          key={background.id}
-                          onClick={() => {
-                            const slotId =
-                              currentSlotId ||
-                              selectionMap[currentPhoto.id]?.[0]?.id ||
-                              createSlotId();
-                            setCurrentSlotId(slotId);
-                            pickBackground(currentPhoto, slotId, background.id);
-                          }}
-                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
-                            isSelected
-                              ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
-                              : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
-                          }`}
-                        >
-                          {background.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <SlotManager
+                    slots={selectionMap[currentPhoto.id] ?? []}
+                    currentSlotId={currentSlotId}
+                    backgrounds={backgrounds}
+                    onSlotClick={setCurrentSlotId}
+                    onDuplicateSlot={(slotId) =>
+                      duplicateSlot(currentPhoto.id, slotId)
+                    }
+                    onRemoveSlot={(slotId) => removeSlot(currentPhoto.id, slotId)}
+                  />
+                  <BackgroundSelector
+                    backgrounds={backgrounds}
+                    activeSlot={
+                      selectionMap[currentPhoto.id]?.find(
+                        (s) => s.id === currentSlotId,
+                      ) || selectionMap[currentPhoto.id]?.[0]
+                    }
+                    onSelectBackground={(backgroundId) => {
+                      const slotId =
+                        currentSlotId ||
+                        selectionMap[currentPhoto.id]?.[0]?.id ||
+                        createSlotId();
+                      setCurrentSlotId(slotId);
+                      pickBackground(currentPhoto, slotId, backgroundId);
+                    }}
+                  />
                   <div className="text-[11px] text-slate-300/80">
                     Tip: drag sliders to move/scale; add slots to deliver multiple backgrounds for one photo.
                   </div>
@@ -793,168 +694,57 @@ export default function FrontdeskPage() {
                   const slots = selectionMap[currentPhoto.id] ?? [];
                   const activeSlot =
                     slots.find((s) => s.id === currentSlotId) || slots[0];
-                  if (!activeSlot) {
-                    return (
-                      <div className="rounded-xl border border-dashed border-white/10 bg-black/30 p-4 text-sm text-slate-300">
-                        Add a background slot to start.
-                      </div>
-                    );
-                  }
                   const transform =
-                    transforms[activeSlot.id] ||
-                    activeSlot.transform || { scale: 1, offsetX: 0, offsetY: 0 };
+                    transforms[activeSlot?.id ?? ""] ||
+                    activeSlot?.transform || { scale: 1, offsetX: 0, offsetY: 0 };
+
                   return (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs uppercase tracking-wide text-slate-300">
-                          Final preview
-                        </p>
-                        <label className="flex items-center gap-2 text-xs text-slate-200/80">
-                          <input
-                            type="checkbox"
-                            checked={activeSlot.matchBackground ?? false}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setSelectionMap((prev) => {
-                                const updated = (prev[currentPhoto.id] || []).map((slot) =>
-                                  slot.id === activeSlot.id
-                                    ? { ...slot, matchBackground: checked }
-                                    : slot,
-                                );
-                                return { ...prev, [currentPhoto.id]: updated };
-                              });
-                              const next: Transform = { ...transform };
-                              if (previewTimers.current[activeSlot.id]) {
-                                clearTimeout(previewTimers.current[activeSlot.id]);
-                              }
-                              previewTimers.current[activeSlot.id] = window.setTimeout(
-                                () => refreshPreview(currentPhoto, activeSlot.id, next),
-                                60,
-                              );
-                            }}
-                          />
-                          Auto-match to background
-                        </label>
-                      </div>
-                      {activeSlot.preview && (
-                        <div className="relative overflow-hidden rounded-xl ring-1 ring-white/5">
-                          <Image
-                            src={activeSlot.preview as string}
-                            alt="Preview with background"
-                            width={1920}
-                            height={1080}
-                            unoptimized
-                            className="w-full rounded-xl"
-                            style={{ aspectRatio: "16/9", objectFit: "cover" }}
-                          />
-                          {previewLoading[activeSlot.id] && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-semibold text-white">
-                              Rendering…
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className="grid gap-2 md:grid-cols-3">
-                        <label className="text-xs text-slate-300/80">
-                          Scale
-                          <input
-                            type="range"
-                            min="0.25"
-                            max="2.5"
-                            step="0.01"
-                            value={transform.scale}
-                            onChange={(e) => {
-                              const next: Transform = {
-                                ...transform,
-                                scale: parseFloat(e.target.value),
-                              };
-                              setTransforms((prev) => ({
-                                ...prev,
-                                [activeSlot.id]: next,
-                              }));
-                              if (previewTimers.current[activeSlot.id]) {
-                                clearTimeout(previewTimers.current[activeSlot.id]);
-                              }
-                              previewTimers.current[activeSlot.id] = window.setTimeout(
-                                () => refreshPreview(currentPhoto, activeSlot.id, next),
-                                90,
-                              );
-                            }}
-                            className="mt-1 w-full"
-                          />
-                        </label>
-                        <label className="text-xs text-slate-300/80">
-                          Offset X
-                          <input
-                            type="range"
-                            min="-1500"
-                            max="1500"
-                            step="1"
-                            value={transform.offsetX}
-                            onChange={(e) => {
-                              const next: Transform = {
-                                ...transform,
-                                offsetX: parseFloat(e.target.value),
-                              };
-                              setTransforms((prev) => ({
-                                ...prev,
-                                [activeSlot.id]: next,
-                              }));
-                              if (previewTimers.current[activeSlot.id]) {
-                                clearTimeout(previewTimers.current[activeSlot.id]);
-                              }
-                              previewTimers.current[activeSlot.id] = window.setTimeout(
-                                () => refreshPreview(currentPhoto, activeSlot.id, next),
-                                90,
-                              );
-                            }}
-                            className="mt-1 w-full"
-                          />
-                        </label>
-                        <label className="text-xs text-slate-300/80">
-                          Offset Y
-                          <input
-                            type="range"
-                            min="-1500"
-                            max="1500"
-                            step="1"
-                            value={transform.offsetY}
-                            onChange={(e) => {
-                              const next: Transform = {
-                                ...transform,
-                                offsetY: parseFloat(e.target.value),
-                              };
-                              setTransforms((prev) => ({
-                                ...prev,
-                                [activeSlot.id]: next,
-                              }));
-                              if (previewTimers.current[activeSlot.id]) {
-                                clearTimeout(previewTimers.current[activeSlot.id]);
-                              }
-                              previewTimers.current[activeSlot.id] = window.setTimeout(
-                                () => refreshPreview(currentPhoto, activeSlot.id, next),
-                                90,
-                              );
-                            }}
-                            className="mt-1 w-full"
-                          />
-                        </label>
-                      </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
-                        onClick={() => {
-                          const reset: Transform = { scale: 1, offsetX: 0, offsetY: 0 };
-                          setTransforms((prev) => ({ ...prev, [activeSlot.id]: reset }));
-                          refreshPreview(currentPhoto, activeSlot.id, reset);
-                        }}
-                      >
-                        Reset transforms
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
+                    <TransformControls
+                      activeSlot={activeSlot}
+                      transform={transform}
+                      previewLoading={previewLoading[activeSlot?.id ?? ""] ?? false}
+                      onTransformChange={(next) => {
+                        if (!activeSlot) return;
+                        setTransforms((prev) => ({
+                          ...prev,
+                          [activeSlot.id]: next,
+                        }));
+                        if (previewTimers.current[activeSlot.id]) {
+                          clearTimeout(previewTimers.current[activeSlot.id]);
+                        }
+                        previewTimers.current[activeSlot.id] = window.setTimeout(
+                          () => refreshPreview(currentPhoto, activeSlot.id, next),
+                          90,
+                        );
+                      }}
+                      onMatchBackgroundChange={(checked) => {
+                        if (!activeSlot) return;
+                        setSelectionMap((prev) => {
+                          const updated = (prev[currentPhoto.id] || []).map((slot) =>
+                            slot.id === activeSlot.id
+                              ? { ...slot, matchBackground: checked }
+                              : slot,
+                          );
+                          return { ...prev, [currentPhoto.id]: updated };
+                        });
+                        const next: Transform = { ...transform };
+                        if (previewTimers.current[activeSlot.id]) {
+                          clearTimeout(previewTimers.current[activeSlot.id]);
+                        }
+                        previewTimers.current[activeSlot.id] = window.setTimeout(
+                          () => refreshPreview(currentPhoto, activeSlot.id, next),
+                          60,
+                        );
+                      }}
+                      onReset={() => {
+                        if (!activeSlot) return;
+                        const reset: Transform = { scale: 1, offsetX: 0, offsetY: 0 };
+                        setTransforms((prev) => ({ ...prev, [activeSlot.id]: reset }));
+                        refreshPreview(currentPhoto, activeSlot.id, reset);
+                      }}
+                    />
+                  );
+                })()}
               </article>
             </section>
           )}

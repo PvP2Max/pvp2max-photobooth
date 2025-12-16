@@ -12,6 +12,7 @@ import { saveProduction } from "@/lib/production";
 import { eventUsage, getEventContext } from "@/lib/tenants";
 import { applyFilterToBuffer } from "@/lib/filters";
 import { allowedOverlayTheme, loadWatermark, renderOverlay } from "@/lib/overlays";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,11 +49,20 @@ async function applyWatermark(buffer: Buffer, watermarkEnabled: boolean) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limit = rateLimit(ip, { windowMs: 60000, max: 10 });
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  if (!context.roles.owner && !context.roles.review) {
+  if (!context.roles.owner && !context.roles.collaborator) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const usage = eventUsage(context.event);
@@ -271,7 +281,7 @@ export async function POST(request: NextRequest) {
     const bundleName = production.bundleFilename || "photos.zip";
     const bundleLink = `${baseUrl}/api/production/files/${productionId}/${encodeURIComponent(
       bundleName,
-    )}?token=${production.downloadToken}&business=${context.scope.businessSlug}&event=${context.scope.eventSlug}`;
+    )}?token=${production.downloadToken}&owner=${context.scope.ownerUid}&event=${context.scope.eventSlug}`;
     const downloadLinks = [
       `<li><a href="${bundleLink}" style="color:#67e8f9;text-decoration:none;">Download all photos (zip)</a></li>`,
     ];
@@ -284,7 +294,7 @@ export async function POST(request: NextRequest) {
       <div style="padding:24px;font-family:Arial,Helvetica,sans-serif;color:#0f172a;background:#0b1022;">
         <div style="max-width:640px;margin:0 auto;background:#0f172a;border:1px solid rgba(255,255,255,0.08);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.25);">
           <div style="padding:26px 28px 12px;">
-            <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">${context.business.name}</p>
+            <p style="letter-spacing:0.2em;text-transform:uppercase;color:#67e8f9;font-size:11px;margin:0 0 8px;">BoothOS</p>
             <h1 style="color:#fff;font-size:24px;margin:0 0 10px;">Your photos from ${context.event.name} are ready</h1>
             <p style="margin:0 0 12px;color:#cbd5e1;font-size:13px;line-height:1.5;">Thanks for visiting our booth. Use the secure links below to view and download your photos.</p>
           </div>

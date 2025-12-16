@@ -8,7 +8,7 @@ export type Checkin = {
   id: string;
   name: string;
   email: string;
-  businessId?: string;
+  ownerUid?: string;
   eventId?: string;
   createdAt: string;
 };
@@ -78,7 +78,7 @@ export async function addCheckin(
       ...existing,
       name,
       createdAt: new Date().toISOString(),
-      businessId: scope.businessId,
+      ownerUid: scope.ownerUid,
       eventId: scope.eventId,
     };
     index.checkins = index.checkins
@@ -93,7 +93,7 @@ export async function addCheckin(
     name,
     email: normalizedEmail,
     createdAt: new Date().toISOString(),
-    businessId: scope.businessId,
+    ownerUid: scope.ownerUid,
     eventId: scope.eventId,
   };
 

@@ -9,7 +9,7 @@ export type SelectionToken = {
   createdAt: string;
   expiresAt: string;
   usedAt?: string;
-  businessId?: string;
+  ownerUid?: string;
   eventId?: string;
 };
 
@@ -60,7 +60,7 @@ export async function createSelectionToken(scope: TenantScope, email: string, tt
     email,
     createdAt: new Date().toISOString(),
     expiresAt,
-    businessId: scope.businessId,
+    ownerUid: scope.ownerUid,
     eventId: scope.eventId,
   };
   index.tokens.push(token);

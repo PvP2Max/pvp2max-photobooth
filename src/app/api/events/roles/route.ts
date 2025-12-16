@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getBusinessContext,
-  updateEventRolesByEmails,
+  updateEventCollaborators,
   sanitizeEvent,
   withEventDefaults,
 } from "@/lib/tenants";
@@ -22,8 +22,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as
     | {
         eventSlug?: string;
-        photographerEmails?: string[];
-        reviewEmails?: string[];
+        collaboratorEmails?: string[];
       }
     | null;
 
@@ -33,10 +32,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const event = await updateEventRolesByEmails(context.business.slug, eventSlug, {
-      photographerEmails: body?.photographerEmails ?? [],
-      reviewEmails: body?.reviewEmails ?? [],
-    });
+    const event = await updateEventCollaborators(
+      context.user.uid,
+      eventSlug,
+      body?.collaboratorEmails ?? [],
+    );
     return NextResponse.json({ event: sanitizeEvent(withEventDefaults(event)) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to update roles.";

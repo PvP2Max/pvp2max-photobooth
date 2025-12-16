@@ -9,6 +9,7 @@ import {
   eventUsage,
   eventRequiresPayment,
 } from "@/lib/tenants";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  if (!context.roles.owner && !context.roles.review) {
+  if (!context.roles.owner && !context.roles.collaborator) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const email = request.nextUrl.searchParams.get("email");
@@ -35,15 +36,24 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limit = rateLimit(ip, { windowMs: 60000, max: 20 });
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   const { context, error, status } = await getEventContext(request);
   if (!context) {
     return NextResponse.json({ error: error ?? "Unauthorized" }, { status: status ?? 401 });
   }
-  if (!context.roles.owner && !context.roles.photographer) {
+  if (!context.roles.owner && !context.roles.collaborator) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const currentUsage = eventUsage(context.event);
-  if (eventRequiresPayment(context.event, context.business)) {
+  if (eventRequiresPayment(context.event, context.subscription)) {
     return NextResponse.json(
       { error: "Event requires payment before uploads. Complete checkout to continue." },
       { status: 402 },

@@ -18,7 +18,7 @@ export type PhotoRecord = {
   originalUrl?: string;
   cutoutUrl?: string;
   previewUrl?: string;
-  businessId?: string;
+  ownerUid?: string;
   eventId?: string;
   mode?: "self-serve" | "photographer";
   overlayPack?: string;
@@ -175,7 +175,7 @@ export async function savePhoto({
     originalContentType,
     cutoutContentType,
     createdAt: new Date().toISOString(),
-    businessId: scope.businessId,
+    ownerUid: scope.ownerUid,
     eventId: scope.eventId,
     overlayPack,
     filterUsed,

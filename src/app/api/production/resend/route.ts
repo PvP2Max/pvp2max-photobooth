@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const bundleName = record.bundleFilename || "photos.zip";
     const bundleLink = `${baseUrl}/api/production/files/${record.id}/${encodeURIComponent(
       bundleName,
-    )}?token=${record.downloadToken}&business=${context.scope.businessSlug}&event=${context.scope.eventSlug}`;
+    )}?token=${record.downloadToken}&owner=${context.scope.ownerUid}&event=${context.scope.eventSlug}`;
     const downloadLinks = [
       `<li><a href="${bundleLink}" style="color:#67e8f9;text-decoration:none;">Download all photos (zip)</a></li>`,
     ];

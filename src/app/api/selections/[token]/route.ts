@@ -65,7 +65,7 @@ export async function POST(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-boothos-business": evt.scope.businessSlug,
+      "x-boothos-owner": evt.scope.ownerUid,
       "x-boothos-event": evt.scope.eventSlug,
     },
     body: JSON.stringify({

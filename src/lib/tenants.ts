@@ -7,12 +7,24 @@ import { verifyBearer, roleForEvent, type AuthenticatedUser } from "./auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 export type BoothEventPlan =
-  | "free"
-  | "event-basic"
-  | "event-unlimited"
-  | "event-ai"
-  | "photographer-single"
-  | "photographer-monthly";
+  | "free"                        // $0 - 10 photos, watermarked
+  | "basic"                       // $10 - 50 photos
+  | "pro"                         // $20 - 100 photos
+  | "unlimited"                   // $30 - unlimited + 10 AI credits
+  | "photographer-event"          // $100 - unlimited + 10 AI credits + collaborators
+  | "photographer-subscription";  // $250/mo - 10 AI credits/month shared
+
+export type BoothBusiness = {
+  id: string;
+  name: string;
+  slug: string;
+  ownerUid?: string;
+  createdAt: string;
+  events: BoothEvent[];
+  subscriptionId?: string;
+  subscriptionStatus?: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
+  subscriptionPlan?: BoothEventPlan;
+};
 
 export type BoothEvent = {
   id: string;
@@ -22,8 +34,7 @@ export type BoothEvent = {
   status: "draft" | "live" | "closed";
   ownerUid: string;
   roles?: {
-    photographer?: string[];
-    review?: string[];
+    collaborator?: string[];  // Users who can upload photos AND send deliveries
   };
   accessHint?: string;
   startsAt?: string;
@@ -59,35 +70,30 @@ export type BoothEvent = {
   allowedFrameIds?: string[];
 };
 
-export type BoothBusiness = {
-  id: string;
-  name: string;
-  slug: string;
-  createdAt: string;
-  events: BoothEvent[];
+// User subscription info (stored in Firestore under users/{uid})
+export type UserSubscription = {
   subscriptionId?: string;
   subscriptionStatus?: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
   subscriptionPlan?: BoothEventPlan;
-  ownerUid?: string;
+  aiCreditsRemaining?: number;  // For subscription - shared across photographer events
+  aiCreditsResetAt?: string;    // When credits reset (monthly)
 };
 
 export type TenantScope = {
-  businessId: string;
-  businessSlug: string;
-  businessName: string;
+  ownerUid: string;    // User's Firebase UID
   eventId: string;
   eventSlug: string;
   eventName: string;
 };
 
 export type EventContext = {
-  business: BoothBusiness;
+  user: AuthenticatedUser;
   event: BoothEvent;
   scope: TenantScope;
+  subscription?: UserSubscription;
   roles: {
     owner: boolean;
-    photographer: boolean;
-    review: boolean;
+    collaborator: boolean;  // Can upload photos AND send deliveries
   };
 };
 
@@ -102,7 +108,21 @@ const FIRESTORE_USERS = "users";
 
 function planDefaults(plan: BoothEventPlan | undefined) {
   switch (plan) {
-    case "event-basic":
+    case "basic":
+      // $10 - 50 photos
+      return {
+        photoCap: 50,
+        aiCredits: 0,
+        overlaysAll: true,
+        premiumFilters: true,
+        watermarkEnabled: false,
+        smsEnabled: false,
+        allowAiBackgrounds: false,
+        galleryZipEnabled: true,
+        canAddCollaborators: false,
+      };
+    case "pro":
+      // $20 - 100 photos
       return {
         photoCap: 100,
         aiCredits: 0,
@@ -112,19 +132,10 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         smsEnabled: true,
         allowAiBackgrounds: false,
         galleryZipEnabled: true,
+        canAddCollaborators: false,
       };
-    case "event-unlimited":
-      return {
-        photoCap: null,
-        aiCredits: 0,
-        overlaysAll: true,
-        premiumFilters: true,
-        watermarkEnabled: false,
-        smsEnabled: true,
-        allowAiBackgrounds: false,
-        galleryZipEnabled: true,
-      };
-    case "event-ai":
+    case "unlimited":
+      // $30 - unlimited photos + 10 AI credits (event-specific, no rollover)
       return {
         photoCap: null,
         aiCredits: 10,
@@ -134,33 +145,40 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         smsEnabled: true,
         allowAiBackgrounds: true,
         galleryZipEnabled: true,
+        canAddCollaborators: false,
       };
-    case "photographer-single":
+    case "photographer-event":
+      // $100 - unlimited + 10 AI credits + collaborators
       return {
         photoCap: null,
-        aiCredits: 20,
+        aiCredits: 10,
         overlaysAll: true,
         premiumFilters: true,
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: true,
         galleryZipEnabled: true,
+        canAddCollaborators: true,
       };
-    case "photographer-monthly":
+    case "photographer-subscription":
+      // $250/mo - 10 AI credits/month (shared across photographer events)
+      // Credits managed at subscription level, not event level
       return {
         photoCap: null,
-        aiCredits: 40,
+        aiCredits: 0, // Credits come from subscription pool
         overlaysAll: true,
         premiumFilters: true,
         watermarkEnabled: false,
         smsEnabled: true,
         allowAiBackgrounds: true,
         galleryZipEnabled: true,
+        canAddCollaborators: true,
       };
     case "free":
     default:
+      // $0 - 10 photos, watermarked
       return {
-        photoCap: 50,
+        photoCap: 10,
         aiCredits: 0,
         overlaysAll: false,
         premiumFilters: false,
@@ -168,6 +186,7 @@ function planDefaults(plan: BoothEventPlan | undefined) {
         smsEnabled: false,
         allowAiBackgrounds: false,
         galleryZipEnabled: false,
+        canAddCollaborators: false,
       };
   }
 }
@@ -202,6 +221,51 @@ async function upsertEventFirestore(uid: string, event: BoothEvent) {
 async function deleteEventFromFirestore(uid: string, eventId: string) {
   if (!uid || !eventId) return;
   await userEventsCollection(uid).doc(eventId).delete();
+}
+
+// User subscription management
+export async function getUserSubscription(uid: string): Promise<UserSubscription | undefined> {
+  if (!uid) return undefined;
+  try {
+    const doc = await getFirestoreDb().collection(FIRESTORE_USERS).doc(uid).get();
+    if (!doc.exists) return undefined;
+    const data = doc.data();
+    if (!data?.subscription) return undefined;
+    return data.subscription as UserSubscription;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function updateUserSubscription(
+  uid: string,
+  updates: Partial<UserSubscription>,
+): Promise<UserSubscription> {
+  const db = getFirestoreDb();
+  const userRef = db.collection(FIRESTORE_USERS).doc(uid);
+  const current = await getUserSubscription(uid);
+  const updated: UserSubscription = { ...current, ...updates };
+  await userRef.set({ subscription: updated }, { merge: true });
+  return updated;
+}
+
+export async function consumeSubscriptionAiCredit(uid: string): Promise<boolean> {
+  const subscription = await getUserSubscription(uid);
+  if (!subscription) return false;
+  if (subscription.subscriptionStatus !== "active") return false;
+  if ((subscription.aiCreditsRemaining ?? 0) <= 0) return false;
+
+  await updateUserSubscription(uid, {
+    aiCreditsRemaining: (subscription.aiCreditsRemaining ?? 0) - 1,
+  });
+  return true;
+}
+
+export async function resetSubscriptionCredits(uid: string): Promise<void> {
+  await updateUserSubscription(uid, {
+    aiCreditsRemaining: 10, // Monthly credit allocation
+    aiCreditsResetAt: new Date().toISOString(),
+  });
 }
 
 async function resolveEmailsToUids(emails: string[]) {
@@ -251,11 +315,19 @@ function slugify(input: string, fallback: string) {
 }
 
 export function withEventDefaults(event: BoothEvent): BoothEvent {
-  const plan = event.plan ?? "event-basic";
-  const defaults = planDefaults(plan);
+  // Map legacy plan names to new ones
+  let plan: BoothEventPlan = event.plan ?? "free";
+  const planStr = event.plan as string;
+  if (planStr === "event-basic") plan = "basic";
+  if (planStr === "event-unlimited") plan = "pro";
+  if (planStr === "event-ai") plan = "unlimited";
+  if (planStr === "photographer-single") plan = "photographer-event";
+  if (planStr === "photographer-monthly") plan = "photographer-subscription";
+
+  const defaults = planDefaults(plan as BoothEventPlan);
   return {
     ...event,
-    plan,
+    plan: plan as BoothEventPlan,
     photoCap: event.photoCap ?? defaults.photoCap,
     photoUsed: event.photoUsed ?? 0,
     aiCredits: event.aiCredits ?? defaults.aiCredits,
@@ -267,7 +339,7 @@ export function withEventDefaults(event: BoothEvent): BoothEvent {
     watermarkEnabled: event.watermarkEnabled ?? defaults.watermarkEnabled ?? true,
     brandingRemoval: event.brandingRemoval ?? false,
     smsEnabled: event.smsEnabled ?? defaults.smsEnabled ?? false,
-    galleryZipEnabled: event.galleryZipEnabled ?? false,
+    galleryZipEnabled: event.galleryZipEnabled ?? defaults.galleryZipEnabled ?? false,
     customUrl: event.customUrl ?? "",
     analyticsEnabled: event.analyticsEnabled ?? false,
     allowBackgroundRemoval: event.allowBackgroundRemoval ?? true,
@@ -278,7 +350,7 @@ export function withEventDefaults(event: BoothEvent): BoothEvent {
     overlayTheme: event.overlayTheme ?? "default",
     galleryPublic: event.galleryPublic ?? false,
     allowedSelections: event.allowedSelections ?? (event.mode === "photographer" ? 3 : undefined),
-    paymentStatus: event.paymentStatus ?? (event.mode === "photographer" ? "unpaid" : "paid"),
+    paymentStatus: event.paymentStatus ?? (isPhotographerPlan(plan as BoothEventPlan) ? "unpaid" : "paid"),
   };
 }
 
@@ -450,14 +522,13 @@ export async function createBusiness({
 }
 
 export async function createEvent(
-  _businessId: string,
   ownerUid: string,
   {
     name,
     slug,
     status = "live",
     mode = "self-serve",
-    plan = "event-basic",
+    plan = "free",
     photoCap,
     aiCredits,
     allowBackgroundRemoval = true,
@@ -471,8 +542,7 @@ export async function createEvent(
     eventDate,
     eventTime,
     allowedSelections,
-    photographerEmails,
-    reviewEmails,
+    collaboratorEmails,
   }: {
     name: string;
     slug?: string;
@@ -492,8 +562,7 @@ export async function createEvent(
     eventDate?: string;
     eventTime?: string;
     allowedSelections?: number;
-    photographerEmails?: string[];
-    reviewEmails?: string[];
+    collaboratorEmails?: string[];
   },
 ) {
   const uid = ownerUid;
@@ -504,10 +573,16 @@ export async function createEvent(
     safeSlug = slugify(`${safeSlug}-${Math.floor(Math.random() * 9999)}`, randomUUID());
   }
   const defaults = planDefaults(plan);
+
+  // Only allow collaborators on photographer plans
+  const collaboratorUids = canAddCollaborators(plan)
+    ? await resolveEmailsToUids(collaboratorEmails || [])
+    : [];
+
   const roles = {
-    photographer: await resolveEmailsToUids(photographerEmails || []),
-    review: await resolveEmailsToUids(reviewEmails || []),
+    collaborator: collaboratorUids,
   };
+
   const event: BoothEvent = {
     id: randomUUID(),
     name,
@@ -538,11 +613,9 @@ export async function createEvent(
   return { event };
 }
 
-function toScope(business: BoothBusiness, event: BoothEvent): TenantScope {
+function toScope(ownerUid: string, event: BoothEvent): TenantScope {
   return {
-    businessId: business.id,
-    businessSlug: business.slug,
-    businessName: business.name,
+    ownerUid,
     eventId: event.id,
     eventSlug: event.slug,
     eventName: event.name,
@@ -570,9 +643,8 @@ export async function findEventBySlugs(
 export function scopedStorageRoot(scope: TenantScope) {
   return path.join(
     STORAGE_ROOT,
-    "tenants",
-    scope.businessSlug,
-    scope.eventSlug,
+    "events",
+    scope.eventId,
   );
 }
 
@@ -622,7 +694,7 @@ export function sanitizeEvent(event: BoothEvent) {
 }
 
 export function eventUsage(event: BoothEvent) {
-  const defaults = planDefaults(event.plan ?? "event-basic");
+  const defaults = planDefaults(event.plan ?? "basic");
   const cap = event.photoCap ?? defaults.photoCap ?? null;
   const used = event.photoUsed ?? 0;
   const aiCap = event.aiCredits ?? defaults.aiCredits ?? 0;
@@ -646,20 +718,24 @@ export function eventUsage(event: BoothEvent) {
 }
 
 export function isPhotographerPlan(plan?: BoothEventPlan) {
-  return plan === "photographer-single" || plan === "photographer-monthly";
+  return plan === "photographer-event" || plan === "photographer-subscription";
 }
 
-export function eventRequiresPayment(event: BoothEvent, business?: BoothBusiness) {
-  if (event.mode === "photographer") {
-    if (isPhotographerPlan(event.plan)) {
-      if (event.plan === "photographer-monthly" && business?.subscriptionStatus === "active") {
-        return false;
-      }
-      return event.paymentStatus !== "paid";
-    }
-    return true;
+export function canAddCollaborators(plan?: BoothEventPlan) {
+  return isPhotographerPlan(plan);
+}
+
+export function eventRequiresPayment(event: BoothEvent, subscription?: UserSubscription) {
+  // Free events don't require payment
+  if (event.plan === "free") return false;
+
+  // Subscription covers photographer events
+  if (event.plan === "photographer-subscription" && subscription?.subscriptionStatus === "active") {
+    return false;
   }
-  return false;
+
+  // All other paid plans require payment
+  return event.paymentStatus !== "paid";
 }
 
 // Session cookies/key auth removed; Firebase ID tokens are now required.
@@ -682,39 +758,50 @@ export async function getEventContext(
   const events = await listUserEvents(user.uid);
   const event = events.find((e) => e.slug === slugify(eventSlug, eventSlug));
   if (!event) return { error: "Event not found", status: 404 };
-  const business: BoothBusiness = {
-    id: user.uid,
-    name: "My BoothOS",
-    slug: user.uid,
-    ownerUid: user.uid,
-    createdAt: event.createdAt ?? new Date().toISOString(),
-    events,
-  };
+
   const roles = roleForEvent(event, user.uid);
+  const subscription = await getUserSubscription(user.uid);
+
   return {
     context: {
-      business,
+      user,
       event,
-      scope: toScope(business, event),
+      scope: toScope(user.uid, event),
+      subscription,
       roles,
     },
   };
 }
 
-export async function getBusinessContext(request: NextRequest) {
+export type UserContext = {
+  user: AuthenticatedUser;
+  events: BoothEvent[];
+  subscription?: UserSubscription;
+};
+
+export async function getUserContext(request: NextRequest): Promise<UserContext | null> {
   const user = await verifyBearer(request);
   if (!user) return null;
   const events = await listUserEvents(user.uid);
+  const subscription = await getUserSubscription(user.uid);
+  return { user, events, subscription };
+}
+
+/** @deprecated Use getUserContext instead */
+export async function getBusinessContext(request: NextRequest) {
+  const ctx = await getUserContext(request);
+  if (!ctx) return null;
+  // Backwards compatibility shim
   const business: BoothBusiness = {
-    id: user.uid,
+    id: ctx.user.uid,
     name: "My BoothOS",
-    slug: user.uid,
-    ownerUid: user.uid,
+    slug: ctx.user.uid,
+    ownerUid: ctx.user.uid,
     createdAt: new Date().toISOString(),
-    events,
-    subscriptionStatus: "canceled",
+    events: ctx.events,
+    subscriptionStatus: ctx.subscription?.subscriptionStatus ?? "canceled",
   };
-  return { business, user };
+  return { business, user: ctx.user };
 }
 
 export function isAdminRequest(request: NextRequest) {
@@ -773,7 +860,7 @@ export async function incrementEventUsage(
   scope: TenantScope,
   { photos = 0, aiCredits = 0 }: { photos?: number; aiCredits?: number },
 ) {
-  const events = await listUserEvents(scope.businessId);
+  const events = await listUserEvents(scope.ownerUid);
   const event = events.find((e) => e.id === scope.eventId);
   if (!event) throw new Error("Event not found");
   const updated = withEventDefaults({
@@ -781,10 +868,34 @@ export async function incrementEventUsage(
     photoUsed: Math.max(0, (event.photoUsed ?? 0) + photos),
     aiUsed: Math.max(0, (event.aiUsed ?? 0) + aiCredits),
   });
-  await upsertEventFirestore(scope.businessId, updated);
+  await upsertEventFirestore(scope.ownerUid, updated);
   return { event: updated, usage: eventUsage(updated) };
 }
 
+export async function updateEventCollaborators(
+  ownerUid: string,
+  eventSlug: string,
+  collaboratorEmails: string[],
+) {
+  const normalizedEvent = slugify(eventSlug, eventSlug);
+  const events = await listUserEvents(ownerUid);
+  const event = events.find((e) => e.slug === normalizedEvent);
+  if (!event) throw new Error("Event not found");
+
+  // Only allow collaborators on photographer plans
+  if (!canAddCollaborators(event.plan)) {
+    throw new Error("This plan does not support collaborators");
+  }
+
+  const collaborator = await resolveEmailsToUids(collaboratorEmails);
+  event.roles = { collaborator };
+
+  await upsertEventFirestore(ownerUid, event);
+
+  return event;
+}
+
+/** @deprecated Use updateEventCollaborators instead */
 export async function updateEventRolesByEmails(
   businessSlug: string,
   eventSlug: string,
@@ -793,16 +904,7 @@ export async function updateEventRolesByEmails(
     reviewEmails = [],
   }: { photographerEmails?: string[]; reviewEmails?: string[] },
 ) {
-  const normalizedEvent = slugify(eventSlug, eventSlug);
-  const ownerUid = businessSlug; // now user-centric; businessSlug carries uid from caller context
-  const events = await listUserEvents(ownerUid);
-  const event = events.find((e) => e.slug === normalizedEvent);
-  if (!event) throw new Error("Event not found");
-  const photographer = await resolveEmailsToUids(photographerEmails);
-  const review = await resolveEmailsToUids(reviewEmails);
-  event.roles = { photographer, review };
-
-  await upsertEventFirestore(ownerUid, event);
-
-  return event;
+  // Merge old photographer and review into collaborator
+  const allEmails = [...new Set([...photographerEmails, ...reviewEmails])];
+  return updateEventCollaborators(businessSlug, eventSlug, allEmails);
 }

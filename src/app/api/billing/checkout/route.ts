@@ -6,12 +6,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PLAN_MAP: Record<string, keyof typeof stripePrices> = {
-  "event-basic": "eventBasic",
-  "event-unlimited": "eventUnlimited",
-  "event-ai": "eventAi",
-  "photographer-single": "photogEvent",
-  "photographer-monthly": "photogMonthly",
-  "ai-topup": "aiTopup",
+  "basic": "basic",
+  "pro": "pro",
+  "unlimited": "unlimited",
+  "photographer-event": "photographerEvent",
+  "photographer-subscription": "photographerSubscription",
 };
 
 export async function POST(request: NextRequest) {
@@ -54,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const session = await stripe.checkout.sessions.create({
-      mode: plan === "photographer-monthly" ? "subscription" : "payment",
+      mode: plan === "photographer-subscription" ? "subscription" : "payment",
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
