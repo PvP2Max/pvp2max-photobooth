@@ -3,7 +3,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { Camera, Check, RefreshCw, Send, Mail } from "lucide-react";
+import { toast } from "sonner";
 import type { BackgroundOption } from "@/lib/backgrounds";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { LoadingSpinner, LoadingOverlay } from "@/components/ui/loading-spinner";
+import { StepIndicator } from "@/components/ui/step-indicator";
+import { cn } from "@/lib/utils";
 
 type SessionResponse = {
   business: { id: string; name: string; slug: string };
@@ -27,6 +38,20 @@ type UploadPhoto = {
 };
 
 type BoothStage = "intro" | "live" | "countdown" | "review" | "processing" | "select" | "sent";
+
+const STEPS = [
+  { id: "capture", label: "Capture" },
+  { id: "process", label: "Process" },
+  { id: "select", label: "Select" },
+  { id: "send", label: "Send" },
+];
+
+function getStepIndex(stage: BoothStage): number {
+  if (["intro", "live", "countdown", "review"].includes(stage)) return 0;
+  if (stage === "processing") return 1;
+  if (stage === "select") return 2;
+  return 3;
+}
 
 function dataUrlToFile(dataUrl: string, name: string) {
   const match = dataUrl.match(/^data:(.+);base64,(.*)$/);
@@ -74,6 +99,7 @@ export default function BoothPage() {
   }, [backgrounds, selectedBackgrounds]);
   const businessLabel = session?.business?.slug ?? resolvedBusiness ?? "Unknown";
   const modeLabel = session?.event?.mode ?? "self-serve";
+  const currentStepIndex = getStepIndex(stage);
 
   const startCamera = useCallback(async () => {
     try {
@@ -87,6 +113,7 @@ export default function BoothPage() {
       }
     } catch {
       setError("Camera unavailable. Check permissions and reload.");
+      toast.error("Camera error", { description: "Check permissions and reload." });
     }
   }, []);
 
@@ -227,7 +254,9 @@ export default function BoothPage() {
         return next;
       }
       if (selectionLimit && next.size >= selectionLimit) {
-        setStatus(`You can pick up to ${selectionLimit} background${selectionLimit > 1 ? "s" : ""}.`);
+        toast.warning("Selection limit reached", {
+          description: `You can pick up to ${selectionLimit} background${selectionLimit > 1 ? "s" : ""}.`,
+        });
         return prev;
       }
       next.add(id);
@@ -242,6 +271,7 @@ export default function BoothPage() {
     }
     if (!email.trim()) {
       setError("Enter an email before continuing.");
+      toast.error("Missing email", { description: "Enter an email before continuing." });
       return;
     }
     setProcessing(true);
@@ -276,12 +306,14 @@ export default function BoothPage() {
       setCutoutUrl(preview);
       setStatus("Background removed. Choose your background.");
       setStage("select");
+      toast.success("Photo processed", { description: "Background removed successfully!" });
       if (backgrounds.length === 1 && selectedBackgrounds.size === 0) {
         setSelectedBackgrounds(new Set([backgrounds[0].id]));
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to process photo.";
       setError(message);
+      toast.error("Processing failed", { description: message });
       setStage("review");
     } finally {
       setProcessing(false);
@@ -301,6 +333,7 @@ export default function BoothPage() {
           : [];
     if (chosen.length === 0) {
       setError("Choose at least one background.");
+      toast.error("No background selected", { description: "Choose at least one background." });
       return;
     }
     if (!email.trim()) {
@@ -330,133 +363,167 @@ export default function BoothPage() {
       }
       setStatus("Sent! Check your email for the download link.");
       setStage("sent");
+      toast.success("Photos sent!", { description: "Check your email for the download link." });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to send right now.";
       setError(message);
+      toast.error("Send failed", { description: message });
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <main className="relative min-h-screen bg-[#05060a] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(56,189,248,0.12),transparent_30%),linear-gradient(180deg,rgba(10,12,18,0.9),rgba(10,12,18,0.96))]" />
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-6 px-5 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-white/60">BoothOS Self-Serve</p>
+    <main className="relative min-h-screen bg-background text-foreground">
+      {processing && <LoadingOverlay message="Processing your photo..." />}
+      {sending && <LoadingOverlay message="Sending your photos..." />}
+
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">BoothOS Self-Serve</p>
             <h1 className="text-2xl font-semibold">
               {session?.event?.name ?? "Event"}{" "}
-              <span className="text-white/60">/ {eventSlug}</span>
+              <span className="text-muted-foreground">/ {eventSlug}</span>
             </h1>
-            <p className="text-sm text-white/60">
+            <p className="text-sm text-muted-foreground">
               Business: {businessLabel} • Mode: {modeLabel}{" "}
-              {session?.event?.paymentStatus && `• Payment: ${session.event.paymentStatus}`}
+              {session?.event?.paymentStatus && (
+                <Badge variant="secondary" className="ml-2">
+                  {session.event.paymentStatus}
+                </Badge>
+              )}
             </p>
           </div>
           {status && (
-            <div className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white ring-1 ring-white/15">
+            <Badge variant="secondary" className="text-sm">
               {status}
-            </div>
+            </Badge>
           )}
         </div>
 
+        {/* Step Indicator */}
+        <StepIndicator steps={STEPS} currentStep={currentStepIndex} variant="compact" />
+
+        {/* Error Alert */}
         {error && (
-          <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-100 ring-1 ring-red-500/30">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
+        {/* Main Content */}
         <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <div className="relative aspect-[3/4] overflow-hidden rounded-3xl bg-gradient-to-br from-[#0d111b] to-[#0a0c12] ring-1 ring-white/10">
-            {!captured && (
-              <video
-                ref={videoRef}
-                className="absolute inset-0 h-full w-full object-cover"
-                playsInline
-                muted
-              />
-            )}
-            {captured && stage !== "processing" && stage !== "select" && (
-              <img
-                src={captured}
-                alt="Captured preview"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            )}
-            {(stage === "processing" || stage === "select" || stage === "sent") && activeBackground && (
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage: `url(${activeBackground.previewAsset || activeBackground.asset})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  filter: stage === "processing" ? "blur(4px)" : "none",
-                  transform: "scale(1.01)",
-                }}
-              />
-            )}
-            {(stage === "processing" || stage === "select" || stage === "sent") && cutoutUrl && (
-              <img
-                src={cutoutUrl}
-                alt="Cutout preview"
-                className="absolute inset-0 m-auto max-h-full max-w-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
-              />
-            )}
+          {/* Camera/Preview Area */}
+          <Card className="overflow-hidden">
+            <div className="relative aspect-[3/4] bg-secondary">
+              {!captured && (
+                <video
+                  ref={videoRef}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  playsInline
+                  muted
+                />
+              )}
+              {captured && stage !== "processing" && stage !== "select" && (
+                <img
+                  src={captured}
+                  alt="Captured preview"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              )}
+              {(stage === "processing" || stage === "select" || stage === "sent") && activeBackground && (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${activeBackground.previewAsset || activeBackground.asset})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    filter: stage === "processing" ? "blur(4px)" : "none",
+                    transform: "scale(1.01)",
+                  }}
+                />
+              )}
+              {(stage === "processing" || stage === "select" || stage === "sent") && cutoutUrl && (
+                <img
+                  src={cutoutUrl}
+                  alt="Cutout preview"
+                  className="absolute inset-0 m-auto max-h-full max-w-full object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
+                />
+              )}
 
-            {stage === "intro" && (
-              <button
-                onClick={handleStart}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-center text-white backdrop-blur-sm transition hover:bg-black/50"
-              >
-                <span className="text-sm uppercase tracking-[0.4em] text-white/70">Booth ready</span>
-                <span className="text-3xl font-semibold">Tap to start</span>
-              </button>
-            )}
+              {/* Intro Overlay */}
+              {stage === "intro" && (
+                <button
+                  onClick={handleStart}
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-center text-white backdrop-blur-sm transition hover:bg-black/50"
+                >
+                  <Camera className="size-12 text-primary" />
+                  <span className="text-xs uppercase tracking-[0.3em] text-white/70">Booth ready</span>
+                  <span className="text-2xl font-semibold">Tap to start</span>
+                </button>
+              )}
 
-            {(stage === "live" || stage === "countdown") && (
-              <button
-                onClick={beginCountdown}
-                className="absolute inset-0 flex items-center justify-center bg-black/35 text-center text-white transition hover:bg-black/25"
-              >
-                <div className="rounded-full bg-black/60 px-5 py-3 text-lg font-semibold text-white/90">
-                  {countdown ? countdown : "Tap to snap your photo"}
+              {/* Live/Countdown Overlay */}
+              {(stage === "live" || stage === "countdown") && (
+                <button
+                  onClick={beginCountdown}
+                  className="absolute inset-0 flex items-center justify-center bg-black/30 text-center text-white transition hover:bg-black/20"
+                >
+                  {countdown ? (
+                    <div className="text-9xl font-bold text-primary animate-pulse">
+                      {countdown}
+                    </div>
+                  ) : (
+                    <div className="rounded-full bg-black/50 px-6 py-3 text-lg font-semibold backdrop-blur-sm">
+                      Tap to snap your photo
+                    </div>
+                  )}
+                </button>
+              )}
+
+              {/* Review Overlay */}
+              {stage === "review" && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <Badge variant="secondary" className="text-lg px-4 py-2">
+                    Looks good?
+                  </Badge>
                 </div>
-              </button>
-            )}
+              )}
 
-            {stage === "review" && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white">
-                  Looks good?
+              {/* Sent Overlay */}
+              {stage === "sent" && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/40 text-center">
+                  <div className="flex size-16 items-center justify-center rounded-full bg-green-500/20">
+                    <Check className="size-8 text-green-500" />
+                  </div>
+                  <p className="text-lg font-semibold text-white">Delivered!</p>
+                  <p className="text-sm text-white/80">Check your inbox for the download link.</p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {stage === "processing" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-center text-white">
-                <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                <p className="mt-3 text-sm text-white/70">Running background removal…</p>
-              </div>
-            )}
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
+          </Card>
 
-            {stage === "sent" && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-center text-white">
-                <div className="rounded-full bg-emerald-500/80 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30">
-                  Delivered
+          {/* Controls Panel */}
+          <div className="flex flex-col gap-4">
+            {/* Status Card */}
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Steps</CardTitle>
+                  {(stage === "review" || stage === "select" || stage === "sent") && (
+                    <Button variant="secondary" size="sm" onClick={handleRetake}>
+                      <RefreshCw className="size-4" />
+                      Retake
+                    </Button>
+                  )}
                 </div>
-                <p className="mt-2 text-sm text-white/80">Check your inbox for the download link.</p>
-              </div>
-            )}
-
-            <canvas ref={canvasRef} className="hidden" />
-          </div>
-
-          <div className="flex flex-col gap-4 rounded-3xl bg-white/5 p-4 ring-1 ring-white/10 backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/60">Steps</p>
-                <p className="text-sm text-white/80">
+                <CardDescription>
                   {stage === "intro" && "Tap to start the booth"}
                   {stage === "live" && "Tap anywhere to start the countdown"}
                   {stage === "countdown" && "Hold still… capturing next"}
@@ -464,137 +531,177 @@ export default function BoothPage() {
                   {stage === "processing" && "Processing with MODNet"}
                   {stage === "select" && "Pick your background(s) then send"}
                   {stage === "sent" && "Delivered — start another?"}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Email Input */}
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="guest-email" className="flex items-center gap-2">
+                    <Mail className="size-4" />
+                    Guest email
+                  </Label>
+                  <Input
+                    id="guest-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="guest@example.com"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  We&apos;ll send the finished photo(s) as a single download link.
                 </p>
-              </div>
-              {(stage === "review" || stage === "select" || stage === "sent") && (
-                <button
-                  onClick={handleRetake}
-                  className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
-                >
-                  Retake
-                </button>
-              )}
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-              <label className="text-sm text-white/70">
-                Guest email
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="guest@example.com"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-white/30 focus:outline-none"
-                />
-              </label>
-              <p className="text-xs text-white/50">
-                We’ll send the finished photo(s) as a single download link. Photos stay in R2, not on this
-                device.
-              </p>
-            </div>
-
+            {/* Review Actions */}
             {stage === "review" && (
-              <div className="flex flex-col gap-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-                <p className="text-sm font-semibold text-white">Happy with this photo?</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={handleRetake}
-                    className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
-                  >
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Happy with this photo?</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={handleRetake}>
+                    <RefreshCw className="size-4" />
                     Retake
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="gradient"
                     onClick={processCutout}
                     disabled={processing}
-                    className="rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-black shadow-lg shadow-cyan-500/30 transition hover:brightness-105 disabled:opacity-60"
                   >
-                    {processing ? "Processing…" : "Looks good — continue"}
-                  </button>
-                </div>
-              </div>
+                    {processing ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        Processing…
+                      </>
+                    ) : (
+                      <>
+                        <Check className="size-4" />
+                        Looks good — continue
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
             )}
 
+            {/* Background Selection */}
             {(stage === "select" || stage === "sent") && (
-              <div className="space-y-3 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-white">Choose background</p>
-                  {selectionLimit ? (
-                    <span className="text-xs text-white/50">
-                      Up to {selectionLimit} option{selectionLimit > 1 ? "s" : ""}
-                    </span>
-                  ) : null}
-                </div>
-                {loadingBackgrounds && (
-                  <p className="text-sm text-white/60">Loading backgrounds…</p>
-                )}
-                {!loadingBackgrounds && backgrounds.length === 0 && (
-                  <p className="text-sm text-white/60">
-                    No backgrounds configured for this event. Ask the host to enable them.
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  {backgrounds.map((bg) => {
-                    const selected = selectedBackgrounds.has(bg.id);
-                    return (
-                      <button
-                        key={bg.id}
-                        onClick={() => toggleBackground(bg.id)}
-                        className={`group overflow-hidden rounded-xl border text-left transition ${
-                          selected
-                            ? "border-cyan-400/60 bg-white/10 shadow-lg shadow-cyan-500/20"
-                            : "border-white/10 bg-white/5 hover:border-white/20"
-                        }`}
-                      >
-                        <div
-                          className="aspect-video w-full bg-black/60"
-                          style={{
-                            backgroundImage: `url(${bg.previewAsset || bg.asset})`,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                          }}
-                        />
-                        <div className="flex items-center justify-between px-3 py-2">
-                          <div>
-                            <p className="text-sm font-semibold text-white">{bg.name}</p>
-                            <p className="text-[11px] text-white/60">{bg.category || "background"}</p>
-                          </div>
-                          <span
-                            className={`h-5 w-5 rounded-full border ${
-                              selected
-                                ? "border-cyan-300 bg-cyan-400/80"
-                                : "border-white/30 bg-black/30"
-                            }`}
-                            aria-hidden
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">Choose background</CardTitle>
+                    {selectionLimit ? (
+                      <Badge variant="secondary">
+                        Up to {selectionLimit}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {loadingBackgrounds && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <LoadingSpinner size="sm" />
+                      Loading backgrounds…
+                    </div>
+                  )}
+                  {!loadingBackgrounds && backgrounds.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No backgrounds configured. Ask the host to enable them.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {backgrounds.map((bg) => {
+                      const selected = selectedBackgrounds.has(bg.id);
+                      return (
+                        <button
+                          key={bg.id}
+                          onClick={() => toggleBackground(bg.id)}
+                          className={cn(
+                            "group overflow-hidden rounded-xl text-left transition ring-1",
+                            selected
+                              ? "ring-2 ring-primary bg-primary/10 shadow-lg shadow-primary/20"
+                              : "ring-border bg-secondary hover:ring-primary/50"
+                          )}
+                        >
+                          <div
+                            className="aspect-video w-full bg-secondary"
+                            style={{
+                              backgroundImage: `url(${bg.previewAsset || bg.asset})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                            }}
                           />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                          <div className="flex items-center justify-between px-3 py-2">
+                            <div>
+                              <p className="text-sm font-semibold">{bg.name}</p>
+                              <p className="text-xs text-muted-foreground">{bg.category || "background"}</p>
+                            </div>
+                            <span
+                              className={cn(
+                                "size-5 rounded-full border-2 transition",
+                                selected
+                                  ? "border-primary bg-primary"
+                                  : "border-muted-foreground bg-transparent"
+                              )}
+                              aria-hidden
+                            >
+                              {selected && <Check className="size-full p-0.5 text-primary-foreground" />}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
+            {/* Send Button */}
             {stage === "select" && (
-              <button
+              <Button
+                variant="gradient"
+                size="lg"
+                className="w-full"
                 onClick={sendEmail}
                 disabled={sending}
-                className="w-full rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 px-4 py-3 text-sm font-semibold text-black shadow-lg shadow-emerald-500/30 transition hover:brightness-105 disabled:opacity-60"
               >
-                {sending ? "Sending…" : "Send to guest"}
-              </button>
+                {sending ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Sending…
+                  </>
+                ) : (
+                  <>
+                    <Send className="size-4" />
+                    Send to guest
+                  </>
+                )}
+              </Button>
             )}
 
+            {/* Sent State */}
             {stage === "sent" && (
-              <div className="flex flex-col gap-3">
-                <div className="rounded-2xl bg-emerald-500/15 px-4 py-3 text-sm text-emerald-50 ring-1 ring-emerald-400/30">
-                  Sent! We’ll deliver a single download link with the selected backgrounds.
-                </div>
-                <button
+              <div className="space-y-3">
+                <Alert className="bg-green-500/10 border-green-500/30">
+                  <Check className="size-4 text-green-500" />
+                  <AlertDescription className="text-green-100">
+                    Sent! We&apos;ll deliver a single download link with the selected backgrounds.
+                  </AlertDescription>
+                </Alert>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="w-full"
                   onClick={handleRetake}
-                  className="w-full rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/15"
                 >
+                  <RefreshCw className="size-4" />
                   Start another
-                </button>
+                </Button>
               </div>
             )}
           </div>

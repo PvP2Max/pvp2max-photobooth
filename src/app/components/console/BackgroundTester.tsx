@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Camera, StopCircle, RefreshCw, Lightbulb } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export interface BackgroundTesterProps {
   defaultBgPreview?: string;
@@ -136,97 +141,136 @@ export function BackgroundTester({
   }
 
   return (
-    <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">Background tester</h2>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Check lighting and framing before the event. Capture a quick preview with the default
-            background.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={startBackgroundTest}
-            className="rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
-          >
-            {testStream ? "Restart camera" : "Start test"}
-          </button>
-          <button
-            onClick={captureBackgroundTest}
-            disabled={testLoading}
-            className="rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90 disabled:opacity-60"
-          >
-            {testLoading ? "Capturing…" : "Capture preview"}
-          </button>
-          <button
-            onClick={stopTestStream}
-            className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-          >
-            Stop
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-3">
-          <div className="aspect-[4/3] overflow-hidden rounded-xl bg-[var(--color-bg-subtle)] ring-1 ring-[var(--color-border-subtle)]">
-            <video
-              ref={testVideoRef}
-              className="h-full w-full object-cover"
-              playsInline
-              muted
-              autoPlay
-            />
-            {!testVideoReady && (
-              <div className="flex h-full w-full items-center justify-center text-sm text-[var(--color-text-muted)]">
-                {testStream ? "Starting camera…" : "Start the tester to preview your setup."}
-              </div>
-            )}
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="size-5" />
+              Background Tester
+            </CardTitle>
+            <CardDescription>
+              Check lighting and framing before the event. Capture a quick preview with the default background.
+            </CardDescription>
           </div>
-          {testError && <p className="text-sm text-[var(--color-text)]">{testError}</p>}
-          {testMessage && <p className="text-sm text-[var(--color-text-muted)]">{testMessage}</p>}
-          {testProcessing && (
-            <p className="text-xs text-[var(--color-text-muted)]">Running background removal…</p>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <div className="rounded-xl bg-[var(--color-surface-elevated)] p-3 ring-1 ring-[var(--color-border-subtle)]">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[var(--color-text)]">Captured preview</p>
-              <button
-                onClick={() => setTestShowTips((prev) => !prev)}
-                className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-              >
-                {testShowTips ? "Hide tips" : "Show tips"}
-              </button>
-            </div>
-            <div className="mt-3 aspect-[4/3] overflow-hidden rounded-lg bg-[var(--color-bg-subtle)] ring-1 ring-[var(--color-border-subtle)]">
-              {testResult ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={testResult} alt="Background test result" className="h-full w-full object-cover" />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={startBackgroundTest}
+            >
+              <RefreshCw className="size-4" />
+              {testStream ? "Restart" : "Start test"}
+            </Button>
+            <Button
+              variant="gradient"
+              size="sm"
+              onClick={captureBackgroundTest}
+              disabled={testLoading}
+            >
+              {testLoading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Capturing…
+                </>
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs text-[var(--color-text-muted)]">
-                  Capture a frame to see how your background will look.
+                <>
+                  <Camera className="size-4" />
+                  Capture
+                </>
+              )}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={stopTestStream}
+            >
+              <StopCircle className="size-4" />
+              Stop
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {testError && (
+          <Alert variant="destructive">
+            <AlertDescription>{testError}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-3">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-secondary ring-1 ring-border">
+              <video
+                ref={testVideoRef}
+                className="h-full w-full object-cover"
+                playsInline
+                muted
+                autoPlay
+              />
+              {!testVideoReady && (
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+                  {testStream ? "Starting camera…" : "Start the tester to preview your setup."}
                 </div>
               )}
             </div>
+            {testMessage && <p className="text-sm text-muted-foreground">{testMessage}</p>}
+            {testProcessing && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <LoadingSpinner size="sm" />
+                Running background removal…
+              </div>
+            )}
           </div>
-          {testShowTips && (
-            <div className="space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
-              <p className="font-semibold">Quick tips</p>
-              <ul className="space-y-1 text-[var(--color-text-muted)]">
-                <li>• Keep subjects 2–3 ft in front of a light gray wall or backdrop.</li>
-                <li>• Aim the ring light slightly above eye level to avoid harsh shadows.</li>
-                <li>• Remove backlighting and keep the camera at 5–5.3 ft height.</li>
-                <li>• Capture once to confirm framing, then start your event.</li>
-              </ul>
-            </div>
-          )}
+
+          <div className="space-y-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Captured Preview</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTestShowTips((prev) => !prev)}
+                  >
+                    <Lightbulb className="size-4" />
+                    {testShowTips ? "Hide tips" : "Tips"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="aspect-[4/3] overflow-hidden rounded-lg bg-secondary ring-1 ring-border">
+                  {testResult ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={testResult} alt="Background test result" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground p-4 text-center">
+                      Capture a frame to see how your background will look.
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {testShowTips && (
+              <Card className="bg-secondary">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Quick Tips</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    <li>• Keep subjects 2–3 ft in front of a light gray wall or backdrop.</li>
+                    <li>• Aim the ring light slightly above eye level to avoid harsh shadows.</li>
+                    <li>• Remove backlighting and keep the camera at 5–5.3 ft height.</li>
+                    <li>• Capture once to confirm framing, then start your event.</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
-      </div>
-      <canvas ref={testCanvasRef} className="hidden" />
-    </div>
+        <canvas ref={testCanvasRef} className="hidden" />
+      </CardContent>
+    </Card>
   );
 }
