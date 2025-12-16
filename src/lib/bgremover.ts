@@ -2,7 +2,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const DEFAULT_BGREMOVER_BASE = "https://modnet.boothos.com";
+const DEFAULT_BGREMOVER_BASE = "https://modnet.boothos.app";
 const DEFAULT_SOURCE_BASE =
   process.env.BGREMOVER_SOURCE_BASE ||
   process.env.APP_BASE_URL ||
