@@ -1,5 +1,5 @@
 import SavingsCalculator from "@/app/components/SavingsCalculator";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 
 export default function SavingsPage() {
   return (

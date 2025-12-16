@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 
 const features = [
   "Check-in guests by name, email, or phone",
@@ -33,7 +33,7 @@ export default function PhotographersPage() {
           </ul>
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
-              Photographer Mode starts at $100 per event or $250 per month for unlimited events. It's
+              Photographer Mode starts at $100 per event or $250 per month for unlimited events. It&apos;s
               designed to be resold as a premium add-on in your packages.
             </p>
           </div>

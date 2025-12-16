@@ -9,12 +9,11 @@ import EventAccessGate from "../../event-access";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { StepIndicator } from "@/components/ui/step-indicator";
-import { LoadingSpinner, LoadingOverlay } from "@/components/ui/loading-spinner";
-import { cn } from "@/lib/utils";
+import { LoadingOverlay } from "@/components/ui/loading-spinner";
 
 type Photo = {
   id: string;

@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingSpinner, LoadingOverlay } from "@/components/ui/loading-spinner";
@@ -484,7 +483,7 @@ export default function ReviewPage() {
                   Guest Email
                 </CardTitle>
                 <CardDescription>
-                  Enter the guest's email to load their photos
+                  Enter the guest&apos;s email to load their photos
                 </CardDescription>
               </CardHeader>
               <CardContent>

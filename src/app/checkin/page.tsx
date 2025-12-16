@@ -113,7 +113,7 @@ export default function CheckinPage() {
                 New Check-in
               </CardTitle>
               <CardDescription>
-                Enter the guest's details to add them to the photographer dropdown
+                Enter the guest&apos;s details to add them to the photographer dropdown
               </CardDescription>
             </CardHeader>
             <CardContent>

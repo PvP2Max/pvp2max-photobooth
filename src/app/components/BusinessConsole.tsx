@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
-import { Home, Calendar, Mail, Settings, LogOut, Plus, RotateCw, Trash2, Key, ExternalLink, Copy, Check, QrCode, Download, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, Calendar, Mail, Settings, LogOut, Plus, RotateCw, Trash2, Key, ExternalLink, Download, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { Stat } from "./console/Stat";
 import { LinkActions } from "./console/LinkActions";
 import { BackgroundTester } from "./console/BackgroundTester";
 import { CreateEventModal } from "./console/CreateEventModal";
@@ -13,7 +12,7 @@ import { QrModal } from "./console/QrModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";

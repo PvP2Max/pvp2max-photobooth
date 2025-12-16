@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 
 const gear = [
   "iPad or modern smartphone",
@@ -23,7 +23,7 @@ export default function GetStartedPage() {
       <div className="space-y-3">
         <h1 className="text-3xl font-semibold md:text-4xl">Get Started with BoothOS</h1>
         <p className="text-sm text-muted-foreground">
-          You don't need expensive hardware to run a great booth. Here's what we recommend for a
+          You don&apos;t need expensive hardware to run a great booth. Here&apos;s what we recommend for a
           clean, reliable setup.
         </p>
       </div>
@@ -61,7 +61,7 @@ export default function GetStartedPage() {
               Ready to host your first event?
             </p>
             <p className="text-sm text-muted-foreground">
-              Set up your event, open booth mode, and you're ready to welcome guests.
+              Set up your event, open booth mode, and you&apos;re ready to welcome guests.
             </p>
           </div>
           <Button variant="gradient" asChild>
