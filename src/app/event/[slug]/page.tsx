@@ -193,15 +193,23 @@ export default function BoothPage() {
     if (!video || !canvas) return null;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    const side =
-      Math.min(video.videoWidth || 1280, video.videoHeight || 720) || video.videoWidth || 1080;
-    canvas.width = side;
-    canvas.height = side;
-    const sx = ((video.videoWidth || side) - side) / 2;
-    const sy = ((video.videoHeight || side) - side) / 2;
+
+    // Calculate square crop from video center
+    const videoSide = Math.min(video.videoWidth || 1280, video.videoHeight || 720);
+    const sx = ((video.videoWidth || videoSide) - videoSide) / 2;
+    const sy = ((video.videoHeight || videoSide) - videoSide) / 2;
+
+    // Limit output size to reduce upload size (max 1024px for faster uploads)
+    const maxSize = 1024;
+    const outputSide = Math.min(videoSide, maxSize);
+    canvas.width = outputSide;
+    canvas.height = outputSide;
+
     ctx.filter = "none";
-    ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side);
-    return canvas.toDataURL("image/png");
+    ctx.drawImage(video, sx, sy, videoSide, videoSide, 0, 0, outputSide, outputSide);
+
+    // Use JPEG at 85% quality (~200-400KB vs 2-5MB for PNG)
+    return canvas.toDataURL("image/jpeg", 0.85);
   }
 
   function beginCountdown() {
@@ -279,7 +287,7 @@ export default function BoothPage() {
     setStatus("Sending to MODNet…");
     setError(null);
     try {
-      const file = dataUrlToFile(captured, "booth-capture.png");
+      const file = dataUrlToFile(captured, "booth-capture.jpg");
       const form = new FormData();
       form.append("email", email.trim());
       form.append("file", file);
