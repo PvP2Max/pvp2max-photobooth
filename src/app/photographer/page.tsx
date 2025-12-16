@@ -2,16 +2,30 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw, Upload, UserCheck, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import EventAccessGate from "../event-access";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Checkin = { id: string; name: string; email: string; createdAt: string };
 
 export default function PhotographerPage() {
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [selectedCheckinId, setSelectedCheckinId] = useState("");
-  const [loadingCheckins, setLoadingCheckins] = useState(false);
+  const [loadingCheckins, setLoadingCheckins] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedCheckin = useMemo(
@@ -57,7 +71,6 @@ export default function PhotographerPage() {
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
 
     const form = event.currentTarget;
     const fileInput = form.elements.namedItem("file") as HTMLInputElement;
@@ -98,17 +111,22 @@ export default function PhotographerPage() {
         : 1;
       const failureCount = payload.failures?.length ?? 0;
 
-      setMessage(
-        failureCount > 0
-          ? `${successCount} photo(s) processed. ${failureCount} failed.`
-          : `${successCount} photo(s) processed and ready for ${selectedCheckin.name}.`,
-      );
+      if (failureCount > 0) {
+        toast.warning("Upload partially completed", {
+          description: `${successCount} photo(s) processed, ${failureCount} failed.`,
+        });
+      } else {
+        toast.success("Photos uploaded successfully", {
+          description: `${successCount} photo(s) processed for ${selectedCheckin.name}.`,
+        });
+      }
       await loadCheckins();
       form.reset();
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Could not upload the photo(s).";
       setError(msg);
+      toast.error("Upload failed", { description: msg });
     } finally {
       setUploading(false);
     }
@@ -116,108 +134,125 @@ export default function PhotographerPage() {
 
   return (
     <EventAccessGate>
-      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <div className="min-h-screen bg-background text-foreground">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
         <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-12">
-          <div className="space-y-2">
-            <p className="text-sm uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
-              Photographer lane
-            </p>
-            <h1 className="text-3xl font-semibold">
-              Upload & auto-remove backgrounds
-            </h1>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Check guests in first, then pick their email from the dropdown so uploads stay grouped for
-              review.
-            </p>
-            <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-muted)]">
-              <Link
-                href="/checkin"
-                className="rounded-full bg-[var(--color-surface)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-              >
-                Open check-in
-              </Link>
-              <button
-                type="button"
-                onClick={loadCheckins}
-                className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 text-left ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
-              >
-                Refresh dropdown
-              </button>
-            </div>
-          </div>
+          <PageHeader
+            title="Photographer Lane"
+            description="Upload photos and automatically remove backgrounds. Select a checked-in guest first, then upload their photos."
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href="/checkin">
+                    <UserCheck className="size-4" />
+                    Check-in
+                  </Link>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={loadCheckins}>
+                  <RefreshCw className="size-4" />
+                  Refresh
+                </Button>
+              </div>
+            }
+          />
 
-          {(message || error) && (
-            <div
-              className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
-                error
-                  ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-                  : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]"
-              }`}
-            >
-              {error || message}
-            </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          <form
-            onSubmit={handleUpload}
-            className="grid gap-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
-          >
-            <label className="text-sm text-[var(--color-text-muted)]">
-              Choose checked-in guest
-              <select
-                required
-                value={selectedCheckinId}
-                onChange={(e) => setSelectedCheckinId(e.target.value)}
-                disabled={checkins.length === 0}
-                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] focus:border-[var(--input-border-focus)] focus:outline-none disabled:opacity-50"
-              >
-                <option value="" disabled>
-                  {loadingCheckins ? "Loading..." : "Select a check-in"}
-                </option>
-                {checkins.map((checkin) => (
-                  <option key={checkin.id} value={checkin.id} className="bg-slate-900 text-white">
-                    {checkin.name} — {checkin.email}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs text-slate-300/70">
-                Add new guests on the check-in page; refresh to pull the latest list.
-              </p>
-            </label>
-            <label className="text-sm text-slate-200/80">
-              Select one or more photos
-              <input
-                name="file"
-                type="file"
-                accept="image/*"
-                required
-                multiple
-                disabled={!selectedCheckin}
-                className="mt-2 w-full rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-3 text-sm text-[var(--color-text)] file:mr-3 file:rounded-lg file:border-0 file:bg-[rgba(155,92,255,0.18)] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={uploading || !selectedCheckin}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] transition hover:opacity-95 disabled:opacity-50"
-            >
-              {uploading ? "Processing..." : "Upload & remove background"}
-            </button>
-            <p className="text-xs text-[var(--color-text-soft)]">
-              Files route to the MODNet bgremover (modnet.boothos.com) with the service token, then cut-outs stay
-              local for review until delivery.
-            </p>
-            {checkins.length === 0 && (
-              <div className="rounded-xl border border-dashed border-[var(--color-border-subtle)] bg-[var(--color-surface-elevated)] px-3 py-2 text-xs text-[var(--color-text-muted)]">
-                No check-ins yet. Add guests on the{" "}
-                <Link href="/checkin" className="underline text-[var(--color-accent-soft)]">
-                  check-in page
-                </Link>{" "}
-                before uploading.
-              </div>
-            )}
-          </form>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="size-5" />
+                Upload Photos
+              </CardTitle>
+              <CardDescription>
+                Select a guest and upload their photos. Backgrounds will be automatically removed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleUpload} className="grid gap-5">
+                <div className="space-y-2">
+                  <Label htmlFor="guest">Select Guest</Label>
+                  {loadingCheckins ? (
+                    <div className="flex h-10 items-center gap-2 rounded-xl border border-border bg-input/30 px-3">
+                      <LoadingSpinner size="sm" />
+                      <span className="text-sm text-muted-foreground">Loading guests...</span>
+                    </div>
+                  ) : checkins.length === 0 ? (
+                    <Alert>
+                      <AlertCircle className="size-4" />
+                      <AlertDescription>
+                        No guests checked in yet.{" "}
+                        <Link href="/checkin" className="underline text-primary hover:text-primary/80">
+                          Add guests on the check-in page
+                        </Link>{" "}
+                        first.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Select value={selectedCheckinId} onValueChange={setSelectedCheckinId}>
+                      <SelectTrigger className="h-10 rounded-xl">
+                        <SelectValue placeholder="Select a guest" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {checkins.map((checkin) => (
+                          <SelectItem key={checkin.id} value={checkin.id}>
+                            <span className="font-medium">{checkin.name}</span>
+                            <span className="ml-2 text-muted-foreground">{checkin.email}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Add new guests on the check-in page; refresh to pull the latest list.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="file">Select Photos</Label>
+                  <input
+                    id="file"
+                    name="file"
+                    type="file"
+                    accept="image/*"
+                    required
+                    multiple
+                    disabled={!selectedCheckin}
+                    className="w-full rounded-xl border border-dashed border-border bg-input/30 px-3 py-4 text-sm text-foreground transition-colors file:mr-3 file:rounded-lg file:border-0 file:bg-primary/20 file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:border-primary/50 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="gradient"
+                  size="lg"
+                  disabled={uploading || !selectedCheckin}
+                  className="w-full sm:w-auto"
+                >
+                  {uploading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="size-4" />
+                      Upload & remove background
+                    </>
+                  )}
+                </Button>
+
+                <p className="text-xs text-muted-foreground">
+                  Photos are processed through the MODNet background remover, then stored for review before delivery.
+                </p>
+              </form>
+            </CardContent>
+          </Card>
         </main>
       </div>
     </EventAccessGate>

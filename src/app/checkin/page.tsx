@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { RefreshCw, Camera, Monitor, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 import EventAccessGate from "../event-access";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Checkin = { id: string; name: string; email: string; createdAt: string };
 
@@ -11,7 +22,7 @@ export default function CheckinPage() {
   const [email, setEmail] = useState("");
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function loadCheckins() {
@@ -25,6 +36,8 @@ export default function CheckinPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load check-ins.";
       setError(msg);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -35,7 +48,6 @@ export default function CheckinPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     setSaving(true);
     try {
       const response = await fetch("/api/checkins", {
@@ -47,13 +59,16 @@ export default function CheckinPage() {
       if (!response.ok || !payload.checkin) {
         throw new Error(payload.error || "Unable to check in.");
       }
-      setMessage("Checked in. The photographer dropdown is updated.");
+      toast.success("Guest checked in successfully", {
+        description: "The photographer dropdown has been updated.",
+      });
       setName("");
       setEmail("");
       loadCheckins();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to check in.";
       setError(msg);
+      toast.error("Check-in failed", { description: msg });
     } finally {
       setSaving(false);
     }
@@ -61,109 +76,149 @@ export default function CheckinPage() {
 
   return (
     <EventAccessGate>
-      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <div className="min-h-screen bg-background text-foreground">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
         <main className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-12">
-          <div className="space-y-2">
-            <p className="text-sm uppercase tracking-[0.25em] text-[var(--color-text-soft)]">Guest check-in</p>
-            <h1 className="text-3xl font-semibold">Collect name + email before shooting</h1>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Check guests in here so the photographer can pick their email from a dropdown. The review station
-              types the email manually to keep addresses private at the counter.
-            </p>
-            <div className="flex flex-wrap gap-3 text-xs text-[var(--color-text-muted)]">
-              <Link href="/photographer" className="rounded-full bg-[var(--color-surface-elevated)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface)]">
-                Go to photographer lane
-              </Link>
-              <Link href="/review" className="rounded-full bg-[var(--color-surface)] px-3 py-1 ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface-elevated)]">
-                Go to review
-              </Link>
-            </div>
-          </div>
+          <PageHeader
+            title="Guest Check-in"
+            description="Collect name and email before the photoshoot. The photographer can then select guests from a dropdown."
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href="/photographer">
+                    <Camera className="size-4" />
+                    Photographer
+                  </Link>
+                </Button>
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href="/review">
+                    <Monitor className="size-4" />
+                    Review
+                  </Link>
+                </Button>
+              </div>
+            }
+          />
 
-          {(message || error) && (
-            <div
-              className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
-                error
-                  ? "bg-[var(--color-danger-soft)] text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]"
-                  : "bg-[var(--color-success-soft)] text-[var(--color-text)] ring-1 ring-[rgba(34,197,94,0.35)]"
-              }`}
-            >
-              {error || message}
-            </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
-          <form
-            onSubmit={handleSubmit}
-            className="grid gap-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
-          >
-            <label className="text-sm text-[var(--color-text-muted)]">
-              Name
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Taylor Brooks"
-                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-              />
-            </label>
-            <label className="text-sm text-[var(--color-text-muted)]">
-              Email
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="family@example.com"
-                className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.32)] transition hover:opacity-95 disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Check in guest"}
-            </button>
-            <p className="text-xs text-[var(--color-text-soft)]">
-              The photographer dropdown refreshes every time they open the page or tap refresh.
-            </p>
-          </form>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="size-5" />
+                New Check-in
+              </CardTitle>
+              <CardDescription>
+                Enter the guest's details to add them to the photographer dropdown
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Taylor Brooks"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="family@example.com"
+                  />
+                </div>
+                <Button type="submit" variant="gradient" disabled={saving} className="w-full sm:w-auto">
+                  {saving ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Checking in...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="size-4" />
+                      Check in guest
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-          {checkins.length > 0 && (
-            <section className="rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]">
+          <Card>
+            <CardHeader>
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-[var(--color-text)]">Recent check-ins</p>
-                <button
-                  type="button"
+                <div>
+                  <CardTitle>Recent Check-ins</CardTitle>
+                  <CardDescription>
+                    Guests checked in today
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={loadCheckins}
-                  className="text-xs text-[var(--color-accent-soft)] hover:text-[var(--color-accent)] underline"
+                  aria-label="Refresh list"
                 >
-                  Refresh list
-                </button>
+                  <RefreshCw className="size-4" />
+                  Refresh
+                </Button>
               </div>
-              <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)]">
-                {checkins.slice(0, 6).map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between rounded-xl bg-[var(--color-surface-elevated)] px-3 py-2 ring-1 ring-[var(--color-border-subtle)]"
-                  >
-                    <div>
-                      <p className="font-semibold text-[var(--color-text)]">{c.name}</p>
-                      <p className="text-xs text-[var(--color-text-soft)]">{c.email}</p>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between rounded-xl bg-secondary p-3">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                      <Skeleton className="h-3 w-16" />
                     </div>
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
-                      {new Date(c.createdAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                  ))}
+                </div>
+              ) : checkins.length === 0 ? (
+                <EmptyState
+                  icon={<UserPlus className="size-6" />}
+                  title="No check-ins yet"
+                  description="Guests will appear here after they check in"
+                />
+              ) : (
+                <div className="space-y-2">
+                  {checkins.slice(0, 6).map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between rounded-xl bg-secondary p-3 ring-1 ring-border"
+                    >
+                      <div>
+                        <p className="font-medium text-foreground">{c.name}</p>
+                        <p className="text-sm text-muted-foreground">{c.email}</p>
+                      </div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        {new Date(c.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </main>
       </div>
     </EventAccessGate>

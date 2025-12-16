@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import AppShellHeader from "./app-shell-header";
 import AuthProvider from "./auth-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "BoothOS | Arctic Aura Designs",
@@ -25,6 +26,7 @@ export default function RootLayout({
         <AuthProvider />
         <AppShellHeader />
         {children}
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

@@ -4,6 +4,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase-client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { AlertCircle } from "lucide-react";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -20,7 +28,6 @@ export default function LoginForm() {
     try {
       const { auth } = getFirebaseClient();
       if (registering) {
-        // Create user in Firebase; business/event seeding should be done via owner APIs after login.
         await createUserWithEmailAndPassword(auth, email, password);
       } else {
         await signInWithEmailAndPassword(auth, email, password);
@@ -35,76 +42,104 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-12">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">BoothOS</p>
-          <h1 className="text-3xl font-semibold">Login</h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            Sign in with your BoothOS account. Toggle “Create account” if you’re new and need to seed your business and
-            first event.
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-12">
+        <div className="space-y-2 text-center">
+          <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">BoothOS</p>
+          <h1 className="text-3xl font-semibold">Welcome back</h1>
+          <p className="text-sm text-muted-foreground">
+            Sign in to your account to continue
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="grid gap-4 rounded-3xl bg-[var(--color-surface)] p-6 ring-1 ring-[var(--color-border-subtle)] shadow-[var(--shadow-soft)]"
-        >
-          {error && (
-            <div className="rounded-xl bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
-              {error}
-            </div>
-          )}
-          <label className="text-sm text-[var(--color-text-muted)]">
-            Email
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-            />
-          </label>
-          <label className="text-sm text-[var(--color-text-muted)]">
-            Password
-            <input
-              required
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-base text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-            />
-          </label>
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-xl">
+              {registering ? "Create account" : "Sign in"}
+            </CardTitle>
+            <CardDescription>
+              {registering
+                ? "Enter your details to create a new account"
+                : "Enter your credentials to access your dashboard"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="grid gap-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-          <label className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-            <input
-              type="checkbox"
-              checked={registering}
-              onChange={(e) => setRegistering(e.target.checked)}
-              className="h-4 w-4"
-            />
-            Create Firebase account
-          </label>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={loading}
-              className="rounded-full bg-[var(--gradient-brand)] px-5 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90 disabled:opacity-60"
-            >
-              {registering ? "Create account" : loading ? "Signing in…" : "Sign in"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRegistering((prev) => !prev);
-              }}
-              className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-            >
-              {registering ? "Use existing account" : "Create a new account"}
-            </button>
-          </div>
-        </form>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete={registering ? "new-password" : "current-password"}
+                />
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="register"
+                  checked={registering}
+                  onCheckedChange={(checked) => setRegistering(checked === true)}
+                />
+                <Label htmlFor="register" className="text-sm font-normal cursor-pointer">
+                  Create a new account
+                </Label>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  type="submit"
+                  variant="gradient"
+                  size="lg"
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      {registering ? "Creating account..." : "Signing in..."}
+                    </>
+                  ) : registering ? (
+                    "Create account"
+                  ) : (
+                    "Sign in"
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setRegistering((prev) => !prev)}
+                >
+                  {registering ? "Already have an account? Sign in" : "Need an account? Create one"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

@@ -3,11 +3,23 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import { Home, Calendar, Mail, Settings, LogOut, Plus, RotateCw, Trash2, Key, ExternalLink, Copy, Check, QrCode, Download, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 import { Stat } from "./console/Stat";
 import { LinkActions } from "./console/LinkActions";
 import { BackgroundTester } from "./console/BackgroundTester";
 import { CreateEventModal } from "./console/CreateEventModal";
 import { QrModal } from "./console/QrModal";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { cn } from "@/lib/utils";
 
 type BusinessSession = {
   business: {
@@ -68,7 +80,6 @@ function linkFor(pathname: string, business: string, event: string) {
     process.env.NEXT_PUBLIC_APP_BASE_URL ||
     process.env.APP_BASE_URL ||
     "";
-  // Ensure pathname has leading slash
   const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
   return `${base}${path}?${qs}`;
 }
@@ -98,7 +109,6 @@ export default function BusinessConsole() {
   const [loading, setLoading] = useState(false);
   const businessSlug = "";
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
   const [newPlan, setNewPlan] = useState("free");
   const [newMode, setNewMode] = useState<"self-serve" | "photographer">("self-serve");
@@ -130,46 +140,12 @@ export default function BusinessConsole() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const navIcons: Record<"overview" | "events" | "deliveries", ReactNode> = {
-    overview: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-    events: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    ),
-    deliveries: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M4.5 5h15a.5.5 0 0 1 .4.8L12 15 4.1 5.8A.5.5 0 0 1 4.5 5Z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M4 6.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6.5"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  };
+
   const navTabs = useMemo(
     () => [
-      { id: "overview" as const, label: "Overview" },
-      { id: "events" as const, label: "Events" },
-      { id: "deliveries" as const, label: "Deliveries" },
+      { id: "overview" as const, label: "Overview", icon: Home },
+      { id: "events" as const, label: "Events", icon: Calendar },
+      { id: "deliveries" as const, label: "Deliveries", icon: Mail },
     ],
     [],
   );
@@ -187,6 +163,7 @@ export default function BusinessConsole() {
     const hasPhotogEvent = (session?.events ?? []).some((e) => e.plan?.startsWith("photographer"));
     return plan.includes("photographer") || hasPhotogEvent;
   }, [session]);
+
   const hasPhotographerSubscription = useMemo(() => {
     const plan = session?.business.subscriptionPlan ?? "";
     const status = session?.business.subscriptionStatus ?? "";
@@ -254,7 +231,6 @@ export default function BusinessConsole() {
       .catch(() => {});
   }
 
-  // Helper to check if plan requires payment
   function isPaidPlan(plan: string): boolean {
     if (plan === "free") return false;
     if (plan === "photographer-event" && hasPhotographerSubscription) return false;
@@ -279,7 +255,6 @@ export default function BusinessConsole() {
       eventTime: newEventTime,
     };
 
-    // For paid plans, redirect to checkout instead of creating event directly
     if (isPaidPlan(newPlan)) {
       try {
         const res = await fetch("/api/billing/checkout", {
@@ -288,25 +263,25 @@ export default function BusinessConsole() {
           credentials: "include",
           body: JSON.stringify({
             plan: newPlan,
-            eventData: payload, // Pass event data to be stored in checkout session
+            eventData: payload,
           }),
         });
         const data = (await res.json()) as { url?: string; error?: string };
         if (!res.ok || !data.url) {
           setError(data.error || "Could not start checkout.");
+          toast.error("Checkout failed", { description: data.error });
           return;
         }
-        // Redirect to Stripe checkout
         window.location.href = data.url;
         return;
       } catch (err) {
         console.error(err);
         setError("Could not start checkout.");
+        toast.error("Checkout failed");
         return;
       }
     }
 
-    // For free plans (or photographer-event with subscription), create event directly
     try {
       const res = await fetch(`/api/events`, {
         method: "POST",
@@ -319,12 +294,13 @@ export default function BusinessConsole() {
       const data = (await res.json()) as { error?: string; event?: EventItem };
       if (!res.ok || data.error) {
         setError(data.error || "Could not create event.");
+        toast.error("Failed to create event", { description: data.error });
         return;
       }
       setSession((prev) =>
         prev ? { ...prev, events: [data.event as EventItem, ...prev.events] } : prev,
       );
-      setMessage("Event created.");
+      toast.success("Event created", { description: `${newEventName} is ready to go!` });
       setNewEventName("");
       setNewPlan("free");
       setNewMode("self-serve");
@@ -341,6 +317,7 @@ export default function BusinessConsole() {
     } catch (err) {
       console.error(err);
       setError("Could not create event.");
+      toast.error("Failed to create event");
     }
   }
 
@@ -359,12 +336,15 @@ export default function BusinessConsole() {
       const data = (await res.json()) as { key?: string; error?: string };
       if (!res.ok || data.error) {
         setIssuingKey((prev) => ({ ...prev, [eventSlug]: data.error || "Failed" }));
+        toast.error("Key rotation failed", { description: data.error });
         return;
       }
       setIssuingKey((prev) => ({ ...prev, [eventSlug]: data.key || "Updated" }));
+      toast.success("Key rotated successfully");
     } catch (err) {
       console.error(err);
       setIssuingKey((prev) => ({ ...prev, [eventSlug]: "Failed" }));
+      toast.error("Key rotation failed");
     }
   }
 
@@ -390,16 +370,16 @@ export default function BusinessConsole() {
               }
             : prev,
         );
+        toast.success(status === "closed" ? "Event closed" : "Event reopened");
       }
     } catch {
-      // ignore
+      toast.error("Failed to update event status");
     }
   }
 
   async function deleteEvent(eventId: string) {
     if (!window.confirm("Delete this event and all its files now? This cannot be undone.")) return;
     setError(null);
-    setMessage(null);
     try {
       const res = await fetch(`/api/events/delete?business=${encodeURIComponent(businessSlug)}`, {
         method: "POST",
@@ -417,10 +397,11 @@ export default function BusinessConsole() {
       setSession((prev) =>
         prev ? { ...prev, events: prev.events.filter((e) => e.id !== eventId) } : prev,
       );
-      setMessage("Event deleted and storage removed.");
+      toast.success("Event deleted", { description: "Event and storage removed." });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not delete event.";
       setError(msg);
+      toast.error("Delete failed", { description: msg });
     }
   }
 
@@ -444,6 +425,7 @@ export default function BusinessConsole() {
       const data = (await res.json().catch(() => ({}))) as { event?: EventItem; error?: string };
       if (!res.ok || data.error || !data.event) {
         setRolesStatus((prev) => ({ ...prev, [eventSlug]: data.error || "Failed" }));
+        toast.error("Failed to save collaborators", { description: data.error });
         return;
       }
       setSession((prev) =>
@@ -457,9 +439,11 @@ export default function BusinessConsole() {
           : prev,
       );
       setRolesStatus((prev) => ({ ...prev, [eventSlug]: "Saved" }));
+      toast.success("Collaborators saved");
     } catch (err) {
       console.error(err);
       setRolesStatus((prev) => ({ ...prev, [eventSlug]: "Failed" }));
+      toast.error("Failed to save collaborators");
     }
   }
 
@@ -474,7 +458,7 @@ export default function BusinessConsole() {
       setProductions((prev) => ({ ...prev, [eventSlug]: data }));
       setProductionEvent(eventSlug);
     } catch {
-      // ignore
+      toast.error("Failed to load deliveries");
     } finally {
       setLoadingProductions(false);
     }
@@ -493,17 +477,23 @@ export default function BusinessConsole() {
       });
       if (res.ok) {
         setSelectionStatus((prev) => ({ ...prev, [productionId]: "Sent" }));
+        toast.success("Email resent");
       } else {
         setSelectionStatus((prev) => ({ ...prev, [productionId]: "Failed" }));
+        toast.error("Failed to resend email");
       }
     } catch {
       setSelectionStatus((prev) => ({ ...prev, [productionId]: "Failed" }));
+      toast.error("Failed to resend email");
     }
   }
 
   async function createSelectionLink(eventSlug: string) {
     const email = selectionEmails[eventSlug];
-    if (!email) return;
+    if (!email) {
+      toast.error("Enter an email address first");
+      return;
+    }
     setSelectionStatus((prev) => ({ ...prev, [eventSlug]: "Sending…" }));
     try {
       const res = await fetch("/api/selections/start", {
@@ -515,12 +505,15 @@ export default function BusinessConsole() {
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || data.error) {
         setSelectionStatus((prev) => ({ ...prev, [eventSlug]: data.error || "Failed" }));
+        toast.error("Failed to create selection link", { description: data.error });
         return;
       }
       setSelectionLinks((prev) => ({ ...prev, [eventSlug]: data.url || "" }));
       setSelectionStatus((prev) => ({ ...prev, [eventSlug]: "Sent" }));
+      toast.success("Selection link sent", { description: `Email sent to ${email}` });
     } catch {
       setSelectionStatus((prev) => ({ ...prev, [eventSlug]: "Failed" }));
+      toast.error("Failed to create selection link");
     }
   }
 
@@ -537,12 +530,14 @@ export default function BusinessConsole() {
       if (!res.ok || !data.url) {
         setCheckoutLoading(null);
         setError(data.error || "Could not start checkout.");
+        toast.error("Checkout failed", { description: data.error });
         return;
       }
       window.location.href = data.url;
     } catch {
       setCheckoutLoading(null);
       setError("Could not start checkout.");
+      toast.error("Checkout failed");
     }
   }
 
@@ -564,9 +559,12 @@ export default function BusinessConsole() {
       .writeText(url)
       .then(() => {
         setCopyStatus((prev) => ({ ...prev, [key]: true }));
+        toast.success("Link copied!");
         window.setTimeout(() => setCopyStatus((prev) => ({ ...prev, [key]: false })), 1500);
       })
-      .catch(() => {});
+      .catch(() => {
+        toast.error("Failed to copy link");
+      });
   }
 
   async function generateCheckinGraphic(checkinUrl: string, eventName: string): Promise<string> {
@@ -575,36 +573,30 @@ export default function BusinessConsole() {
     canvas.height = 1920;
     const ctx = canvas.getContext('2d')!;
 
-    // Background gradient (purple to cyan)
     const gradient = ctx.createLinearGradient(0, 0, 1080, 1920);
     gradient.addColorStop(0, '#1a0a2e');
     gradient.addColorStop(1, '#0a1628');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1920);
 
-    // "Check-in Here" text
     ctx.font = 'bold 72px system-ui';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.fillText('Check-in Here', 540, 300);
 
-    // Event name
     ctx.font = '48px system-ui';
     ctx.fillStyle = '#a3aac7';
     ctx.fillText(eventName, 540, 380);
 
-    // QR Code
     const qrDataUrl = await QRCode.toDataURL(checkinUrl, { width: 600, margin: 2 });
     const qrImg = new Image();
     await new Promise(r => { qrImg.onload = r; qrImg.src = qrDataUrl; });
     ctx.drawImage(qrImg, 240, 500, 600, 600);
 
-    // "Scan to check in" text
     ctx.font = '36px system-ui';
     ctx.fillStyle = '#7b81a3';
     ctx.fillText('Scan to check in', 540, 1200);
 
-    // BoothOS branding at bottom
     ctx.font = 'bold 42px system-ui';
     ctx.fillStyle = '#9b5cff';
     ctx.fillText('BoothOS', 540, 1800);
@@ -620,90 +612,109 @@ export default function BusinessConsole() {
       link.download = `${eventSlug}-checkin-qr.png`;
       link.href = dataUrl;
       link.click();
+      toast.success("QR graphic downloaded");
     } catch (err) {
       console.error('Failed to generate check-in graphic:', err);
+      toast.error("Failed to generate QR graphic");
     }
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
-        Checking session…
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm text-muted-foreground">Checking session...</p>
+        </div>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center bg-[var(--color-bg)] text-[var(--color-text-muted)]">
-        Redirecting to login…
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner size="lg" />
+          <p className="text-sm text-muted-foreground">Redirecting to login...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 px-4 py-4 md:flex-row md:items-start md:gap-6 md:py-6">
         {/* Mobile: Horizontal scrolling nav tabs */}
         <nav className="flex gap-2 overflow-x-auto pb-2 md:hidden">
-          {navTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setView(tab.id)}
-              className={`flex flex-shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${
-                view === tab.id
-                  ? "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]"
-              }`}
-            >
-              {navIcons[tab.id]}
-              <span>{tab.label}</span>
-            </button>
-          ))}
-          <button
+          {navTabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <Button
+                key={tab.id}
+                variant={view === tab.id ? "default" : "secondary"}
+                size="sm"
+                onClick={() => setView(tab.id)}
+                className="flex-shrink-0"
+              >
+                <Icon className="size-4" />
+                {tab.label}
+              </Button>
+            );
+          })}
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setProfileOpen((prev) => !prev)}
-            className="flex flex-shrink-0 items-center gap-2 rounded-xl bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+            className="flex-shrink-0"
           >
+            <Settings className="size-4" />
             Account
-          </button>
+          </Button>
         </nav>
 
         {/* Mobile: Account dropdown */}
         {profileOpen && (
-          <div className="space-y-2 rounded-xl bg-[var(--color-surface)] p-3 text-sm ring-1 ring-[var(--color-border-subtle)] md:hidden">
-            <p className="px-3 py-1 text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
-              {session.business.name}
-            </p>
-            <button
-              type="button"
-              onClick={() =>
-                window.open(
-                  "https://billing.stripe.com/p/login/aFa14odXR5gweH4gQRgA800",
-                  "_blank",
-                  "noopener,noreferrer",
-                )
-              }
-              className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface-elevated)]"
-            >
-              Billing
-            </button>
-            <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface-elevated)]">
-              Settings
-            </button>
-            <button
-              onClick={logout}
-              className="w-full rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-            >
-              Sign out
-            </button>
-          </div>
+          <Card className="md:hidden">
+            <CardContent className="p-3 space-y-2">
+              <p className="px-3 py-1 text-xs uppercase tracking-wider text-muted-foreground">
+                {session.business.name}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() =>
+                  window.open(
+                    "https://billing.stripe.com/p/login/aFa14odXR5gweH4gQRgA800",
+                    "_blank",
+                    "noopener,noreferrer",
+                  )
+                }
+              >
+                Billing
+              </Button>
+              <Button variant="ghost" size="sm" className="w-full justify-start">
+                Settings
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={logout}
+                className="w-full"
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Desktop: Vertical sidebar */}
         <aside
-          className={`sticky top-6 hidden self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all md:block ${
+          className={cn(
+            "sticky top-6 hidden self-start rounded-2xl border border-border bg-card p-3 transition-all md:block",
             isSidebarWide ? "w-[230px]" : "w-[80px]"
-          }`}
+          )}
           onMouseEnter={() => {
             if (!sidebarCondensed) return;
             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -716,482 +727,513 @@ export default function BusinessConsole() {
           }}
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-elevated)] ring-1 ring-[var(--color-border-subtle)]">
-              <span className="text-lg font-semibold text-[var(--color-primary)]">B</span>
+            <div className="flex size-10 flex-shrink-0 items-center justify-center rounded-xl bg-secondary ring-1 ring-border">
+              <span className="text-lg font-semibold text-primary">B</span>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setSidebarCondensed((prev) => !prev)}
-              className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-xs text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
+              className="ml-auto size-8"
               aria-label={isSidebarWide ? "Collapse sidebar" : "Expand sidebar"}
             >
-              {isSidebarWide ? "⟨" : "⟩"}
-            </button>
+              {isSidebarWide ? <ChevronLeft className="size-4" /> : <ChevronRight className="size-4" />}
+            </Button>
           </div>
 
           <nav className="mt-6 space-y-2">
-            {navTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setView(tab.id)}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
-                  view === tab.id
-                    ? "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)]"
-                }`}
-              >
-                {navIcons[tab.id]}
-                {isSidebarWide && <span>{tab.label}</span>}
-              </button>
-            ))}
+            {navTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <Button
+                  key={tab.id}
+                  variant={view === tab.id ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setView(tab.id)}
+                  className={cn("w-full", isSidebarWide ? "justify-start" : "justify-center")}
+                >
+                  <Icon className="size-4" />
+                  {isSidebarWide && <span>{tab.label}</span>}
+                </Button>
+              );
+            })}
           </nav>
 
-          <div className="mt-auto flex flex-col gap-2 border-t border-[var(--color-border-subtle)] pt-3">
-            <button
+          <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setProfileOpen((prev) => !prev)}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold text-[var(--color-text)] transition hover:bg-[var(--color-surface-elevated)]"
+              className={cn("w-full", isSidebarWide ? "justify-between" : "justify-center")}
             >
-              <span>{isSidebarWide ? session.business.name : "Account"}</span>
-              {isSidebarWide && <span>{profileOpen ? "–" : "+"}</span>}
-            </button>
+              <span>{isSidebarWide ? session.business.name : ""}</span>
+              {isSidebarWide && (profileOpen ? <X className="size-4" /> : <Settings className="size-4" />)}
+              {!isSidebarWide && <Settings className="size-4" />}
+            </Button>
             {profileOpen && (
-              <div className="space-y-2 rounded-xl bg-[var(--color-surface-elevated)] p-3 text-sm ring-1 ring-[var(--color-border-subtle)]">
-                <button
-                  type="button"
-                  onClick={() =>
-                    window.open(
-                      "https://billing.stripe.com/p/login/aFa14odXR5gweH4gQRgA800",
-                      "_blank",
-                      "noopener,noreferrer",
-                    )
-                  }
-                  className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]"
-                >
-                  Billing
-                </button>
-                <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface)]">
-                  Settings
-                </button>
-                <button
-                  onClick={logout}
-                  className="w-full rounded-full bg-[var(--color-surface)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-                >
-                  Sign out
-                </button>
-              </div>
+              <Card className="p-2">
+                <div className="space-y-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() =>
+                      window.open(
+                        "https://billing.stripe.com/p/login/aFa14odXR5gweH4gQRgA800",
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
+                  >
+                    <ExternalLink className="size-4" />
+                    Billing
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full justify-start">
+                    <Settings className="size-4" />
+                    Settings
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={logout}
+                    className="w-full"
+                  >
+                    <LogOut className="size-4" />
+                    Sign out
+                  </Button>
+                </div>
+              </Card>
             )}
           </div>
         </aside>
 
         <main className="w-full flex-1 space-y-4 md:space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
-                BoothOS dashboard
-              </p>
-              <h1 className="text-2xl font-semibold text-[var(--color-text)]">
-                {isPhotographer ? "Photographer workspace" : "Events & delivery"}
-              </h1>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                {isPhotographer
+            <PageHeader
+              title={isPhotographer ? "Photographer workspace" : "Events & delivery"}
+              description={
+                isPhotographer
                   ? "Manage photographer events, check-ins, and delivery flows."
-                  : "Track self-serve events, uploads, and deliveries for your booth."}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setCreateModalOpen(true)}
-                className="rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-              >
-                Create event
-              </button>
-            </div>
+                  : "Track self-serve events, uploads, and deliveries for your booth."
+              }
+            />
+            <Button variant="gradient" onClick={() => setCreateModalOpen(true)}>
+              <Plus className="size-4" />
+              Create event
+            </Button>
           </div>
 
-          {/* Error/Message display */}
+          {/* Error display */}
           {error && (
-            <div className="rounded-xl bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
-              {error}
-              <button
-                onClick={() => setError(null)}
-                className="ml-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {message && (
-            <div className="rounded-xl bg-[var(--color-success-soft)] px-4 py-3 text-sm text-[var(--color-text)] ring-1 ring-[rgba(74,222,128,0.35)]">
-              {message}
-              <button
-                onClick={() => setMessage(null)}
-                className="ml-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-              >
-                ×
-              </button>
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription className="flex items-center justify-between">
+                {error}
+                <Button variant="ghost" size="icon" onClick={() => setError(null)} className="size-6">
+                  <X className="size-4" />
+                </Button>
+              </AlertDescription>
+            </Alert>
           )}
           {checkoutLoading && (
-            <div className="rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-              Redirecting to checkout...
-            </div>
+            <Alert>
+              <LoadingSpinner size="sm" />
+              <AlertDescription>Redirecting to checkout...</AlertDescription>
+            </Alert>
           )}
 
-          <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[var(--color-surface)] p-3 ring-1 ring-[var(--color-border-subtle)] sm:p-4 md:grid-cols-4">
-            <Stat label="Live events" value={stats.liveEvents} />
-            <Stat label="Closed events" value={stats.closedEvents} />
-            <Stat label="Photos used" value={stats.photoUsed} />
-            <Stat label="AI credits used" value={stats.aiUsed} />
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-semibold">{stats.liveEvents}</p>
+                <p className="text-xs text-muted-foreground">Live events</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-semibold">{stats.closedEvents}</p>
+                <p className="text-xs text-muted-foreground">Closed events</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-semibold">{stats.photoUsed}</p>
+                <p className="text-xs text-muted-foreground">Photos used</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-semibold">{stats.aiUsed}</p>
+                <p className="text-xs text-muted-foreground">AI credits used</p>
+              </CardContent>
+            </Card>
           </div>
 
           {view === "overview" && (
             <div className="space-y-4">
-              <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] sm:p-5">
-                <h2 className="text-lg font-semibold text-[var(--color-text)]">Active events</h2>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {activeEvents.map((event) => {
-                    const usage = usageFor(event);
-                    const boothLink = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
-                    const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
-                    const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
-                    const backgroundsLink = linkFor("/backgrounds", session.business.slug, event.slug);
-                    return (
-                      <div
-                        key={event.id}
-                        className="space-y-3 rounded-xl bg-[var(--color-surface-elevated)] p-4 ring-1 ring-[var(--color-border-subtle)]"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--color-text)]">{event.name}</p>
-                            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-text-soft)]">
-                              {event.slug}
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-[var(--color-surface)] px-3 py-1 text-[11px] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
-                            {event.status === "closed" ? "Closed" : "Live"}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-xs text-[var(--color-text-muted)]">
-                          <div>
-                            <p>Plan</p>
-                            <p className="font-semibold text-[var(--color-text)]">{event.plan ?? "Event-based"}</p>
-                          </div>
-                          <div>
-                            <p>Mode</p>
-                            <p className="font-semibold text-[var(--color-text)]">{event.mode ?? "self-serve"}</p>
-                          </div>
-                          <div>
-                            <p>Photos</p>
-                            <p className="font-semibold text-[var(--color-text)]">
-                              {usage.photoCap === null ? "Unlimited" : `${usage.photoUsed ?? 0}/${usage.photoCap}`}
-                            </p>
-                          </div>
-                          <div>
-                            <p>AI credits</p>
-                            <p className="font-semibold text-[var(--color-text)]">
-                              {usage.aiCredits === undefined ? "—" : `${usage.aiUsed}/${usage.aiCredits}`}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-2 text-xs text-[var(--color-text-muted)]">
-                          {event.mode === "photographer" ? (
-                            <div className="flex flex-col gap-2">
-                              <LinkActions
-                                label="Check-in"
-                                url={checkinLink}
-                                copyKey={`${event.slug}-checkin`}
-                                onCopy={copyLink}
-                                onQr={() => generateQr(checkinLink, `${event.name} check-in`)}
-                                showQr
-                                copied={copyStatus[`${event.slug}-checkin`] === true}
-                              />
-                          <LinkActions
-                            label="Photographer"
-                            url={photographerLink}
-                            copyKey={`${event.slug}-photographer`}
-                            onCopy={copyLink}
-                            onQr={() => generateQr(photographerLink, `${event.name} photographer`)}
-                            showQr
-                            copied={copyStatus[`${event.slug}-photographer`] === true}
-                          />
-                          <LinkActions
-                            label="Background manager"
-                            url={backgroundsLink}
-                            copyKey={`${event.slug}-backgrounds`}
-                            onCopy={copyLink}
-                            onQr={() => generateQr(backgroundsLink, `${event.name} backgrounds`)}
-                            showQr
-                            copied={copyStatus[`${event.slug}-backgrounds`] === true}
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-2">
-                          <LinkActions
-                            label="Booth link"
-                            url={boothLink}
-                            copyKey={`${event.slug}-booth`}
-                            onCopy={copyLink}
-                            onQr={() => generateQr(boothLink, `${event.name} booth`)}
-                            showQr
-                            copied={copyStatus[`${event.slug}-booth`] === true}
-                          />
-                          <LinkActions
-                            label="Background manager"
-                            url={backgroundsLink}
-                            copyKey={`${event.slug}-backgrounds`}
-                            onCopy={copyLink}
-                            onQr={() => generateQr(backgroundsLink, `${event.name} backgrounds`)}
-                            showQr
-                            copied={copyStatus[`${event.slug}-backgrounds`] === true}
-                          />
-                        </div>
-                      )}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <button
-                            onClick={() => deleteEvent(event.id)}
-                            className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-text)]"
-                          >
-                            Delete event
-                          </button>
-                          <button
-                            onClick={() => rotateEventKey(event.slug)}
-                            className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-                          >
-                            {issuingKey[event.slug] ?? "Rotate key"}
-                          </button>
-                          <button
-                            onClick={() => createCheckout("event-basic", event.slug)}
-                            className="rounded-full bg-[var(--gradient-brand)] px-3 py-2 font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-                          >
-                            Buy event plan
-                          </button>
-                          {event.mode === "photographer" && (
-                            <>
-                              <button
-                                onClick={() => createSelectionLink(event.slug)}
-                                className="rounded-full px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-                              >
-                                Send selection link
-                              </button>
-                              <button
-                                onClick={() => downloadCheckinGraphic(event.slug, event.name)}
-                                className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-                              >
-                                Download QR graphic
-                              </button>
-                            </>
-                          )}
-                        </div>
-
-                        {event.mode === "photographer" && (
-                          <div className="space-y-3 text-xs text-[var(--color-text-muted)]">
-                            <div className="rounded-xl bg-[var(--color-bg-subtle)] p-3 ring-1 ring-[var(--color-border-subtle)]">
-                              <p className="text-[var(--color-text)] font-semibold">Collaborator Access</p>
-                              <p className="mt-1 text-[var(--color-text-muted)]">
-                                Collaborators can upload photos and send deliveries
-                              </p>
-                              <div className="mt-2 grid gap-2">
-                                <label className="flex flex-col gap-1">
-                                  Collaborator emails (comma separated)
-                                  <input
-                                    type="text"
-                                    value={collaboratorInputs[event.slug] || ""}
-                                    onChange={(e) =>
-                                      setCollaboratorInputs((prev) => ({
-                                        ...prev,
-                                        [event.slug]: e.target.value,
-                                      }))
-                                    }
-                                    className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                                    placeholder="photographer@example.com, assistant@example.com"
-                                  />
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => saveRoles(event.slug)}
-                                    className="rounded-full bg-[var(--gradient-brand)] px-3 py-2 text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-                                  >
-                                    {rolesStatus[event.slug] ?? "Save collaborators"}
-                                  </button>
-                                  {rolesStatus[event.slug] && (
-                                    <span className="text-[var(--color-text-muted)]">
-                                      {rolesStatus[event.slug]}
-                                    </span>
-                                  )}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Active events</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activeEvents.length === 0 ? (
+                    <EmptyState
+                      icon={<Calendar className="size-6" />}
+                      title="No events yet"
+                      description="Create your first event to get started."
+                      action={
+                        <Button variant="gradient" onClick={() => setCreateModalOpen(true)}>
+                          <Plus className="size-4" />
+                          Create event
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {activeEvents.map((event) => {
+                        const usage = usageFor(event);
+                        const boothLink = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
+                        const checkinLink = linkFor("/checkin", session.business.slug, event.slug);
+                        const photographerLink = linkFor("/photographer", session.business.slug, event.slug);
+                        const backgroundsLink = linkFor("/backgrounds", session.business.slug, event.slug);
+                        return (
+                          <Card key={event.id} className="overflow-hidden">
+                            <CardContent className="p-4 space-y-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold">{event.name}</p>
+                                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                                    {event.slug}
+                                  </p>
                                 </div>
-                                {event.roles && event.roles.collaborator && event.roles.collaborator.length > 0 && (
-                                  <div className="mt-2 rounded-lg bg-[var(--color-surface)] p-2">
-                                    <p className="text-[var(--color-text)] font-semibold mb-1">Current collaborators:</p>
-                                    <div className="flex flex-wrap gap-1">
-                                      {event.roles.collaborator.map((email) => (
-                                        <span
-                                          key={email}
-                                          className="rounded-full bg-[var(--color-surface-elevated)] px-2 py-1 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
-                                        >
-                                          {email}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
+                                <Badge variant={event.status === "closed" ? "secondary" : "default"}>
+                                  {event.status === "closed" ? "Closed" : "Live"}
+                                </Badge>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <p className="text-muted-foreground">Plan</p>
+                                  <p className="font-semibold">{event.plan ?? "Event-based"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Mode</p>
+                                  <p className="font-semibold">{event.mode ?? "self-serve"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Photos</p>
+                                  <p className="font-semibold">
+                                    {usage.photoCap === null ? "Unlimited" : `${usage.photoUsed ?? 0}/${usage.photoCap}`}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">AI credits</p>
+                                  <p className="font-semibold">
+                                    {usage.aiCredits === undefined ? "—" : `${usage.aiUsed}/${usage.aiCredits}`}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2 text-xs">
+                                {event.mode === "photographer" ? (
+                                  <>
+                                    <LinkActions
+                                      label="Check-in"
+                                      url={checkinLink}
+                                      copyKey={`${event.slug}-checkin`}
+                                      onCopy={copyLink}
+                                      onQr={() => generateQr(checkinLink, `${event.name} check-in`)}
+                                      showQr
+                                      copied={copyStatus[`${event.slug}-checkin`] === true}
+                                    />
+                                    <LinkActions
+                                      label="Photographer"
+                                      url={photographerLink}
+                                      copyKey={`${event.slug}-photographer`}
+                                      onCopy={copyLink}
+                                      onQr={() => generateQr(photographerLink, `${event.name} photographer`)}
+                                      showQr
+                                      copied={copyStatus[`${event.slug}-photographer`] === true}
+                                    />
+                                    <LinkActions
+                                      label="Background manager"
+                                      url={backgroundsLink}
+                                      copyKey={`${event.slug}-backgrounds`}
+                                      onCopy={copyLink}
+                                      onQr={() => generateQr(backgroundsLink, `${event.name} backgrounds`)}
+                                      showQr
+                                      copied={copyStatus[`${event.slug}-backgrounds`] === true}
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <LinkActions
+                                      label="Booth link"
+                                      url={boothLink}
+                                      copyKey={`${event.slug}-booth`}
+                                      onCopy={copyLink}
+                                      onQr={() => generateQr(boothLink, `${event.name} booth`)}
+                                      showQr
+                                      copied={copyStatus[`${event.slug}-booth`] === true}
+                                    />
+                                    <LinkActions
+                                      label="Background manager"
+                                      url={backgroundsLink}
+                                      copyKey={`${event.slug}-backgrounds`}
+                                      onCopy={copyLink}
+                                      onQr={() => generateQr(backgroundsLink, `${event.name} backgrounds`)}
+                                      showQr
+                                      copied={copyStatus[`${event.slug}-backgrounds`] === true}
+                                    />
+                                  </>
                                 )}
                               </div>
-                            </div>
 
-                            <label className="flex flex-col gap-2">
-                              Selection email
-                              <input
-                                type="email"
-                                value={selectionEmails[event.slug] || ""}
-                                onChange={(e) =>
-                                  setSelectionEmails((prev) => ({ ...prev, [event.slug]: e.target.value }))
-                                }
-                                className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                              />
-                            </label>
-                            {selectionLinks[event.slug] && (
-                              <div className="rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2 text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]">
-                                {selectionLinks[event.slug]}
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => deleteEvent(event.id)}
+                                >
+                                  <Trash2 className="size-4" />
+                                  Delete
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => rotateEventKey(event.slug)}
+                                >
+                                  <Key className="size-4" />
+                                  {issuingKey[event.slug] ?? "Rotate key"}
+                                </Button>
+                                <Button
+                                  variant="gradient"
+                                  size="sm"
+                                  onClick={() => createCheckout("event-basic", event.slug)}
+                                >
+                                  Buy event plan
+                                </Button>
+                                {event.mode === "photographer" && (
+                                  <>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => createSelectionLink(event.slug)}
+                                    >
+                                      <Mail className="size-4" />
+                                      Send selection
+                                    </Button>
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => downloadCheckinGraphic(event.slug, event.name)}
+                                    >
+                                      <Download className="size-4" />
+                                      Download QR
+                                    </Button>
+                                  </>
+                                )}
                               </div>
-                            )}
-                            {selectionStatus[event.slug] && (
-                              <p className="text-[var(--color-text-muted)]">{selectionStatus[event.slug]}</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {activeEvents.length === 0 && (
-                    <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-                      No events yet. Create one to get started.
+
+                              {event.mode === "photographer" && (
+                                <div className="space-y-3 pt-2 border-t border-border">
+                                  <div className="space-y-2">
+                                    <Label className="text-xs font-semibold">Collaborator Access</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                      Collaborators can upload photos and send deliveries
+                                    </p>
+                                    <Input
+                                      type="text"
+                                      value={collaboratorInputs[event.slug] || ""}
+                                      onChange={(e) =>
+                                        setCollaboratorInputs((prev) => ({
+                                          ...prev,
+                                          [event.slug]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="photographer@example.com, assistant@example.com"
+                                    />
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="gradient"
+                                        size="sm"
+                                        onClick={() => saveRoles(event.slug)}
+                                      >
+                                        {rolesStatus[event.slug] ?? "Save collaborators"}
+                                      </Button>
+                                    </div>
+                                    {event.roles?.collaborator && event.roles.collaborator.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 pt-2">
+                                        {event.roles.collaborator.map((email) => (
+                                          <Badge key={email} variant="secondary">
+                                            {email}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Selection email</Label>
+                                    <Input
+                                      type="email"
+                                      value={selectionEmails[event.slug] || ""}
+                                      onChange={(e) =>
+                                        setSelectionEmails((prev) => ({ ...prev, [event.slug]: e.target.value }))
+                                      }
+                                    />
+                                    {selectionLinks[event.slug] && (
+                                      <div className="rounded-xl bg-secondary p-2 text-xs break-all">
+                                        {selectionLinks[event.slug]}
+                                      </div>
+                                    )}
+                                    {selectionStatus[event.slug] && (
+                                      <p className="text-xs text-muted-foreground">{selectionStatus[event.slug]}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               <BackgroundTester />
             </div>
           )}
 
           {view === "events" && (
-            <div className="space-y-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
-                <button
-                  onClick={() => setCreateModalOpen(true)}
-                  className="rounded-full bg-[var(--gradient-brand)] px-4 py-2 text-sm font-semibold text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] transition hover:opacity-90"
-                >
-                  Create event
-                </button>
-              </div>
-              <div className="grid gap-2">
-                {session.events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] md:flex-row md:items-center md:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold">{event.name}</p>
-                      <p className="text-[var(--color-text-muted)]">{event.slug}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => rotateEventKey(event.slug)}
-                        className="rounded-full bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-                      >
-                        {issuingKey[event.slug] ?? "Rotate key"}
-                      </button>
-                      <button
-                        onClick={() => closeEvent(event.slug, event.status === "closed" ? "live" : "closed")}
-                        className="rounded-full px-3 py-2 font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface-elevated)]"
-                      >
-                        {event.status === "closed" ? "Reopen" : "Close"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {session.events.length === 0 && (
-                  <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-                    No events yet.
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle>Events</CardTitle>
+                  <Button variant="gradient" onClick={() => setCreateModalOpen(true)}>
+                    <Plus className="size-4" />
+                    Create event
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {session.events.length === 0 ? (
+                  <EmptyState
+                    icon={<Calendar className="size-6" />}
+                    title="No events yet"
+                    description="Create your first event to get started."
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {session.events.map((event) => (
+                      <Card key={event.id}>
+                        <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="font-semibold">{event.name}</p>
+                            <p className="text-sm text-muted-foreground">{event.slug}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => rotateEventKey(event.slug)}
+                            >
+                              <RotateCw className="size-4" />
+                              {issuingKey[event.slug] ?? "Rotate key"}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => closeEvent(event.slug, event.status === "closed" ? "live" : "closed")}
+                            >
+                              {event.status === "closed" ? "Reopen" : "Close"}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
 
           {view === "deliveries" && (
-            <div className="space-y-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-[var(--color-text)]">Deliveries</h2>
-                <div className="flex flex-wrap gap-2">
-                  {session.events.map((event) => (
-                    <button
-                      key={event.id}
-                      onClick={() => fetchProductions(event.slug)}
-                      className={`rounded-full px-3 py-2 text-sm font-semibold ring-1 ring-[var(--color-border-subtle)] transition ${
-                        productionEvent === event.slug
-                          ? "bg-[var(--color-surface-elevated)] text-[var(--color-text)]"
-                          : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-elevated)]"
-                      }`}
-                    >
-                      {event.name}
-                    </button>
-                  ))}
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle>Deliveries</CardTitle>
+                  <div className="flex flex-wrap gap-2">
+                    {session.events.map((event) => (
+                      <Button
+                        key={event.id}
+                        variant={productionEvent === event.slug ? "default" : "secondary"}
+                        size="sm"
+                        onClick={() => fetchProductions(event.slug)}
+                      >
+                        {event.name}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </CardHeader>
+              <CardContent>
+                {loadingProductions && (
+                  <div className="flex items-center gap-2 py-4">
+                    <LoadingSpinner size="sm" />
+                    <p className="text-sm text-muted-foreground">Loading deliveries...</p>
+                  </div>
+                )}
 
-              {loadingProductions && (
-                <p className="text-sm text-[var(--color-text-muted)]">Loading deliveries…</p>
-              )}
-
-              {productionEvent && (
-                <div className="grid gap-2">
-                  {(productions[productionEvent] ?? []).map((prod) => (
-                    <div
-                      key={prod.id}
-                      className="flex flex-col gap-2 rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] md:flex-row md:items-center md:justify-between"
-                    >
-                      <div>
-                        <p className="font-semibold">{prod.email}</p>
-                        <p className="text-[var(--color-text-muted)]">
-                          {new Date(prod.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          type="email"
-                          placeholder="Resend to email"
-                          value={resendEmailMap[prod.id] || ""}
-                          onChange={(e) =>
-                            setResendEmailMap((prev) => ({ ...prev, [prod.id]: e.target.value }))
-                          }
-                          className="rounded-xl border border-[var(--color-border-subtle)] bg-[var(--input-bg)] px-3 py-2 text-[var(--color-text)] placeholder:text-[var(--input-placeholder)] focus:border-[var(--input-border-focus)] focus:outline-none"
-                        />
-                        <button
-                          onClick={() => resendDeliveryEmail(prod.id, productionEvent)}
-                          className="rounded-full bg-[var(--color-surface)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
-                        >
-                          Resend
-                        </button>
-                        {selectionStatus[prod.id] && (
-                          <p className="text-xs text-[var(--color-text-muted)]">
-                            {selectionStatus[prod.id]}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {(productions[productionEvent] ?? []).length === 0 && (
-                    <div className="rounded-xl bg-[var(--color-surface-elevated)] p-4 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
-                      No deliveries yet.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                {productionEvent && (
+                  <div className="space-y-2">
+                    {(productions[productionEvent] ?? []).length === 0 ? (
+                      <EmptyState
+                        icon={<Mail className="size-6" />}
+                        title="No deliveries yet"
+                        description="Deliveries will appear here when photos are sent."
+                      />
+                    ) : (
+                      (productions[productionEvent] ?? []).map((prod) => (
+                        <Card key={prod.id}>
+                          <CardContent className="flex flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="font-semibold">{prod.email}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(prod.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Input
+                                type="email"
+                                placeholder="Resend to email"
+                                value={resendEmailMap[prod.id] || ""}
+                                onChange={(e) =>
+                                  setResendEmailMap((prev) => ({ ...prev, [prod.id]: e.target.value }))
+                                }
+                                className="w-48"
+                              />
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => resendDeliveryEmail(prod.id, productionEvent)}
+                              >
+                                <Mail className="size-4" />
+                                Resend
+                              </Button>
+                              {selectionStatus[prod.id] && (
+                                <Badge variant="secondary">{selectionStatus[prod.id]}</Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
         </main>
       </div>

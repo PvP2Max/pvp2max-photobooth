@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type Plan = {
   name: string;
@@ -70,137 +74,147 @@ export default function PricingPage() {
     <div className="space-y-12">
       <div className="space-y-3">
         <h1 className="text-3xl font-semibold md:text-4xl">Plans & Pricing</h1>
-        <p className="text-sm text-[var(--color-text-muted)]">
+        <p className="text-sm text-muted-foreground">
           Run your own booth for less than the cost of renting a traditional photo booth.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => (
-          <div
+          <Card
             key={plan.name}
-            className={`relative flex h-full flex-col gap-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)] ${plan.highlight ? "ring-2 ring-[var(--color-primary-soft)]" : ""}`}
-          >
-            {plan.highlight && (
-              <span className="absolute right-4 top-4 rounded-full bg-[rgba(155,92,255,0.16)] px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text)] ring-1 ring-[rgba(155,92,255,0.35)]">
-                Most Popular
-              </span>
+            className={cn(
+              "relative flex h-full flex-col",
+              plan.highlight && "ring-2 ring-primary"
             )}
-            <div className="space-y-1">
-              <p className="text-lg font-semibold text-[var(--color-text)]">{plan.name}</p>
-              <p className="text-sm text-[var(--color-primary-soft)]">{plan.price}</p>
-              <p className="text-sm text-[var(--color-text-muted)]">{plan.tagline}</p>
-            </div>
-            <ul className="space-y-2 text-sm text-[var(--color-text-muted)]">
-              {plan.bullets.map((bullet) => (
-                <li key={bullet} className="flex items-start gap-2">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                  <span>{bullet}</span>
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/get-started"
-              className={`mt-auto inline-flex w-fit items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${plan.highlight ? "bg-[var(--gradient-brand)] text-[var(--color-text-on-primary)] shadow-[0_12px_30px_rgba(155,92,255,0.3)] hover:opacity-90" : "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] hover:bg-[var(--color-surface)]"}`}
-            >
-              {plan.cta}
-            </Link>
-          </div>
+          >
+            <CardContent className="flex flex-col gap-4 p-5 h-full">
+              {plan.highlight && (
+                <Badge variant="default" className="absolute right-4 top-4">
+                  Most Popular
+                </Badge>
+              )}
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">{plan.name}</p>
+                <p className="text-sm text-primary">{plan.price}</p>
+                <p className="text-sm text-muted-foreground">{plan.tagline}</p>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {plan.bullets.map((bullet) => (
+                  <li key={bullet} className="flex items-start gap-2">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                variant={plan.highlight ? "gradient" : "secondary"}
+                className="mt-auto w-fit"
+                asChild
+              >
+                <Link href="/get-started">
+                  {plan.cta}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      <div className="space-y-6 rounded-3xl bg-[var(--color-surface-elevated)] p-6 ring-1 ring-[var(--color-border-subtle)]">
+      <Card className="p-6 space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold">Photographer Plans</h2>
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <p className="text-sm text-muted-foreground">
             Offer on-site selection and instant delivery as part of your photo packages.
             Perfect for professional photographers and event businesses.
           </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
-            <div className="space-y-1">
-              <p className="text-lg font-semibold text-[var(--color-text)]">Photographer Event</p>
-              <p className="text-sm text-[var(--color-primary-soft)]">$100 / event</p>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                One-time event purchase with full features.
-              </p>
-            </div>
-            <ul className="space-y-2 text-sm text-[var(--color-text-muted)]">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Unlimited photos</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>10 AI credits (backgrounds & filters)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Add collaborators to event</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Photographer mode with guest selection</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Email & SMS delivery</span>
-              </li>
-            </ul>
-            <Link
-              href="/get-started"
-              className="mt-auto inline-flex w-fit items-center justify-center rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
-            >
-              Choose Event Plan
-            </Link>
-          </div>
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-5">
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">Photographer Event</p>
+                <p className="text-sm text-primary">$100 / event</p>
+                <p className="text-sm text-muted-foreground">
+                  One-time event purchase with full features.
+                </p>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Unlimited photos</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>10 AI credits (backgrounds & filters)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Add collaborators to event</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Photographer mode with guest selection</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Email & SMS delivery</span>
+                </li>
+              </ul>
+              <Button variant="secondary" className="mt-auto w-fit" asChild>
+                <Link href="/get-started">
+                  Choose Event Plan
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
 
-          <div className="flex flex-col gap-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
-            <div className="space-y-1">
-              <p className="text-lg font-semibold text-[var(--color-text)]">Photographer Subscription</p>
-              <p className="text-sm text-[var(--color-primary-soft)]">$250 / month</p>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                Monthly subscription for unlimited events.
-              </p>
-            </div>
-            <ul className="space-y-2 text-sm text-[var(--color-text-muted)]">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Unlimited events per month</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>10 AI credits/month (shared across events)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Add collaborators to events</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Photographer mode with guest selection</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-                <span>Email & SMS delivery</span>
-              </li>
-            </ul>
-            <Link
-              href="/get-started"
-              className="mt-auto inline-flex w-fit items-center justify-center rounded-full bg-[var(--color-surface-elevated)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]"
-            >
-              Choose Subscription
-            </Link>
-          </div>
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-5">
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">Photographer Subscription</p>
+                <p className="text-sm text-primary">$250 / month</p>
+                <p className="text-sm text-muted-foreground">
+                  Monthly subscription for unlimited events.
+                </p>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Unlimited events per month</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>10 AI credits/month (shared across events)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Add collaborators to events</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Photographer mode with guest selection</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-primary" />
+                  <span>Email & SMS delivery</span>
+                </li>
+              </ul>
+              <Button variant="secondary" className="mt-auto w-fit" asChild>
+                <Link href="/get-started">
+                  Choose Subscription
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
-        <p className="text-sm text-[var(--color-text-muted)]">
+        <p className="text-sm text-muted-foreground">
           Most traditional photo booth rentals cost between $400 and $1,000 per event. With BoothOS,
           you only pay per event or get unlimited events with a monthly subscription.
         </p>
-      </div>
+      </Card>
     </div>
   );
 }

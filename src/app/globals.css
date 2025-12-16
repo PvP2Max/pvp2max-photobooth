@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --font-geist-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
@@ -58,6 +61,41 @@
   --input-placeholder: var(--color-text-soft);
   --badge-bg: rgba(155, 92, 255, 0.16);
   --badge-text: var(--color-primary-soft);
+  --radius: 0.75rem;
+
+  /* ==== SHADCN UI VARIABLES (Dark Theme) ==== */
+  --background: 228 84% 4%;
+  --foreground: 240 100% 99%;
+  --card: 227 39% 12%;
+  --card-foreground: 240 100% 99%;
+  --popover: 227 39% 12%;
+  --popover-foreground: 240 100% 99%;
+  --primary: 266 100% 68%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 227 39% 15%;
+  --secondary-foreground: 240 100% 99%;
+  --muted: 230 25% 20%;
+  --muted-foreground: 230 25% 71%;
+  --accent: 187 86% 53%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 62% 68%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 228 27% 19%;
+  --input: 228 36% 8%;
+  --ring: 266 100% 68%;
+  --chart-1: 266 100% 68%;
+  --chart-2: 187 86% 53%;
+  --chart-3: 142 76% 36%;
+  --chart-4: 44 89% 56%;
+  --chart-5: 0 62% 68%;
+  --sidebar: 227 39% 10%;
+  --sidebar-foreground: 240 100% 99%;
+  --sidebar-primary: 266 100% 68%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 187 86% 53%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 228 27% 19%;
+  --sidebar-ring: 266 100% 68%;
 }
 
 @theme inline {
@@ -65,6 +103,42 @@
   --color-foreground: var(--color-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
 *,
@@ -79,4 +153,15 @@ body {
   font-family: var(--font-geist-sans), "Inter", "Helvetica Neue", Arial,
     sans-serif;
   margin: 0;
+}
+
+/* Dark mode is default - no .dark selector needed */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

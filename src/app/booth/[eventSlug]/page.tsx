@@ -2,8 +2,19 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { Camera, Check, RefreshCw, Send, ArrowLeft, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import type { BackgroundOption } from "@/lib/backgrounds";
 import EventAccessGate from "../../event-access";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { StepIndicator } from "@/components/ui/step-indicator";
+import { LoadingSpinner, LoadingOverlay } from "@/components/ui/loading-spinner";
+import { cn } from "@/lib/utils";
 
 type Photo = {
   id: string;
@@ -34,6 +45,12 @@ const PREVIEW_MAX_WIDTH = 1280;
 const PREVIEW_MAX_HEIGHT = 720;
 const PREVIEW_ASSET_WIDTH = 1400;
 const COUNTDOWN_SECONDS = 3;
+
+const STEPS = [
+  { id: "capture", label: "Capture" },
+  { id: "background", label: "Background" },
+  { id: "send", label: "Send" },
+];
 
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 
@@ -120,6 +137,12 @@ async function composePreview(
   return { dataUrl: canvas.toDataURL("image/png"), transform: usedTransform };
 }
 
+function getStepIndex(stage: Stage): number {
+  if (["setup", "test", "ready", "countdown", "flash", "review", "processing"].includes(stage)) return 0;
+  if (stage === "background") return 1;
+  return 2;
+}
+
 export default function BoothPage() {
   const [stage, setStage] = useState<Stage>("setup");
   const [email, setEmail] = useState("");
@@ -131,12 +154,13 @@ export default function BoothPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [transform, setTransform] = useState<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const previewTimerRef = useRef<number | null>(null);
+
+  const currentStepIndex = getStepIndex(stage);
 
   // Load backgrounds on mount
   useEffect(() => {
@@ -183,6 +207,7 @@ export default function BoothPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Camera access denied.";
       setError(msg);
+      toast.error("Camera error", { description: msg });
     }
   }
 
@@ -274,9 +299,11 @@ export default function BoothPage() {
 
       setProcessedPhoto(payload.photos[0]);
       setStage("background");
+      toast.success("Photo processed", { description: "Background removed successfully!" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Processing failed.";
       setError(msg);
+      toast.error("Processing failed", { description: msg });
       setStage("review");
     }
   }
@@ -304,6 +331,7 @@ export default function BoothPage() {
           ? err.message
           : "Could not generate preview for that background.";
       setError(msg);
+      toast.error("Preview failed", { description: msg });
     }
   }
 
@@ -347,10 +375,12 @@ export default function BoothPage() {
   async function sendEmail() {
     if (!email) {
       setError("Please enter an email address.");
+      toast.error("Missing email", { description: "Please enter an email address." });
       return;
     }
     if (!processedPhoto || !selectedBackground || !previewUrl) {
       setError("Please select a background first.");
+      toast.error("No background", { description: "Please select a background first." });
       return;
     }
 
@@ -380,7 +410,7 @@ export default function BoothPage() {
       }
 
       setStage("sent");
-      setMessage("Your photo has been sent! Check your email.");
+      toast.success("Photo sent!", { description: "Check your email for your photo." });
 
       // Reset after 5 seconds
       setTimeout(() => {
@@ -389,6 +419,7 @@ export default function BoothPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to send email.";
       setError(msg);
+      toast.error("Send failed", { description: msg });
       setStage("email");
     }
   }
@@ -402,67 +433,61 @@ export default function BoothPage() {
     setTransform({ scale: 1, offsetX: 0, offsetY: 0 });
     setEmail("");
     setError(null);
-    setMessage(null);
     setCountdown(COUNTDOWN_SECONDS);
     setStage("setup");
   }
 
   return (
     <EventAccessGate>
-      <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <div className="min-h-screen bg-background text-foreground relative">
+        {(stage === "sending" || stage === "processing") && (
+          <LoadingOverlay message={stage === "sending" ? "Sending your photo..." : "Processing your photo..."} />
+        )}
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(155,92,255,0.12),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(34,211,238,0.12),transparent_20%),radial-gradient(circle_at_60%_70%,rgba(155,92,255,0.08),transparent_30%)]" />
 
         <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-12">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-semibold">BoothOS Self-Service</h1>
-            <p className="text-sm text-[var(--color-text-muted)]">
-              Take your photo, choose a background, and get it sent to your email.
-            </p>
-          </div>
+          <PageHeader
+            title="BoothOS Self-Service"
+            description="Take your photo, choose a background, and get it sent to your email."
+          />
 
-          {(message || error) && (
-            <div
-              className={`rounded-2xl px-4 py-3 text-sm ring-1 ${
-                error
-                  ? "bg-red-500/10 text-red-100 ring-red-400/50"
-                  : "bg-emerald-500/10 text-emerald-100 ring-emerald-400/50"
-              }`}
-            >
-              {error || message}
-            </div>
+          <StepIndicator steps={STEPS} currentStep={currentStepIndex} variant="compact" />
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           {/* Stage: Setup */}
           {stage === "setup" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold">Let&apos;s get started!</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     We&apos;ll need access to your camera to take your photo.
                   </p>
                 </div>
-                <button
-                  onClick={setupCamera}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-6 py-3 text-base font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200"
-                >
+                <Button variant="gradient" size="lg" onClick={setupCamera}>
+                  <Camera className="size-5" />
                   Enable Camera
-                </button>
+                </Button>
               </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Test */}
           {stage === "test" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold">Camera Preview</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Make sure you&apos;re in frame and the lighting looks good.
                   </p>
                 </div>
-                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -473,37 +498,35 @@ export default function BoothPage() {
                   />
                 </div>
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => setStage("ready")}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-6 py-3 text-base font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200"
-                  >
+                  <Button variant="gradient" onClick={() => setStage("ready")}>
+                    <Check className="size-4" />
                     Looks Good
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
                     onClick={() => {
                       stopCamera();
                       setStage("setup");
                     }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Ready */}
           {stage === "ready" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold">Ready to take your photo?</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Click the button when you&apos;re ready. We&apos;ll count down from {COUNTDOWN_SECONDS}.
                   </p>
                 </div>
-                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -514,31 +537,31 @@ export default function BoothPage() {
                   />
                 </div>
                 <div className="flex gap-3">
-                  <button
+                  <Button
+                    variant="gradient"
+                    size="lg"
                     onClick={() => {
                       setCountdown(COUNTDOWN_SECONDS);
                       setStage("countdown");
                     }}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-pink-400 px-6 py-3 text-base font-semibold text-slate-950 transition hover:from-cyan-300 hover:to-pink-300"
                   >
+                    <Camera className="size-5" />
                     Take Photo
-                  </button>
-                  <button
-                    onClick={() => setStage("test")}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
-                  >
+                  </Button>
+                  <Button variant="secondary" onClick={() => setStage("test")}>
+                    <ArrowLeft className="size-4" />
                     Back
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Countdown */}
           {stage === "countdown" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
-                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -549,12 +572,12 @@ export default function BoothPage() {
                   />
                 </div>
                 <div className="flex items-center justify-center">
-                  <div className="text-9xl font-bold text-emerald-400">
+                  <div className="text-9xl font-bold text-primary animate-pulse">
                     {countdown}
                   </div>
                 </div>
               </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Flash */}
@@ -564,15 +587,15 @@ export default function BoothPage() {
 
           {/* Stage: Review */}
           {stage === "review" && capturedImage && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold">How does it look?</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Happy with your photo? Let&apos;s process it and add a background.
                   </p>
                 </div>
-                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border">
                   <Image
                     src={capturedImage}
                     alt="Captured photo"
@@ -584,47 +607,26 @@ export default function BoothPage() {
                   />
                 </div>
                 <div className="flex gap-3">
-                  <button
-                    onClick={processPhoto}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-6 py-3 text-base font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200"
-                  >
+                  <Button variant="gradient" onClick={processPhoto}>
+                    <Check className="size-4" />
                     Use This Photo
-                  </button>
-                  <button
-                    onClick={retakePhoto}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
-                  >
+                  </Button>
+                  <Button variant="secondary" onClick={retakePhoto}>
+                    <RefreshCw className="size-4" />
                     Retake
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </section>
-          )}
-
-          {/* Stage: Processing */}
-          {stage === "processing" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
-              <div className="space-y-6 text-center">
-                <div>
-                  <h2 className="text-2xl font-semibold">Processing your photo...</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                    Removing the background and preparing your image.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center">
-                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-emerald-400 border-t-transparent" />
-                </div>
-              </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Background */}
           {stage === "background" && processedPhoto && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold">Choose a background</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Select from our collection of backgrounds.
                   </p>
                 </div>
@@ -634,27 +636,24 @@ export default function BoothPage() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       {backgrounds.map((bg) => (
-                        <button
+                        <Button
                           key={bg.id}
                           onClick={() => applyBackground(bg)}
-                          className={`rounded-xl border px-4 py-3 text-sm font-semibold transition ${
-                            selectedBackground?.id === bg.id
-                              ? "border-cyan-300 bg-cyan-400/10 text-cyan-100"
-                              : "border-white/10 bg-white/5 text-slate-200 hover:border-white/30"
-                          }`}
+                          variant={selectedBackground?.id === bg.id ? "default" : "secondary"}
+                          className="justify-start"
                         >
                           {bg.name}
-                        </button>
+                        </Button>
                       ))}
                     </div>
 
                     {/* Transform Controls */}
                     {selectedBackground && previewUrl && (
-                      <div className="space-y-3 rounded-2xl bg-slate-900/60 p-4 ring-1 ring-white/5">
-                        <p className="text-sm font-semibold text-white">Adjust Position</p>
+                      <div className="space-y-3 rounded-2xl bg-secondary p-4 ring-1 ring-border">
+                        <p className="text-sm font-semibold">Adjust Position</p>
                         <div className="grid gap-3">
-                          <label className="text-xs text-slate-300/80">
-                            Scale
+                          <div className="space-y-1">
+                            <Label className="text-xs">Scale</Label>
                             <input
                               type="range"
                               min="0.25"
@@ -664,11 +663,11 @@ export default function BoothPage() {
                               onChange={(e) =>
                                 handleTransformChange("scale", parseFloat(e.target.value))
                               }
-                              className="mt-1 w-full"
+                              className="w-full accent-primary"
                             />
-                          </label>
-                          <label className="text-xs text-slate-300/80">
-                            Horizontal Position
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Horizontal Position</Label>
                             <input
                               type="range"
                               min="-1500"
@@ -678,11 +677,11 @@ export default function BoothPage() {
                               onChange={(e) =>
                                 handleTransformChange("offsetX", parseFloat(e.target.value))
                               }
-                              className="mt-1 w-full"
+                              className="w-full accent-primary"
                             />
-                          </label>
-                          <label className="text-xs text-slate-300/80">
-                            Vertical Position
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Vertical Position</Label>
                             <input
                               type="range"
                               min="-1500"
@@ -692,31 +691,33 @@ export default function BoothPage() {
                               onChange={(e) =>
                                 handleTransformChange("offsetY", parseFloat(e.target.value))
                               }
-                              className="mt-1 w-full"
+                              className="w-full accent-primary"
                             />
-                          </label>
+                          </div>
                         </div>
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => {
                             const reset: Transform = { scale: 1, offsetX: 0, offsetY: 0 };
                             setTransform(reset);
                             refreshPreview(reset);
                           }}
-                          className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
                         >
+                          <RefreshCw className="size-4" />
                           Reset
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
 
                   {/* Preview */}
                   <div className="space-y-3">
-                    <p className="text-xs uppercase tracking-wide text-slate-300">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
                       Preview
                     </p>
                     {previewUrl ? (
-                      <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
+                      <div className="overflow-hidden rounded-xl ring-1 ring-border">
                         <Image
                           src={previewUrl}
                           alt="Preview with background"
@@ -728,7 +729,7 @@ export default function BoothPage() {
                         />
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-white/10 bg-black/30 p-8 text-center text-sm text-slate-300">
+                      <div className="rounded-xl border border-dashed border-border bg-secondary p-8 text-center text-sm text-muted-foreground">
                         Select a background to see preview
                       </div>
                     )}
@@ -736,37 +737,36 @@ export default function BoothPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button
+                  <Button
+                    variant="gradient"
                     onClick={() => setStage("email")}
                     disabled={!previewUrl}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-lime-300 px-6 py-3 text-base font-semibold text-slate-950 transition hover:from-emerald-300 hover:to-lime-200 disabled:opacity-50"
                   >
+                    <ArrowRight className="size-4" />
                     Continue to Email
-                  </button>
-                  <button
-                    onClick={retakePhoto}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
-                  >
+                  </Button>
+                  <Button variant="secondary" onClick={retakePhoto}>
+                    <RefreshCw className="size-4" />
                     Start Over
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Email */}
           {stage === "email" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold">Where should we send your photo?</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Enter your email address to receive your photo.
                   </p>
                 </div>
 
                 {previewUrl && (
-                  <div className="overflow-hidden rounded-xl ring-1 ring-white/5">
+                  <div className="overflow-hidden rounded-xl ring-1 ring-border">
                     <Image
                       src={previewUrl}
                       alt="Final photo preview"
@@ -779,83 +779,56 @@ export default function BoothPage() {
                   </div>
                 )}
 
-                <label className="text-sm text-slate-200/80">
-                  Your email
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="email">Your email</Label>
+                  <Input
+                    id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
                   />
-                </label>
+                </div>
 
                 <div className="flex gap-3">
-                  <button
+                  <Button
+                    variant="gradient"
+                    size="lg"
                     onClick={sendEmail}
                     disabled={!email}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-400 to-cyan-300 px-6 py-3 text-base font-semibold text-slate-950 transition hover:from-pink-300 hover:to-cyan-200 disabled:opacity-50"
                   >
+                    <Send className="size-5" />
                     Send My Photo
-                  </button>
-                  <button
-                    onClick={() => setStage("background")}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
-                  >
+                  </Button>
+                  <Button variant="secondary" onClick={() => setStage("background")}>
+                    <ArrowLeft className="size-4" />
                     Back
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </section>
-          )}
-
-          {/* Stage: Sending */}
-          {stage === "sending" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
-              <div className="space-y-6 text-center">
-                <div>
-                  <h2 className="text-2xl font-semibold">Sending your photo...</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                    This will only take a moment.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center">
-                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-pink-400 border-t-transparent" />
-                </div>
-              </div>
-            </section>
+            </Card>
           )}
 
           {/* Stage: Sent */}
           {stage === "sent" && (
-            <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
+            <Card className="p-8">
               <div className="space-y-6 text-center">
                 <div>
                   <h2 className="text-2xl font-semibold">All done!</h2>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Check your email for your photo. Thanks for using BoothOS!
                   </p>
                 </div>
                 <div className="flex items-center justify-center">
-                  <svg
-                    className="h-24 w-24 text-emerald-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
+                  <div className="flex size-24 items-center justify-center rounded-full bg-green-500/20">
+                    <Check className="size-12 text-green-500" />
+                  </div>
                 </div>
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-muted-foreground">
                   Restarting in a few seconds...
                 </p>
               </div>
-            </section>
+            </Card>
           )}
 
           {/* Hidden canvas for photo capture */}
