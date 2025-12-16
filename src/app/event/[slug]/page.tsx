@@ -162,7 +162,10 @@ export default function BoothPage() {
   const loadBackgrounds = useCallback(async () => {
     setLoadingBackgrounds(true);
     try {
-      const res = await fetch("/api/backgrounds", { credentials: "include" });
+      const res = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventParam)}`, {
+        headers: { "x-boothos-event": eventParam },
+        credentials: "include",
+      });
       const payload = (await res.json().catch(() => ({}))) as { backgrounds?: BackgroundOption[] };
       if (res.ok && Array.isArray(payload.backgrounds)) {
         setBackgrounds(payload.backgrounds);
@@ -175,7 +178,7 @@ export default function BoothPage() {
     } finally {
       setLoadingBackgrounds(false);
     }
-  }, []);
+  }, [eventParam]);
 
   useEffect(() => {
     void loadSession();
@@ -293,8 +296,11 @@ export default function BoothPage() {
       form.append("file", file);
       form.append("booth", "1");
       form.append("removeBackground", "true");
-      const res = await fetch("/api/photos", {
+      const res = await fetch(`/api/photos?event=${encodeURIComponent(eventParam)}`, {
         method: "POST",
+        headers: {
+          "x-boothos-event": eventParam,
+        },
         body: form,
         credentials: "include",
       });
@@ -359,9 +365,12 @@ export default function BoothPage() {
           backgroundId,
         })),
       };
-      const res = await fetch("/api/email", {
+      const res = await fetch(`/api/email?event=${encodeURIComponent(eventParam)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-boothos-event": eventParam,
+        },
         credentials: "include",
         body: JSON.stringify(body),
       });
