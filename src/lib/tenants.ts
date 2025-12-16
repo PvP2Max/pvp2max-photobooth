@@ -206,7 +206,7 @@ export async function listUserEvents(uid: string) {
   return snap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
 }
 
-async function fetchEventBySlug(uid: string, slug: string) {
+async function _fetchEventBySlug(uid: string, slug: string) {
   if (!uid || !slug) return null;
   const snap = await userEventsCollection(uid).where("slug", "==", slug).limit(1).get();
   if (snap.empty) return null;
@@ -622,7 +622,7 @@ function toScope(ownerUid: string, event: BoothEvent): TenantScope {
   };
 }
 
-function eventIsActive(event: BoothEvent) {
+function _eventIsActive(event: BoothEvent) {
   if (event.status === "closed") return false;
   const now = Date.now();
   if (event.startsAt && new Date(event.startsAt).getTime() > now) return false;
@@ -634,8 +634,8 @@ export async function findEventBySlugs(
   businessSlug: string,
   eventSlug: string,
 ): Promise<EventContext | null> {
-  const normalizedBiz = slugify(businessSlug, businessSlug);
-  const normalizedEvent = slugify(eventSlug, eventSlug);
+  const _normalizedBiz = slugify(businessSlug, businessSlug);
+  const _normalizedEvent = slugify(eventSlug, eventSlug);
   // User-centric: businessSlug is ignored; use caller's UID in getEventContext.
   return null;
 }

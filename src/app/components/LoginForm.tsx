@@ -10,10 +10,10 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [registering, setRegistering] = useState(false);
-  const [businessName, setBusinessName] = useState("");
-  const [businessSlug, setBusinessSlug] = useState("");
-  const [eventName, setEventName] = useState("");
-  const [eventSlug, setEventSlug] = useState("");
+  const [_businessName, _setBusinessName] = useState("");
+  const [_businessSlug, _setBusinessSlug] = useState("");
+  const [_eventName, _setEventName] = useState("");
+  const [_eventSlug, _setEventSlug] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

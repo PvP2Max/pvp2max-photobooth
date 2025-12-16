@@ -1,7 +1,7 @@
 "use client";
 
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { useEffect } from "react";
 import { getFirebaseClient } from "@/lib/firebase-client";
 
 // Patches window.fetch to inject the current Firebase ID token in Authorization headers.

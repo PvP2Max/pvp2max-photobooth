@@ -436,9 +436,9 @@ export default function BoothPage() {
             <section className="rounded-3xl bg-white/5 p-8 ring-1 ring-white/10">
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-2xl font-semibold">Let's get started!</h2>
+                  <h2 className="text-2xl font-semibold">Let&apos;s get started!</h2>
                   <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                    We'll need access to your camera to take your photo.
+                    We&apos;ll need access to your camera to take your photo.
                   </p>
                 </div>
                 <button
@@ -458,7 +458,7 @@ export default function BoothPage() {
                 <div>
                   <h2 className="text-2xl font-semibold">Camera Preview</h2>
                   <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                    Make sure you're in frame and the lighting looks good.
+                    Make sure you&apos;re in frame and the lighting looks good.
                   </p>
                 </div>
                 <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
@@ -499,7 +499,7 @@ export default function BoothPage() {
                 <div>
                   <h2 className="text-2xl font-semibold">Ready to take your photo?</h2>
                   <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                    Click the button when you're ready. We'll count down from {COUNTDOWN_SECONDS}.
+                    Click the button when you&apos;re ready. We&apos;ll count down from {COUNTDOWN_SECONDS}.
                   </p>
                 </div>
                 <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
@@ -568,7 +568,7 @@ export default function BoothPage() {
                 <div>
                   <h2 className="text-2xl font-semibold">How does it look?</h2>
                   <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                    Happy with your photo? Let's process it and add a background.
+                    Happy with your photo? Let&apos;s process it and add a background.
                   </p>
                 </div>
                 <div className="overflow-hidden rounded-xl bg-black ring-1 ring-white/10">

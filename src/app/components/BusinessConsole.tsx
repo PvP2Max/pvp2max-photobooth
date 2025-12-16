@@ -89,18 +89,6 @@ function usageFor(event: EventItem) {
   };
 }
 
-function overlayLabel(theme?: string) {
-  switch (theme) {
-    case "none":
-    case undefined:
-      return "None";
-    case "custom-request":
-      return "Custom overlay by Arctic Aura Designs";
-    default:
-      return "Custom";
-  }
-}
-
 export default function BusinessConsole() {
   const router = useRouter();
   const [session, setSession] = useState<BusinessSession | null>({
@@ -109,8 +97,8 @@ export default function BusinessConsole() {
   });
   const [loading, setLoading] = useState(false);
   const businessSlug = "";
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
+  const [_message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
   const [newPlan, setNewPlan] = useState("event-basic");
   const [newMode, setNewMode] = useState<"self-serve" | "photographer">("self-serve");
@@ -133,12 +121,12 @@ export default function BusinessConsole() {
   const [selectionStatus, setSelectionStatus] = useState<Record<string, string>>({});
   const [collaboratorInputs, setCollaboratorInputs] = useState<Record<string, string>>({});
   const [rolesStatus, setRolesStatus] = useState<Record<string, string>>({});
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [_checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [qrLink, setQrLink] = useState<string | null>(null);
   const [qrLabel, setQrLabel] = useState<string | null>(null);
   const [qrData, setQrData] = useState<string | null>(null);
   const [view, setView] = useState<"overview" | "events" | "deliveries">("overview");
-  const [copiedLink, setCopiedLink] = useState<Record<string, boolean>>({});
+  const [_copiedLink, _setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
