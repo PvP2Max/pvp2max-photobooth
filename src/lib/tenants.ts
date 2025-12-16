@@ -206,13 +206,6 @@ export async function listUserEvents(uid: string) {
   return snap.docs.map((d) => withEventDefaults(d.data() as BoothEvent));
 }
 
-async function _fetchEventBySlug(uid: string, slug: string) {
-  if (!uid || !slug) return null;
-  const snap = await userEventsCollection(uid).where("slug", "==", slug).limit(1).get();
-  if (snap.empty) return null;
-  return withEventDefaults(snap.docs[0].data() as BoothEvent);
-}
-
 async function upsertEventFirestore(uid: string, event: BoothEvent) {
   if (!uid || !event.id) return;
   await userEventsCollection(uid).doc(event.id).set(event, { merge: true });
@@ -620,24 +613,6 @@ function toScope(ownerUid: string, event: BoothEvent): TenantScope {
     eventSlug: event.slug,
     eventName: event.name,
   };
-}
-
-function _eventIsActive(event: BoothEvent) {
-  if (event.status === "closed") return false;
-  const now = Date.now();
-  if (event.startsAt && new Date(event.startsAt).getTime() > now) return false;
-  if (event.endsAt && new Date(event.endsAt).getTime() < now) return false;
-  return true;
-}
-
-export async function findEventBySlugs(
-  businessSlug: string,
-  eventSlug: string,
-): Promise<EventContext | null> {
-  const _normalizedBiz = slugify(businessSlug, businessSlug);
-  const _normalizedEvent = slugify(eventSlug, eventSlug);
-  // User-centric: businessSlug is ignored; use caller's UID in getEventContext.
-  return null;
 }
 
 export function scopedStorageRoot(scope: TenantScope) {

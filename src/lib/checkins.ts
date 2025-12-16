@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { getFirebaseAdmin } from "./firebase";
 import { normalizeEmail } from "./storage";
-import { TenantScope, scopedStorageRoot } from "./tenants";
+import { TenantScope } from "./tenants";
 
 export type Checkin = {
   id: string;
@@ -13,50 +12,26 @@ export type Checkin = {
   createdAt: string;
 };
 
-type CheckinIndex = {
-  checkins: Checkin[];
-};
-
-function checkinPaths(scope: TenantScope) {
-  const root = scopedStorageRoot(scope);
-  const dir = path.join(root, "checkins");
-  const index = path.join(dir, "checkins.json");
-  return { dir, index };
+function getFirestoreDb() {
+  const { firestore } = getFirebaseAdmin();
+  return firestore;
 }
 
-async function ensureStorage(scope: TenantScope) {
-  const { dir, index } = checkinPaths(scope);
-  await mkdir(dir, { recursive: true });
-  try {
-    await readFile(index, "utf8");
-  } catch {
-    const seed: CheckinIndex = { checkins: [] };
-    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
-  }
-}
-
-async function readIndex(scope: TenantScope): Promise<CheckinIndex> {
-  await ensureStorage(scope);
-  const { index } = checkinPaths(scope);
-  try {
-    const raw = await readFile(index, "utf8");
-    return JSON.parse(raw) as CheckinIndex;
-  } catch (error) {
-    console.error("Failed to read checkins index", error);
-    return { checkins: [] };
-  }
-}
-
-async function writeIndex(index: CheckinIndex, scope: TenantScope) {
-  const { index: indexFile } = checkinPaths(scope);
-  await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
+function checkinsCollection(scope: TenantScope) {
+  return getFirestoreDb()
+    .collection("users")
+    .doc(scope.ownerUid)
+    .collection("events")
+    .doc(scope.eventId)
+    .collection("checkins");
 }
 
 export async function listCheckins(scope: TenantScope): Promise<Checkin[]> {
-  const index = await readIndex(scope);
-  return [...index.checkins].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  const snapshot = await checkinsCollection(scope)
+    .orderBy("createdAt", "desc")
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as Checkin);
 }
 
 export async function addCheckin(
@@ -70,24 +45,29 @@ export async function addCheckin(
   },
 ): Promise<Checkin> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex(scope);
-  const existing = index.checkins.find((c) => c.email === normalizedEmail);
+  const collection = checkinsCollection(scope);
 
-  if (existing) {
+  // Check for existing checkin with this email
+  const existingSnapshot = await collection
+    .where("email", "==", normalizedEmail)
+    .limit(1)
+    .get();
+
+  if (!existingSnapshot.empty) {
+    // Update existing checkin
+    const existingDoc = existingSnapshot.docs[0];
     const updated: Checkin = {
-      ...existing,
+      ...existingDoc.data() as Checkin,
       name,
       createdAt: new Date().toISOString(),
       ownerUid: scope.ownerUid,
       eventId: scope.eventId,
     };
-    index.checkins = index.checkins
-      .filter((c) => c.email !== normalizedEmail)
-      .concat(updated);
-    await writeIndex(index, scope);
+    await existingDoc.ref.update(updated);
     return updated;
   }
 
+  // Create new checkin
   const checkin: Checkin = {
     id: randomUUID(),
     name,
@@ -97,15 +77,25 @@ export async function addCheckin(
     eventId: scope.eventId,
   };
 
-  index.checkins.push(checkin);
-  await writeIndex(index, scope);
+  await collection.doc(checkin.id).set(checkin);
   return checkin;
 }
 
-export async function removeCheckinByEmail(scope: TenantScope, email: string) {
+export async function removeCheckinByEmail(scope: TenantScope, email: string): Promise<Checkin[]> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex(scope);
-  const remaining = index.checkins.filter((c) => c.email !== normalizedEmail);
-  await writeIndex({ checkins: remaining }, scope);
-  return remaining;
+  const collection = checkinsCollection(scope);
+
+  // Find and delete checkins with this email
+  const snapshot = await collection
+    .where("email", "==", normalizedEmail)
+    .get();
+
+  const batch = getFirestoreDb().batch();
+  for (const doc of snapshot.docs) {
+    batch.delete(doc.ref);
+  }
+  await batch.commit();
+
+  // Return remaining checkins
+  return listCheckins(scope);
 }

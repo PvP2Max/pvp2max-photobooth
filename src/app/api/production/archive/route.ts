@@ -1,7 +1,6 @@
-import { spawn } from "node:child_process";
-import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { productionRoot, purgeExpiredProduction } from "@/lib/production";
+import archiver from "archiver";
+import { listProduction, getProductionAttachment, purgeExpiredProduction, findProductionById } from "@/lib/production";
 import { eventUsage, getEventContext, isAdminRequest } from "@/lib/tenants";
 
 export const runtime = "nodejs";
@@ -33,30 +32,68 @@ export async function GET(request: NextRequest) {
   await purgeExpiredProduction(context.scope);
 
   const id = request.nextUrl.searchParams.get("id");
-  const root = productionRoot(context.scope);
+
+  // Single production archive
   if (id) {
-    const recordRoot = path.join(root, id);
-    const parentDir = path.dirname(recordRoot);
-    const folderName = path.basename(recordRoot);
-    const tar = spawn("tar", ["-czf", "-", folderName], { cwd: parentDir });
-    return new NextResponse(tar.stdout as unknown as ReadableStream, {
+    const production = await findProductionById(context.scope, id);
+    if (!production) {
+      return NextResponse.json({ error: "Production not found" }, { status: 404 });
+    }
+
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    const chunks: Buffer[] = [];
+
+    archive.on("data", (chunk) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    // Add all attachments from the production
+    for (const attachment of production.attachments) {
+      const file = await getProductionAttachment(context.scope, id, attachment.filename);
+      if (file) {
+        archive.append(file.buffer, { name: attachment.filename });
+      }
+    }
+
+    await archive.finalize();
+
+    const buffer = Buffer.concat(chunks);
+    return new NextResponse(buffer, {
       headers: {
-        "Content-Type": "application/gzip",
-        "Content-Disposition": `attachment; filename="photobooth-${id}.tar.gz"`,
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="photobooth-${id}.zip"`,
         "Cache-Control": "no-store",
       },
     });
   }
 
-  const parentDir = path.dirname(root);
-  const folderName = path.basename(root);
+  // All productions archive
+  const productions = await listProduction(context.scope);
 
-  const tar = spawn("tar", ["-czf", "-", folderName], { cwd: parentDir });
+  const archive = archiver("zip", { zlib: { level: 6 } });
+  const chunks: Buffer[] = [];
 
-  return new NextResponse(tar.stdout as unknown as ReadableStream, {
+  archive.on("data", (chunk) => {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  });
+
+  for (const production of productions) {
+    for (const attachment of production.attachments) {
+      const file = await getProductionAttachment(context.scope, production.id, attachment.filename);
+      if (file) {
+        // Organize by production ID to avoid filename conflicts
+        archive.append(file.buffer, { name: `${production.id}/${attachment.filename}` });
+      }
+    }
+  }
+
+  await archive.finalize();
+
+  const buffer = Buffer.concat(chunks);
+  return new NextResponse(buffer, {
     headers: {
-      "Content-Type": "application/gzip",
-      "Content-Disposition": 'attachment; filename="photobooth-production.tar.gz"',
+      "Content-Type": "application/zip",
+      "Content-Disposition": 'attachment; filename="photobooth-production.zip"',
       "Cache-Control": "no-store",
     },
   });

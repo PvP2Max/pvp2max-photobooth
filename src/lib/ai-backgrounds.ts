@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import OpenAI from "openai";
-import { TenantScope, scopedStorageRoot } from "./tenants";
+import { uploadToR2 } from "./r2";
+import { TenantScope } from "./tenants";
+
+const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
 
 type GenerationKind = "background" | "frame";
 
@@ -37,11 +39,18 @@ export async function generateAiBackground(
   }
 
   const buffer = Buffer.from(imageB64, "base64");
-  const dir = path.join(scopedStorageRoot(scope), "ai-backgrounds");
-  await mkdir(dir, { recursive: true });
   const id = randomUUID();
   const filename = `${id}.png`;
-  const filePath = path.join(dir, filename);
-  await writeFile(filePath, buffer);
-  return { id, filename, path: filePath, contentType: "image/png" };
+  const r2Key = `${R2_PREFIX}/ai-backgrounds/${scope.ownerUid}/${scope.eventId}/${filename}`;
+
+  const { url } = await uploadToR2({
+    key: r2Key,
+    body: buffer,
+    contentType: "image/png",
+    cacheControl: "public, max-age=604800",
+  });
+
+  const publicUrl = url || (R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${r2Key}` : undefined);
+
+  return { id, filename, r2Key, url: publicUrl, contentType: "image/png", buffer };
 }

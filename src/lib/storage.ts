@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import path from "node:path";
-import sharp from "sharp";
-import { TenantScope, scopedStorageRoot } from "./tenants";
+import { getFirebaseAdmin } from "./firebase";
+import { uploadToR2, fetchFromR2, deleteFromR2 } from "./r2";
+import { TenantScope } from "./tenants";
+
+const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
 
 export type PhotoRecord = {
   id: string;
@@ -11,18 +13,20 @@ export type PhotoRecord = {
   originalContentType: string;
   cutoutContentType: string;
   createdAt: string;
-  originalPath?: string;
-  cutoutPath?: string;
-  previewPath?: string;
-  previewContentType?: string;
+  // R2 storage keys and URLs
+  r2Key?: string;
+  compositeUrl?: string;
+  // Legacy fields (for backwards compat during transition)
   originalUrl?: string;
   cutoutUrl?: string;
   previewUrl?: string;
+  // Scope fields
   ownerUid?: string;
   eventId?: string;
   mode?: "self-serve" | "photographer";
   overlayPack?: string;
   filterUsed?: string;
+  backgroundId?: string;
 };
 
 export type PublicPhoto = {
@@ -35,109 +39,37 @@ export type PublicPhoto = {
   previewUrl?: string;
 };
 
-type IndexFile = {
-  photos: PhotoRecord[];
-};
-
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-function photoPaths(scope: TenantScope) {
-  const root = scopedStorageRoot(scope);
-  const photoDir = path.join(root, "photos");
-  const index = path.join(root, "photos.json");
-  return { root, photoDir, index };
+function getFirestoreDb() {
+  const { firestore } = getFirebaseAdmin();
+  return firestore;
 }
 
-async function ensureStorage(scope: TenantScope) {
-  const { photoDir, index } = photoPaths(scope);
-  await mkdir(photoDir, { recursive: true });
-  try {
-    await readFile(index, "utf8");
-  } catch {
-    const seed: IndexFile = { photos: [] };
-    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
-  }
-}
-
-async function readIndex(scope: TenantScope): Promise<IndexFile> {
-  await ensureStorage(scope);
-  const { index } = photoPaths(scope);
-  try {
-    const raw = await readFile(index, "utf8");
-    return JSON.parse(raw) as IndexFile;
-  } catch (error) {
-    console.error("Failed to read storage index", error);
-    return { photos: [] };
-  }
-}
-
-async function writeIndex(index: IndexFile, scope: TenantScope) {
-  const { index: indexFile } = photoPaths(scope);
-  await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
-}
-
-function photoDir(scope: TenantScope, id: string) {
-  const { photoDir } = photoPaths(scope);
-  return path.join(photoDir, id);
+function photosCollection(scope: TenantScope) {
+  return getFirestoreDb()
+    .collection("users")
+    .doc(scope.ownerUid)
+    .collection("events")
+    .doc(scope.eventId)
+    .collection("photos");
 }
 
 function toPublicPhoto(record: PhotoRecord): PublicPhoto {
-  const cutoutUrl = record.cutoutUrl ?? `/api/media/${record.id}/cutout`;
-  const previewUrl =
-    record.previewUrl ??
-    record.cutoutUrl ??
-    (record.previewPath ? `/api/media/${record.id}/preview` : cutoutUrl);
-  const originalUrl =
-    record.originalUrl ??
-    (record.originalPath ? `/api/media/${record.id}/original` : cutoutUrl);
+  // Use composite URL as the primary URL for all variants
+  const url = record.compositeUrl || record.cutoutUrl || `/api/media/${record.id}/cutout`;
 
   return {
     id: record.id,
     email: record.email,
     originalName: record.originalName,
     createdAt: record.createdAt,
-    originalUrl,
-    cutoutUrl,
-    previewUrl,
+    originalUrl: url,
+    cutoutUrl: url,
+    previewUrl: url,
   };
-}
-
-async function ensureCutoutPreview(scope: TenantScope, record: PhotoRecord) {
-  if (record.previewUrl || record.cutoutUrl) {
-    return record;
-  }
-  if (record.previewPath) {
-    try {
-      await stat(record.previewPath);
-      return record;
-    } catch {
-      // fall through and regenerate
-    }
-  }
-  if (!record.cutoutPath) {
-    return record;
-  }
-  try {
-    const previewPath = path.join(photoDir(scope, record.id), "cutout-preview.webp");
-    await sharp(record.cutoutPath)
-      .resize({ width: 1200, withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toFile(previewPath);
-    record.previewPath = previewPath;
-    record.previewContentType = "image/webp";
-    const index = await readIndex(scope);
-    const idx = index.photos.findIndex((p) => p.id === record.id);
-    if (idx >= 0) {
-      index.photos[idx].previewPath = previewPath;
-      index.photos[idx].previewContentType = "image/webp";
-      await writeIndex(index, scope);
-    }
-  } catch (error) {
-    console.error("Failed to generate cutout preview", { id: record.id, error });
-  }
-  return record;
 }
 
 export async function savePhoto({
@@ -149,6 +81,7 @@ export async function savePhoto({
   overlayPack,
   filterUsed,
   mode,
+  backgroundId,
 }: {
   email: string;
   file: File;
@@ -158,32 +91,60 @@ export async function savePhoto({
   overlayPack?: string;
   filterUsed?: string;
   mode?: "self-serve" | "photographer";
-}) {
+  backgroundId?: string;
+}): Promise<PublicPhoto> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex(scope);
-
   const id = randomUUID();
   const originalContentType = (file as Blob).type || "application/octet-stream";
+
+  // Fetch the cutout from MODNet's temporary URL
+  console.log(`[storage] Fetching cutout from MODNet: ${cutoutUrl}`);
+  const cutoutResponse = await fetch(cutoutUrl);
+  if (!cutoutResponse.ok) {
+    throw new Error(`Failed to fetch cutout from MODNet (${cutoutResponse.status})`);
+  }
+  const cutoutBuffer = Buffer.from(await cutoutResponse.arrayBuffer());
+
+  // TODO: If backgroundId is provided, composite the cutout with the background
+  // For now, just upload the cutout as the final image
+  // Future: const finalImage = await compositeImages(cutoutBuffer, backgroundId);
+  const finalImage = cutoutBuffer;
+
+  // Upload to R2 at boothos/production/{ownerUid}/{eventId}/{photoId}.png
+  const r2Key = `${R2_PREFIX}/production/${scope.ownerUid}/${scope.eventId}/${id}.png`;
+  console.log(`[storage] Uploading composite to R2: ${r2Key}`);
+
+  const { url: compositeUrl } = await uploadToR2({
+    key: r2Key,
+    body: finalImage,
+    contentType: "image/png",
+    cacheControl: "public, max-age=604800", // 7 days
+  });
+
+  const publicUrl = compositeUrl || (R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${r2Key}` : undefined);
 
   const record: PhotoRecord = {
     id,
     email: normalizedEmail,
     originalName: (file as File).name || "upload",
-    originalUrl: cutoutUrl,
-    cutoutUrl,
-    previewUrl: cutoutUrl,
     originalContentType,
     cutoutContentType,
     createdAt: new Date().toISOString(),
+    r2Key,
+    compositeUrl: publicUrl,
+    // Keep cutoutUrl for backwards compat (it will expire after 1 day from MODNet)
+    cutoutUrl,
     ownerUid: scope.ownerUid,
     eventId: scope.eventId,
     overlayPack,
     filterUsed,
     mode,
+    backgroundId,
   };
 
-  index.photos.push(record);
-  await writeIndex(index, scope);
+  // Save to Firestore
+  await photosCollection(scope).doc(id).set(record);
+  console.log(`[storage] Photo saved to Firestore: users/${scope.ownerUid}/events/${scope.eventId}/photos/${id}`);
 
   return toPublicPhoto(record);
 }
@@ -193,22 +154,36 @@ export async function listPhotosByEmail(
   email: string,
 ): Promise<PublicPhoto[]> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex(scope);
-  const filtered = index.photos.filter((photo) => photo.email === normalizedEmail);
-  return Promise.all(
-    filtered.map(async (photo) => toPublicPhoto(await ensureCutoutPreview(scope, photo))),
-  );
+  const snapshot = await photosCollection(scope)
+    .where("email", "==", normalizedEmail)
+    .orderBy("createdAt", "desc")
+    .get();
+
+  return snapshot.docs.map((doc) => toPublicPhoto(doc.data() as PhotoRecord));
 }
 
 export async function listPhotoIdsByEmail(scope: TenantScope, email: string): Promise<string[]> {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex(scope);
-  return index.photos.filter((p) => p.email === normalizedEmail).map((p) => p.id);
+  const snapshot = await photosCollection(scope)
+    .where("email", "==", normalizedEmail)
+    .select("id")
+    .get();
+
+  return snapshot.docs.map((doc) => doc.id);
 }
 
-export async function findPhotoById(scope: TenantScope, id: string) {
-  const index = await readIndex(scope);
-  return index.photos.find((photo) => photo.id === id);
+export async function listAllPhotos(scope: TenantScope): Promise<PhotoRecord[]> {
+  const snapshot = await photosCollection(scope)
+    .orderBy("createdAt", "desc")
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as PhotoRecord);
+}
+
+export async function findPhotoById(scope: TenantScope, id: string): Promise<PhotoRecord | undefined> {
+  const doc = await photosCollection(scope).doc(id).get();
+  if (!doc.exists) return undefined;
+  return doc.data() as PhotoRecord;
 }
 
 async function loadRemote(url: string, fallbackType: string) {
@@ -230,42 +205,22 @@ export async function getMediaFile(
   if (!record) return null;
 
   try {
-    if (variant === "original") {
-      if (record.originalUrl) {
-        return loadRemote(record.originalUrl, record.originalContentType || "application/octet-stream");
-      }
-      if (record.originalPath) {
-        const buffer = await readFile(record.originalPath);
-        return { buffer, contentType: record.originalContentType };
-      }
-      if (record.cutoutUrl) {
-        return loadRemote(record.cutoutUrl, record.cutoutContentType || "image/png");
-      }
-      if (record.cutoutPath) {
-        const buffer = await readFile(record.cutoutPath);
-        return { buffer, contentType: record.cutoutContentType };
-      }
-      return null;
-    }
-
-    if (variant === "preview") {
-      if (record.previewUrl) {
-        return loadRemote(record.previewUrl, record.cutoutContentType || "image/png");
-      }
-      const ensured = await ensureCutoutPreview(scope, record);
-      if (ensured.previewPath && ensured.previewContentType) {
-        const buffer = await readFile(ensured.previewPath);
-        return { buffer, contentType: ensured.previewContentType };
+    // Try R2 first (preferred for all variants now)
+    if (record.r2Key) {
+      try {
+        const { buffer, contentType } = await fetchFromR2(record.r2Key);
+        return { buffer, contentType };
+      } catch (error) {
+        console.warn(`[storage] Failed to fetch from R2, falling back to URL: ${error}`);
       }
     }
 
-    if (record.cutoutUrl) {
-      return loadRemote(record.cutoutUrl, record.cutoutContentType || "image/png");
+    // Fall back to composite URL or cutout URL
+    const url = record.compositeUrl || record.cutoutUrl;
+    if (url) {
+      return loadRemote(url, record.cutoutContentType || "image/png");
     }
-    if (record.cutoutPath) {
-      const buffer = await readFile(record.cutoutPath);
-      return { buffer, contentType: record.cutoutContentType };
-    }
+
     return null;
   } catch (error) {
     console.error("Failed to load media", { id, variant, error });
@@ -275,32 +230,42 @@ export async function getMediaFile(
 
 export async function removePhotos(scope: TenantScope, ids: string[]) {
   if (ids.length === 0) return;
-  const index = await readIndex(scope);
-  const remaining = index.photos.filter((photo) => !ids.includes(photo.id));
-  const removed = index.photos.filter((photo) => ids.includes(photo.id));
 
-  for (const photo of removed) {
-    const dir = photoDir(scope, photo.id);
-    await rm(dir, { recursive: true, force: true });
+  const collection = photosCollection(scope);
+  const r2Keys: string[] = [];
+
+  // Get R2 keys for deletion
+  for (const id of ids) {
+    const doc = await collection.doc(id).get();
+    if (doc.exists) {
+      const data = doc.data() as PhotoRecord;
+      if (data.r2Key) {
+        r2Keys.push(data.r2Key);
+      }
+    }
   }
 
-  await writeIndex({ photos: remaining }, scope);
+  // Delete from R2
+  if (r2Keys.length > 0) {
+    await deleteFromR2(r2Keys);
+  }
+
+  // Delete from Firestore
+  const batch = getFirestoreDb().batch();
+  for (const id of ids) {
+    batch.delete(collection.doc(id));
+  }
+  await batch.commit();
 }
 
 export async function resetAllForEmail(scope: TenantScope, email: string) {
   const normalizedEmail = normalizeEmail(email);
-  const index = await readIndex(scope);
-  const remaining = index.photos.filter(
-    (photo) => photo.email !== normalizedEmail,
-  );
-  const removed = index.photos.filter(
-    (photo) => photo.email === normalizedEmail,
-  );
+  const snapshot = await photosCollection(scope)
+    .where("email", "==", normalizedEmail)
+    .get();
 
-  for (const photo of removed) {
-    const dir = photoDir(scope, photo.id);
-    await rm(dir, { recursive: true, force: true });
+  const ids = snapshot.docs.map((doc) => doc.id);
+  if (ids.length > 0) {
+    await removePhotos(scope, ids);
   }
-
-  await writeIndex({ photos: remaining }, scope);
 }

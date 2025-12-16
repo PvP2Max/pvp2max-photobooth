@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { TenantScope, scopedStorageRoot } from "./tenants";
+import { getFirebaseAdmin } from "./firebase";
+import { uploadToR2, fetchFromR2, deleteFromR2 } from "./r2";
+import { TenantScope } from "./tenants";
+
+const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
 
 export type BackgroundOption = {
   id: string;
@@ -16,23 +20,34 @@ export type BackgroundOption = {
   category?: "background" | "frame";
 };
 
-type BackgroundRecord = {
+export type BackgroundRecord = {
   id: string;
   name: string;
   description: string;
-  filename: string;
+  r2Key: string;
+  url: string;
+  previewR2Key?: string;
+  previewUrl?: string;
   contentType: string;
-  previewFilename?: string;
-  previewContentType?: string;
   createdAt: string;
   ownerUid?: string;
   eventId?: string;
   category?: "background" | "frame";
 };
 
-type BackgroundIndex = {
-  backgrounds: BackgroundRecord[];
-};
+function getFirestoreDb() {
+  const { firestore } = getFirebaseAdmin();
+  return firestore;
+}
+
+function backgroundsCollection(scope: TenantScope) {
+  return getFirestoreDb()
+    .collection("users")
+    .doc(scope.ownerUid)
+    .collection("events")
+    .doc(scope.eventId)
+    .collection("backgrounds");
+}
 
 async function loadBuiltInAssets(): Promise<BackgroundOption[]> {
   const assetsRoot = path.join(process.cwd(), "public", "assets");
@@ -67,14 +82,6 @@ async function loadBuiltInAssets(): Promise<BackgroundOption[]> {
   return options;
 }
 
-function backgroundPaths(scope: TenantScope) {
-  const root = scopedStorageRoot(scope);
-  const dir = path.join(root, "backgrounds");
-  const fileDir = path.join(dir, "files");
-  const index = path.join(dir, "backgrounds.json");
-  return { dir, fileDir, index };
-}
-
 function extensionFor(contentType: string, fallback = ".png") {
   if (contentType.includes("svg")) return ".svg";
   if (contentType.includes("jpeg")) return ".jpg";
@@ -84,87 +91,26 @@ function extensionFor(contentType: string, fallback = ".png") {
   return fallback;
 }
 
-async function ensureBackgroundPreview(scope: TenantScope, record: BackgroundRecord) {
-  const { fileDir } = backgroundPaths(scope);
-  if (record.previewFilename) {
-    try {
-      await stat(path.join(fileDir, record.previewFilename));
-      return record;
-    } catch {
-      // fall through and regenerate
-    }
-  }
-  try {
-    const previewFilename = `preview-${record.id}.webp`;
-    const target = path.join(fileDir, previewFilename);
-    await sharp(path.join(fileDir, record.filename))
-      .resize({ width: 1600, withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toFile(target);
-    record.previewFilename = previewFilename;
-    record.previewContentType = "image/webp";
-    const currentIndex = await readIndex(scope);
-    const idx = currentIndex.backgrounds.findIndex((bg) => bg.id === record.id);
-    if (idx >= 0) {
-      currentIndex.backgrounds[idx].previewFilename = previewFilename;
-      currentIndex.backgrounds[idx].previewContentType = "image/webp";
-      await writeIndex(currentIndex, scope);
-    }
-  } catch (error) {
-    console.error("Failed to generate background preview", { id: record.id, error });
-  }
-  return record;
-}
-
-async function ensureBackgroundStorage(scope: TenantScope) {
-  const { fileDir, index } = backgroundPaths(scope);
-  await mkdir(fileDir, { recursive: true });
-  try {
-    await readFile(index, "utf8");
-  } catch {
-    const seed: BackgroundIndex = { backgrounds: [] };
-    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
-  }
-}
-
-async function readIndex(scope: TenantScope): Promise<BackgroundIndex> {
-  await ensureBackgroundStorage(scope);
-  const { index } = backgroundPaths(scope);
-  try {
-    const raw = await readFile(index, "utf8");
-    return JSON.parse(raw) as BackgroundIndex;
-  } catch (error) {
-    console.error("Failed to read background index", error);
-    return { backgrounds: [] };
-  }
-}
-
-async function writeIndex(index: BackgroundIndex, scope: TenantScope) {
-  const { index: indexFile } = backgroundPaths(scope);
-  await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
-}
-
 export async function listBackgrounds(
   scope: TenantScope,
   allowedIds?: string[] | null,
 ): Promise<BackgroundOption[]> {
-  const index = await readIndex(scope);
+  const snapshot = await backgroundsCollection(scope).get();
   const builtIns = await loadBuiltInAssets();
-  const custom: BackgroundOption[] = await Promise.all(
-    index.backgrounds.map(async (bg) => {
-      const ensured = await ensureBackgroundPreview(scope, bg);
-      return {
-        id: ensured.id,
-        name: ensured.name,
-        description: ensured.description,
-        asset: `/api/backgrounds/files/${ensured.id}`,
-        previewAsset: `/api/backgrounds/files/${ensured.id}?preview=1`,
-        isCustom: true,
-        createdAt: ensured.createdAt,
-        category: ensured.category ?? "background",
-      };
-    }),
-  );
+
+  const custom: BackgroundOption[] = snapshot.docs.map((doc) => {
+    const bg = doc.data() as BackgroundRecord;
+    return {
+      id: bg.id,
+      name: bg.name,
+      description: bg.description,
+      asset: bg.url,
+      previewAsset: bg.previewUrl || bg.url,
+      isCustom: true,
+      createdAt: bg.createdAt,
+      category: bg.category ?? "background",
+    };
+  });
 
   const combined = [...builtIns, ...custom];
   if (Array.isArray(allowedIds)) {
@@ -190,26 +136,42 @@ export async function addBackground(
     category?: "background" | "frame";
   },
 ): Promise<BackgroundOption> {
-  const index = await readIndex(scope);
-  const { fileDir } = backgroundPaths(scope);
+  const collection = backgroundsCollection(scope);
   const id = randomUUID();
   const contentType = (file as Blob).type || "application/octet-stream";
   const ext = extensionFor(contentType);
-  const filename = `${id}${ext}`;
-  const target = path.join(fileDir, filename);
 
+  // Read file buffer
   const arrayBuffer = await file.arrayBuffer();
-  await writeFile(target, Buffer.from(arrayBuffer));
-  let previewFilename: string | undefined;
-  let previewContentType: string | undefined;
+  const buffer = Buffer.from(arrayBuffer);
+
+  // Upload main file to R2
+  const r2Key = `${R2_PREFIX}/backgrounds/${scope.ownerUid}/${scope.eventId}/${id}${ext}`;
+  const { url } = await uploadToR2({
+    key: r2Key,
+    body: buffer,
+    contentType,
+    cacheControl: "public, max-age=604800",
+  });
+  const publicUrl = url || (R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${r2Key}` : `/api/backgrounds/files/${id}`);
+
+  // Generate and upload preview
+  let previewR2Key: string | undefined;
+  let previewUrl: string | undefined;
   try {
-    previewFilename = `preview-${id}.webp`;
-    const previewTarget = path.join(fileDir, previewFilename);
-    await sharp(target)
+    const previewBuffer = await sharp(buffer)
       .resize({ width: 1600, withoutEnlargement: true })
       .webp({ quality: 80 })
-      .toFile(previewTarget);
-    previewContentType = "image/webp";
+      .toBuffer();
+
+    previewR2Key = `${R2_PREFIX}/backgrounds/${scope.ownerUid}/${scope.eventId}/preview-${id}.webp`;
+    const { url: previewUploadUrl } = await uploadToR2({
+      key: previewR2Key,
+      body: previewBuffer,
+      contentType: "image/webp",
+      cacheControl: "public, max-age=604800",
+    });
+    previewUrl = previewUploadUrl || (R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${previewR2Key}` : `/api/backgrounds/files/${id}?preview=1`);
   } catch (error) {
     console.error("Failed to generate background preview", { id, error });
   }
@@ -218,65 +180,74 @@ export async function addBackground(
     id,
     name,
     description,
-    filename,
+    r2Key,
+    url: publicUrl,
+    previewR2Key,
+    previewUrl,
     contentType,
-    previewFilename,
-    previewContentType,
     createdAt: new Date().toISOString(),
     ownerUid: scope.ownerUid,
     eventId: scope.eventId,
     category,
   };
 
-  index.backgrounds.push(record);
-  await writeIndex(index, scope);
+  await collection.doc(id).set(record);
 
   return {
     id,
     name,
     description,
-    asset: `/api/backgrounds/files/${id}`,
-    previewAsset: `/api/backgrounds/files/${id}?preview=1`,
+    asset: publicUrl,
+    previewAsset: previewUrl || publicUrl,
     isCustom: true,
     createdAt: record.createdAt,
     category,
   };
 }
 
-export async function removeBackground(scope: TenantScope, id: string) {
-  const index = await readIndex(scope);
-  const { fileDir } = backgroundPaths(scope);
-  const record = index.backgrounds.find((bg) => bg.id === id);
-  if (!record) {
+export async function removeBackground(scope: TenantScope, id: string): Promise<void> {
+  const collection = backgroundsCollection(scope);
+  const doc = await collection.doc(id).get();
+
+  if (!doc.exists) {
     throw new Error("Background not found or not removable");
   }
 
-  const filePath = path.join(fileDir, record.filename);
-  await rm(filePath, { force: true });
-  const remaining = index.backgrounds.filter((bg) => bg.id !== id);
-  await writeIndex({ backgrounds: remaining }, scope);
+  const data = doc.data() as BackgroundRecord;
+  const keysToDelete = [data.r2Key];
+  if (data.previewR2Key) {
+    keysToDelete.push(data.previewR2Key);
+  }
+
+  await deleteFromR2(keysToDelete);
+  await collection.doc(id).delete();
 }
 
-export async function findBackgroundAsset(scope: TenantScope, id: string) {
-  const index = await readIndex(scope);
-  const { fileDir } = backgroundPaths(scope);
-  const record = index.backgrounds.find((bg) => bg.id === id);
+export async function findBackgroundById(scope: TenantScope, id: string): Promise<BackgroundRecord | undefined> {
+  const doc = await backgroundsCollection(scope).doc(id).get();
+  if (!doc.exists) return undefined;
+  return doc.data() as BackgroundRecord;
+}
+
+export async function getBackgroundAsset(scope: TenantScope, id: string, preview = false) {
+  const record = await findBackgroundById(scope, id);
   if (!record) return null;
-  return {
-    path: path.join(fileDir, record.filename),
-    contentType: record.contentType,
-    previewPath: record.previewFilename
-      ? path.join(fileDir, record.previewFilename)
-      : undefined,
-    previewContentType: record.previewContentType,
-  };
+
+  const key = preview && record.previewR2Key ? record.previewR2Key : record.r2Key;
+  try {
+    const { buffer, contentType } = await fetchFromR2(key);
+    return { buffer, contentType };
+  } catch (error) {
+    console.error("Failed to fetch background from R2", { id, error });
+    return null;
+  }
 }
 
-export async function builtInBackgrounds() {
+export async function builtInBackgrounds(): Promise<BackgroundOption[]> {
   return loadBuiltInAssets();
 }
 
-export async function getBackgroundName(scope: TenantScope, id: string) {
+export async function getBackgroundName(scope: TenantScope, id: string): Promise<string> {
   const all = await listBackgrounds(scope);
   return all.find((bg) => bg.id === id)?.name ?? id;
 }

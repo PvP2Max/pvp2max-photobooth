@@ -368,6 +368,7 @@ export default function BackgroundsPage() {
                     {bg.description || "—"} {bg.isCustom ? "(custom)" : ""} {bg.category === "frame" ? "• Frame" : ""}
                   </p>
                   <div className="mt-2 h-24 w-full overflow-hidden rounded-lg bg-black/10 ring-1 ring-[var(--color-border-subtle)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={bg.previewAsset ?? bg.asset}
                       alt={bg.name}

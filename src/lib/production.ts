@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import archiver from "archiver";
+import { getFirebaseAdmin } from "./firebase";
 import { uploadToR2, fetchFromR2, deleteFromR2 } from "./r2";
-import { TenantScope, scopedStorageRoot } from "./tenants";
+import { TenantScope } from "./tenants";
 
 const R2_PREFIX = (process.env.R2_KEY_PREFIX || "boothos").replace(/\/+$/, "");
 
@@ -32,43 +31,18 @@ export type ProductionSet = {
   bundleFilename?: string;
 };
 
-type ProductionIndex = {
-  items: ProductionSet[];
-};
-
-function productionPaths(scope: TenantScope) {
-  const root = scopedStorageRoot(scope);
-  const dir = path.join(root, "production");
-  const index = path.join(dir, "production.json");
-  return { dir, index };
+function getFirestoreDb() {
+  const { firestore } = getFirebaseAdmin();
+  return firestore;
 }
 
-async function ensureProductionStorage(scope: TenantScope) {
-  const { dir, index } = productionPaths(scope);
-  await mkdir(dir, { recursive: true });
-  try {
-    await readFile(index, "utf8");
-  } catch {
-    const seed: ProductionIndex = { items: [] };
-    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
-  }
-}
-
-async function readIndex(scope: TenantScope): Promise<ProductionIndex> {
-  await ensureProductionStorage(scope);
-  const { index } = productionPaths(scope);
-  try {
-    const raw = await readFile(index, "utf8");
-    return JSON.parse(raw) as ProductionIndex;
-  } catch (error) {
-    console.error("Failed to read production index", error);
-    return { items: [] };
-  }
-}
-
-async function writeIndex(index: ProductionIndex, scope: TenantScope) {
-  const { index: indexFile } = productionPaths(scope);
-  await writeFile(indexFile, JSON.stringify(index, null, 2), "utf8");
+function productionsCollection(scope: TenantScope) {
+  return getFirestoreDb()
+    .collection("users")
+    .doc(scope.ownerUid)
+    .collection("events")
+    .doc(scope.eventId)
+    .collection("productions");
 }
 
 export async function saveProduction(
@@ -76,14 +50,11 @@ export async function saveProduction(
   email: string,
   attachments: { filename: string; content: Buffer; contentType: string }[],
   ttlHours = 72,
-) {
-  await ensureProductionStorage(scope);
-  const index = await readIndex(scope);
+): Promise<ProductionSet> {
+  const collection = productionsCollection(scope);
   const id = randomUUID();
   const downloadToken = randomUUID();
   const tokenExpiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString();
-  const { dir } = productionPaths(scope);
-  await mkdir(dir, { recursive: true });
 
   const savedAttachments: ProductionAttachment[] = [];
   for (const attachment of attachments) {
@@ -129,46 +100,63 @@ export async function saveProduction(
     bundleUrl,
     bundleFilename,
   };
-  index.items.unshift(record);
-  await writeIndex(index, scope);
+
+  await collection.doc(id).set(record);
   return record;
 }
 
 export async function listProduction(scope: TenantScope): Promise<ProductionSet[]> {
   await purgeExpiredProduction(scope);
-  const index = await readIndex(scope);
-  return index.items;
+  const snapshot = await productionsCollection(scope)
+    .orderBy("createdAt", "desc")
+    .get();
+
+  return snapshot.docs.map((doc) => doc.data() as ProductionSet);
 }
 
-export async function deleteProduction(scope: TenantScope, id: string) {
-  const index = await readIndex(scope);
-  const remaining = index.items.filter((item) => item.id !== id);
-  const removed = index.items.find((item) => item.id === id);
-  if (removed) {
+export async function deleteProduction(scope: TenantScope, id: string): Promise<void> {
+  const collection = productionsCollection(scope);
+  const doc = await collection.doc(id).get();
+
+  if (doc.exists) {
+    const data = doc.data() as ProductionSet;
     const keys = [
-      ...removed.attachments.map((a) => a.r2Key).filter(Boolean),
-      ...(removed.bundleKey ? [removed.bundleKey] : []),
+      ...data.attachments.map((a) => a.r2Key).filter(Boolean),
+      ...(data.bundleKey ? [data.bundleKey] : []),
     ];
     await deleteFromR2(keys);
+    await collection.doc(id).delete();
   }
-  await writeIndex({ items: remaining }, scope);
 }
 
-export async function deleteAllProduction(scope: TenantScope) {
-  const index = await readIndex(scope);
-  const keys = index.items.flatMap((item) => [
-    ...item.attachments.map((a) => a.r2Key).filter(Boolean),
-    ...(item.bundleKey ? [item.bundleKey] : []),
-  ]);
-  await deleteFromR2(keys);
-  await writeIndex({ items: [] }, scope);
+export async function deleteAllProduction(scope: TenantScope): Promise<void> {
+  const snapshot = await productionsCollection(scope).get();
+  const allKeys: string[] = [];
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data() as ProductionSet;
+    allKeys.push(
+      ...data.attachments.map((a) => a.r2Key).filter(Boolean),
+      ...(data.bundleKey ? [data.bundleKey] : []),
+    );
+  }
+
+  await deleteFromR2(allKeys);
+
+  const batch = getFirestoreDb().batch();
+  for (const doc of snapshot.docs) {
+    batch.delete(doc.ref);
+  }
+  await batch.commit();
 }
 
 export async function getProductionAttachment(scope: TenantScope, id: string, filename: string) {
-  const index = await readIndex(scope);
-  const item = index.items.find((i) => i.id === id);
-  if (!item) return null;
+  const doc = await productionsCollection(scope).doc(id).get();
+  if (!doc.exists) return null;
+
+  const item = doc.data() as ProductionSet;
   const isBundle = item.bundleFilename && filename === item.bundleFilename;
+
   if (isBundle && item.bundleKey) {
     const blob = await fetchFromR2(item.bundleKey);
     return {
@@ -177,18 +165,10 @@ export async function getProductionAttachment(scope: TenantScope, id: string, fi
       filename: item.bundleFilename,
     };
   }
+
   const attachment = item.attachments.find((a) => a.filename === filename);
   if (!attachment) return null;
-  const legacyPath = (attachment as { path?: string }).path;
-  if (!attachment.r2Key && legacyPath) {
-    // Legacy local path fallback
-    const buffer = await readFile(legacyPath);
-    return {
-      buffer,
-      contentType: attachment.contentType,
-      filename: attachment.filename,
-    };
-  }
+
   const blob = await fetchFromR2(attachment.r2Key);
   return {
     buffer: blob.buffer,
@@ -197,14 +177,16 @@ export async function getProductionAttachment(scope: TenantScope, id: string, fi
   };
 }
 
-export async function findProductionById(scope: TenantScope, id: string) {
-  const index = await readIndex(scope);
-  return index.items.find((i) => i.id === id);
+export async function findProductionById(scope: TenantScope, id: string): Promise<ProductionSet | undefined> {
+  const doc = await productionsCollection(scope).doc(id).get();
+  if (!doc.exists) return undefined;
+  return doc.data() as ProductionSet;
 }
 
-export async function verifyProductionToken(scope: TenantScope, id: string, token: string) {
+export async function verifyProductionToken(scope: TenantScope, id: string, token: string): Promise<ProductionSet | null> {
   const record = await findProductionById(scope, id);
   if (!record) return null;
+
   const now = Date.now();
   const expires = new Date(record.tokenExpiresAt).getTime();
   if (token !== record.downloadToken || (expires && expires < now)) {
@@ -214,53 +196,58 @@ export async function verifyProductionToken(scope: TenantScope, id: string, toke
     }
     return null;
   }
+
   return record;
 }
 
-export async function recordDownload(scope: TenantScope, id: string, ip?: string) {
-  const index = await readIndex(scope);
-  const record = index.items.find((i) => i.id === id);
-  if (!record) return;
+export async function recordDownload(scope: TenantScope, id: string, ip?: string): Promise<void> {
+  const docRef = productionsCollection(scope).doc(id);
+  const doc = await docRef.get();
+  if (!doc.exists) return;
+
+  const record = doc.data() as ProductionSet;
   const at = new Date().toISOString();
-  record.downloadCount = (record.downloadCount ?? 0) + 1;
-  record.lastDownloadedAt = at;
   const history = record.downloadEvents ?? [];
   history.unshift({ at, ip });
-  record.downloadEvents = history.slice(0, 25);
-  await writeIndex(index, scope);
+
+  await docRef.update({
+    downloadCount: (record.downloadCount ?? 0) + 1,
+    lastDownloadedAt: at,
+    downloadEvents: history.slice(0, 25),
+  });
 }
 
-export function productionRoot(scope: TenantScope) {
-  const { dir } = productionPaths(scope);
-  return dir;
-}
-
-export async function purgeExpiredProduction(scope: TenantScope) {
-  const index = await readIndex(scope);
+export async function purgeExpiredProduction(scope: TenantScope): Promise<void> {
   const now = Date.now();
-  const keep: ProductionSet[] = [];
+  const snapshot = await productionsCollection(scope).get();
   const expired: ProductionSet[] = [];
-  for (const item of index.items) {
+
+  for (const doc of snapshot.docs) {
+    const item = doc.data() as ProductionSet;
     const exp = new Date(item.tokenExpiresAt).getTime();
     if (exp && exp < now) {
       expired.push(item);
-    } else {
-      keep.push(item);
     }
   }
+
   if (expired.length > 0) {
+    const allKeys: string[] = [];
+    const batch = getFirestoreDb().batch();
+
     for (const item of expired) {
-      const keys = [
+      allKeys.push(
         ...item.attachments.map((a) => a.r2Key).filter(Boolean),
         ...(item.bundleKey ? [item.bundleKey] : []),
-      ];
-      await deleteFromR2(keys);
+      );
+      batch.delete(productionsCollection(scope).doc(item.id));
     }
-    await writeIndex({ items: keep }, scope);
+
+    await deleteFromR2(allKeys);
+    await batch.commit();
   }
 }
 
-async function buildZip(files: { filename: string; content: Buffer }[]) {
+async function buildZip(files: { filename: string; content: Buffer }[]): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const archive = archiver("zip", { zlib: { level: 9 } });
     const chunks: Buffer[] = [];

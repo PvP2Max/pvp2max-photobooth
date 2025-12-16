@@ -1,6 +1,8 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
-import { findBackgroundAsset, getBackgroundName } from "@/lib/backgrounds";
+import { getBackgroundAsset, getBackgroundName, builtInBackgrounds } from "@/lib/backgrounds";
 import { sendMail } from "@/lib/mailer";
 import {
   findPhotoById,
@@ -9,7 +11,7 @@ import {
   removePhotos,
 } from "@/lib/storage";
 import { saveProduction } from "@/lib/production";
-import { eventUsage, getEventContext } from "@/lib/tenants";
+import { eventUsage, getEventContext, TenantScope } from "@/lib/tenants";
 import { applyFilterToBuffer } from "@/lib/filters";
 import { allowedOverlayTheme, loadWatermark, renderOverlay } from "@/lib/overlays";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -46,6 +48,25 @@ async function applyWatermark(buffer: Buffer, watermarkEnabled: boolean) {
     .png()
     .toBuffer();
   return composed;
+}
+
+async function loadBackgroundBuffer(scope: TenantScope, backgroundId: string): Promise<Buffer | null> {
+  // Check if it's a built-in background (from public/assets)
+  const builtIns = await builtInBackgrounds();
+  const builtIn = builtIns.find((bg) => bg.id === backgroundId);
+  if (builtIn) {
+    // Built-in backgrounds are served from public folder
+    const assetPath = path.join(process.cwd(), "public", builtIn.asset);
+    try {
+      return await readFile(assetPath);
+    } catch {
+      return null;
+    }
+  }
+
+  // Custom background from R2
+  const asset = await getBackgroundAsset(scope, backgroundId, false);
+  return asset?.buffer ?? null;
 }
 
 export async function POST(request: NextRequest) {
@@ -107,18 +128,18 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const backgroundAsset = await findBackgroundAsset(
+        const backgroundBuffer = await loadBackgroundBuffer(
           context.scope,
           selection.backgroundId,
         );
-        if (!backgroundAsset) {
+        if (!backgroundBuffer) {
           return NextResponse.json(
             { error: `Background ${selection.backgroundId} not found.` },
             { status: 404 },
           );
         }
 
-        const background = sharp(backgroundAsset.path).ensureAlpha();
+        const background = sharp(backgroundBuffer).ensureAlpha();
         const [bgMeta, cutoutMeta] = await Promise.all([
           background.metadata(),
           sharp(cutoutFile.buffer).metadata(),
@@ -185,7 +206,7 @@ export async function POST(request: NextRequest) {
         if (selection.matchBackground) {
           try {
             const [bgStats, cutStats] = await Promise.all([
-              sharp(backgroundAsset.path).stats(),
+              sharp(backgroundBuffer).stats(),
               sharp(cutoutBuffer).stats(),
             ]);
             const bgMean =
@@ -304,7 +325,7 @@ export async function POST(request: NextRequest) {
               ${downloadLinks.join("")}
             </ul>
             ${watermarkNote}
-            <p style="margin:10px 0 0;color:#94a3b8;font-size:12px;">Links expire after a few days. If they stop working, reply to this email and we’ll refresh them.</p>
+            <p style="margin:10px 0 0;color:#94a3b8;font-size:12px;">Links expire after a few days. If they stop working, reply to this email and we'll refresh them.</p>
           </div>
           <div style="background:#0f172a;padding:0 28px 24px;">
             <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:14px 16px;text-align:center;">

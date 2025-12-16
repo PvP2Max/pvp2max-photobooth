@@ -51,12 +51,10 @@ export async function POST(request: NextRequest) {
   }
   try {
     const file = await generateAiBackground(context.scope, prompt, kind);
-    const fs = await import("node:fs/promises");
-    const buffer = await fs.readFile(file.path);
     const background = await addBackground(context.scope, {
       name: prompt.slice(0, 60),
       description: "AI generated",
-      file: new File([buffer], file.filename, {
+      file: new File([file.buffer], file.filename, {
         type: file.contentType,
       }),
     });

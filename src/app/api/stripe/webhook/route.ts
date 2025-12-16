@@ -4,9 +4,7 @@ import {
   BoothEventPlan,
   applyPlanDefaults,
   updateEventConfig,
-  updateBusinessSubscription,
   createEvent,
-  findBusinessById,
   updateUserSubscription,
 } from "@/lib/tenants";
 
@@ -40,15 +38,29 @@ export async function POST(request: NextRequest) {
         const plan = session.metadata?.plan as BoothEventPlan | undefined;
         const businessId = session.metadata?.businessId as string | undefined;
         const eventId = session.metadata?.eventId as string | undefined;
-        if (plan && businessId && eventId) {
-          await markEventPaid(businessId, eventId, plan);
-        } else if (plan && businessId && session.metadata?.eventPayload) {
-          await createPaidEventFromMetadata(businessId, plan, session.metadata.eventPayload);
+        const eventName = session.metadata?.eventName as string | undefined;
+
+        // businessId is now the user's UID
+        const ownerUid = businessId;
+
+        // If we have event data in metadata, create a new event
+        if (plan && ownerUid && eventName) {
+          await createPaidEventFromMetadata(ownerUid, plan, session.metadata!);
         }
-        if (plan === "photographer-subscription" && businessId) {
-          await markSubscription(businessId, session.subscription as string, "active", plan);
-          // Set initial AI credits for photographer subscription
-          await updateUserSubscription(businessId, {
+        // Otherwise, if we have an existing eventId, just mark it as paid
+        else if (plan && ownerUid && eventId) {
+          await markEventPaid(ownerUid, eventId, plan);
+        }
+        // Legacy: handle JSON-encoded payload
+        else if (plan && ownerUid && session.metadata?.eventPayload) {
+          await createPaidEventFromJsonPayload(ownerUid, plan, session.metadata.eventPayload);
+        }
+
+        if (plan === "photographer-subscription" && ownerUid) {
+          await updateUserSubscription(ownerUid, {
+            subscriptionId: session.subscription as string,
+            subscriptionStatus: "active",
+            subscriptionPlan: plan,
             aiCreditsRemaining: 10,
             aiCreditsResetAt: new Date().toISOString(),
           });
@@ -63,12 +75,16 @@ export async function POST(request: NextRequest) {
           status: "active" | "past_due" | "canceled" | "incomplete" | "trialing";
           metadata?: Record<string, string>;
         };
-        const businessId = sub.metadata?.businessId;
-        if (businessId) {
-          await markSubscription(businessId, sub.id, sub.status, "photographer-subscription");
+        const ownerUid = sub.metadata?.businessId;
+        if (ownerUid) {
+          await updateUserSubscription(ownerUid, {
+            subscriptionId: sub.id,
+            subscriptionStatus: sub.status,
+            subscriptionPlan: "photographer-subscription",
+          });
           // Reset AI credits on invoice.paid (monthly renewal)
           if (event.type === "invoice.paid" && sub.status === "active") {
-            await updateUserSubscription(businessId, {
+            await updateUserSubscription(ownerUid, {
               aiCreditsRemaining: 10,
               aiCreditsResetAt: new Date().toISOString(),
             });
@@ -78,9 +94,11 @@ export async function POST(request: NextRequest) {
       }
       case "customer.subscription.deleted": {
         const sub = event.data.object as { metadata?: Record<string, string> };
-        const businessId = sub.metadata?.businessId;
-        if (businessId) {
-          await markSubscription(businessId, undefined, "canceled", "photographer-subscription");
+        const ownerUid = sub.metadata?.businessId;
+        if (ownerUid) {
+          await updateUserSubscription(ownerUid, {
+            subscriptionStatus: "canceled",
+          });
         }
         break;
       }
@@ -95,12 +113,54 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ received: true });
 }
 
-async function markEventPaid(businessId: string, eventId: string, plan: BoothEventPlan) {
+async function markEventPaid(ownerUid: string, eventId: string, plan: BoothEventPlan) {
   const defaults = applyPlanDefaults(plan);
-  await updateEventConfig(businessId, eventId, { ...defaults, paymentStatus: "paid" });
+  await updateEventConfig(ownerUid, eventId, { ...defaults, paymentStatus: "paid" });
 }
 
-async function createPaidEventFromMetadata(businessId: string, plan: BoothEventPlan, payload: string) {
+// Create event from individual metadata fields (new format)
+async function createPaidEventFromMetadata(
+  ownerUid: string,
+  plan: BoothEventPlan,
+  metadata: Record<string, string>,
+) {
+  try {
+    const eventName = metadata.eventName;
+    if (!eventName) return;
+
+    const defaults = applyPlanDefaults(plan);
+    const mode = (metadata.eventMode as "self-serve" | "photographer") ?? "self-serve";
+    const allowedSelections = parseInt(metadata.eventAllowedSelections ?? "3", 10);
+
+    const { event } = await createEvent(ownerUid, {
+      name: eventName,
+      status: "live",
+      mode,
+      plan,
+      allowedSelections,
+      allowBackgroundRemoval: metadata.eventAllowBgRemoval === "true",
+      allowAiBackgrounds: metadata.eventAllowAiBg === "true",
+      allowAiFilters: metadata.eventAllowAiFilters === "true",
+      deliveryEmail: true,
+      deliverySms: metadata.eventDeliverySms === "true",
+      galleryPublic: metadata.eventGalleryPublic === "true",
+      eventDate: metadata.eventDate || undefined,
+      eventTime: metadata.eventTime || undefined,
+      overlayTheme: metadata.eventOverlayTheme || "none",
+    });
+
+    await updateEventConfig(ownerUid, event.id, { ...defaults, paymentStatus: "paid" });
+  } catch {
+    // swallow errors; we don't fail the webhook
+  }
+}
+
+// Legacy: Create event from JSON-encoded payload
+async function createPaidEventFromJsonPayload(
+  ownerUid: string,
+  plan: BoothEventPlan,
+  payload: string,
+) {
   try {
     const parsed = JSON.parse(payload) as {
       name?: string;
@@ -117,8 +177,6 @@ async function createPaidEventFromMetadata(businessId: string, plan: BoothEventP
     };
     if (!parsed?.name) return;
     const defaults = applyPlanDefaults(plan);
-    const business = await findBusinessById(businessId);
-    const ownerUid = business?.ownerUid ?? "seed-owner";
     const { event } = await createEvent(ownerUid, {
       name: parsed.name,
       status: parsed.status === "closed" ? "closed" : "live",
@@ -134,21 +192,8 @@ async function createPaidEventFromMetadata(businessId: string, plan: BoothEventP
       eventTime: parsed.eventTime,
       overlayTheme: "none",
     });
-    await updateEventConfig(businessId, event.id, { ...defaults, paymentStatus: "paid" });
+    await updateEventConfig(ownerUid, event.id, { ...defaults, paymentStatus: "paid" });
   } catch {
     // swallow malformed payloads; we don't fail the webhook
   }
-}
-
-async function markSubscription(
-  businessId: string,
-  subscriptionId: string | undefined,
-  status: "active" | "past_due" | "canceled" | "incomplete" | "trialing",
-  plan: BoothEventPlan,
-) {
-  await updateBusinessSubscription(businessId, {
-    subscriptionId,
-    subscriptionStatus: status,
-    subscriptionPlan: plan,
-  });
 }

@@ -72,15 +72,29 @@ export type RemoveBackgroundResult = {
 
 export async function removeBackground(file: File): Promise<RemoveBackgroundResult> {
   const apiBase = resolveApiBase();
+  const sourceBase = resolveSourceBase();
   const token = resolveServiceToken();
 
   if (!token) {
-    throw new Error("Background remover service token is not configured.");
+    throw new Error("Background remover service token is not configured. Set BGREMOVER_SERVICE_TOKEN.");
+  }
+
+  // Validate source base is publicly accessible
+  if (sourceBase.includes("localhost") || sourceBase.includes("127.0.0.1")) {
+    console.warn(
+      `[bgremover] WARNING: BGREMOVER_SOURCE_BASE is set to "${sourceBase}" which is not publicly accessible. ` +
+      `The modnet service won't be able to fetch images. Set BGREMOVER_SOURCE_BASE to your public URL (e.g., https://boothos.app).`
+    );
   }
 
   const { imageUrl, cleanup } = await stageUploadForService(file, token);
 
+  console.log(`[bgremover] Calling ${apiBase}/remove-bg with imageUrl: ${imageUrl}`);
+
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000); // 55s timeout (under the 60s max duration)
+
     const response = await fetch(`${apiBase}/remove-bg`, {
       method: "POST",
       headers: {
@@ -88,10 +102,14 @@ export async function removeBackground(file: File): Promise<RemoveBackgroundResu
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ imageUrl }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const detail = await response.text();
+      console.error(`[bgremover] Failed with status ${response.status}: ${detail.slice(0, 500)}`);
       throw new Error(
         `Background removal failed (${response.status}): ${detail.slice(0, 500)}`,
       );
@@ -103,15 +121,23 @@ export async function removeBackground(file: File): Promise<RemoveBackgroundResu
     };
 
     if (!payload.outputUrl) {
+      console.error(`[bgremover] No outputUrl in response:`, payload);
       throw new Error("Background remover did not return an output URL.");
     }
 
+    console.log(`[bgremover] Success: ${payload.outputUrl}`);
     return {
       outputUrl: payload.outputUrl,
       contentType: "image/png",
       mode: payload.mode,
     };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Background removal timed out after 55 seconds. The modnet service may be overloaded.");
+    }
+    throw error;
   } finally {
-    await cleanup().catch(() => {});
+    // Delay cleanup slightly to ensure modnet has fetched the image
+    setTimeout(() => cleanup().catch(() => {}), 5000);
   }
 }

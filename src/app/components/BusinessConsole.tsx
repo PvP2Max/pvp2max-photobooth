@@ -97,10 +97,10 @@ export default function BusinessConsole() {
   });
   const [loading, setLoading] = useState(false);
   const businessSlug = "";
-  const [_error, setError] = useState<string | null>(null);
-  const [_message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [newEventName, setNewEventName] = useState("");
-  const [newPlan, setNewPlan] = useState("event-basic");
+  const [newPlan, setNewPlan] = useState("free");
   const [newMode, setNewMode] = useState<"self-serve" | "photographer">("self-serve");
   const [newAllowedSelections, setNewAllowedSelections] = useState(3);
   const [newAllowBgRemoval, setNewAllowBgRemoval] = useState(true);
@@ -121,12 +121,11 @@ export default function BusinessConsole() {
   const [selectionStatus, setSelectionStatus] = useState<Record<string, string>>({});
   const [collaboratorInputs, setCollaboratorInputs] = useState<Record<string, string>>({});
   const [rolesStatus, setRolesStatus] = useState<Record<string, string>>({});
-  const [_checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [qrLink, setQrLink] = useState<string | null>(null);
   const [qrLabel, setQrLabel] = useState<string | null>(null);
   const [qrData, setQrData] = useState<string | null>(null);
   const [view, setView] = useState<"overview" | "events" | "deliveries">("overview");
-  const [_copiedLink, _setCopiedLink] = useState<Record<string, boolean>>({});
   const [profileOpen, setProfileOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
@@ -255,6 +254,13 @@ export default function BusinessConsole() {
       .catch(() => {});
   }
 
+  // Helper to check if plan requires payment
+  function isPaidPlan(plan: string): boolean {
+    if (plan === "free") return false;
+    if (plan === "photographer-event" && hasPhotographerSubscription) return false;
+    return true;
+  }
+
   async function createEvent(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
@@ -272,6 +278,35 @@ export default function BusinessConsole() {
       eventDate: newEventDate,
       eventTime: newEventTime,
     };
+
+    // For paid plans, redirect to checkout instead of creating event directly
+    if (isPaidPlan(newPlan)) {
+      try {
+        const res = await fetch("/api/billing/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            plan: newPlan,
+            eventData: payload, // Pass event data to be stored in checkout session
+          }),
+        });
+        const data = (await res.json()) as { url?: string; error?: string };
+        if (!res.ok || !data.url) {
+          setError(data.error || "Could not start checkout.");
+          return;
+        }
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+        return;
+      } catch (err) {
+        console.error(err);
+        setError("Could not start checkout.");
+        return;
+      }
+    }
+
+    // For free plans (or photographer-event with subscription), create event directly
     try {
       const res = await fetch(`/api/events`, {
         method: "POST",
@@ -291,7 +326,7 @@ export default function BusinessConsole() {
       );
       setMessage("Event created.");
       setNewEventName("");
-      setNewPlan("event-basic");
+      setNewPlan("free");
       setNewMode("self-serve");
       setNewAllowedSelections(3);
       setNewAllowBgRemoval(true);
@@ -608,9 +643,65 @@ export default function BusinessConsole() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <div className="mx-auto flex min-h-screen max-w-7xl items-start gap-6 px-4 py-6">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 px-4 py-4 md:flex-row md:items-start md:gap-6 md:py-6">
+        {/* Mobile: Horizontal scrolling nav tabs */}
+        <nav className="flex gap-2 overflow-x-auto pb-2 md:hidden">
+          {navTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setView(tab.id)}
+              className={`flex flex-shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm transition ${
+                view === tab.id
+                  ? "bg-[var(--color-surface-elevated)] text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+                  : "bg-[var(--color-surface)] text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]"
+              }`}
+            >
+              {navIcons[tab.id]}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setProfileOpen((prev) => !prev)}
+            className="flex flex-shrink-0 items-center gap-2 rounded-xl bg-[var(--color-surface)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)]"
+          >
+            Account
+          </button>
+        </nav>
+
+        {/* Mobile: Account dropdown */}
+        {profileOpen && (
+          <div className="space-y-2 rounded-xl bg-[var(--color-surface)] p-3 text-sm ring-1 ring-[var(--color-border-subtle)] md:hidden">
+            <p className="px-3 py-1 text-xs uppercase tracking-wider text-[var(--color-text-muted)]">
+              {session.business.name}
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                window.open(
+                  "https://billing.stripe.com/p/login/aFa14odXR5gweH4gQRgA800",
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+              className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface-elevated)]"
+            >
+              Billing
+            </button>
+            <button className="w-full rounded-full px-3 py-2 text-left text-[var(--color-text)] hover:bg-[var(--color-surface-elevated)]">
+              Settings
+            </button>
+            <button
+              onClick={logout}
+              className="w-full rounded-full bg-[var(--color-surface-elevated)] px-3 py-2 text-sm font-semibold text-[var(--color-text)] ring-1 ring-[var(--color-border-subtle)] transition hover:bg-[var(--color-surface)]/80"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
+
+        {/* Desktop: Vertical sidebar */}
         <aside
-          className={`sticky top-6 self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all ${
+          className={`sticky top-6 hidden self-start rounded-2xl border border-[var(--color-border-subtle)] bg-[var(--color-surface)] p-3 transition-all md:block ${
             isSidebarWide ? "w-[230px]" : "w-[80px]"
           }`}
           onMouseEnter={() => {
@@ -691,7 +782,7 @@ export default function BusinessConsole() {
           </div>
         </aside>
 
-        <main className="flex-1 space-y-6">
+        <main className="w-full flex-1 space-y-4 md:space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-[var(--color-text-soft)]">
@@ -716,7 +807,36 @@ export default function BusinessConsole() {
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] md:grid-cols-2 lg:grid-cols-4">
+          {/* Error/Message display */}
+          {error && (
+            <div className="rounded-xl bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-text)] ring-1 ring-[rgba(249,115,115,0.35)]">
+              {error}
+              <button
+                onClick={() => setError(null)}
+                className="ml-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {message && (
+            <div className="rounded-xl bg-[var(--color-success-soft)] px-4 py-3 text-sm text-[var(--color-text)] ring-1 ring-[rgba(74,222,128,0.35)]">
+              {message}
+              <button
+                onClick={() => setMessage(null)}
+                className="ml-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {checkoutLoading && (
+            <div className="rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text-muted)] ring-1 ring-[var(--color-border-subtle)]">
+              Redirecting to checkout...
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[var(--color-surface)] p-3 ring-1 ring-[var(--color-border-subtle)] sm:p-4 md:grid-cols-4">
             <Stat label="Live events" value={stats.liveEvents} />
             <Stat label="Closed events" value={stats.closedEvents} />
             <Stat label="Photos used" value={stats.photoUsed} />
@@ -725,9 +845,9 @@ export default function BusinessConsole() {
 
           {view === "overview" && (
             <div className="space-y-4">
-              <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+              <div className="space-y-4 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] sm:p-5">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Active events</h2>
-                <div className="grid gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {activeEvents.map((event) => {
                     const usage = usageFor(event);
                     const boothLink = linkFor(`/event/${event.slug}`, session.business.slug, event.slug);
@@ -957,7 +1077,7 @@ export default function BusinessConsole() {
           )}
 
           {view === "events" && (
-            <div className="space-y-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+            <div className="space-y-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Events</h2>
                 <button
@@ -1003,7 +1123,7 @@ export default function BusinessConsole() {
           )}
 
           {view === "deliveries" && (
-            <div className="space-y-3 rounded-2xl bg-[var(--color-surface)] p-5 ring-1 ring-[var(--color-border-subtle)]">
+            <div className="space-y-3 rounded-2xl bg-[var(--color-surface)] p-4 ring-1 ring-[var(--color-border-subtle)] sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-[var(--color-text)]">Deliveries</h2>
                 <div className="flex flex-wrap gap-2">

@@ -207,6 +207,7 @@ export default function BoothPage() {
         capturePhoto();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, countdown]);
 
   // Capture photo from video

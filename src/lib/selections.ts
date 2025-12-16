@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { TenantScope, scopedStorageRoot } from "./tenants";
+import { getFirebaseAdmin } from "./firebase";
+import { TenantScope } from "./tenants";
 
 export type SelectionToken = {
   token: string;
@@ -13,46 +12,22 @@ export type SelectionToken = {
   eventId?: string;
 };
 
-type SelectionIndex = {
-  tokens: SelectionToken[];
-};
-
-function selectionPaths(scope: TenantScope) {
-  const root = scopedStorageRoot(scope);
-  const dir = path.join(root, "selections");
-  const index = path.join(dir, "tokens.json");
-  return { dir, index };
+function getFirestoreDb() {
+  const { firestore } = getFirebaseAdmin();
+  return firestore;
 }
 
-async function ensureStorage(scope: TenantScope) {
-  const { dir, index } = selectionPaths(scope);
-  await mkdir(dir, { recursive: true });
-  try {
-    await readFile(index, "utf8");
-  } catch {
-    const seed: SelectionIndex = { tokens: [] };
-    await writeFile(index, JSON.stringify(seed, null, 2), "utf8");
-  }
+function selectionsCollection(scope: TenantScope) {
+  return getFirestoreDb()
+    .collection("users")
+    .doc(scope.ownerUid)
+    .collection("events")
+    .doc(scope.eventId)
+    .collection("selections");
 }
 
-async function readIndex(scope: TenantScope): Promise<SelectionIndex> {
-  await ensureStorage(scope);
-  const { index } = selectionPaths(scope);
-  try {
-    const raw = await readFile(index, "utf8");
-    return JSON.parse(raw) as SelectionIndex;
-  } catch {
-    return { tokens: [] };
-  }
-}
-
-async function writeIndex(index: SelectionIndex, scope: TenantScope) {
-  const { index: idx } = selectionPaths(scope);
-  await writeFile(idx, JSON.stringify(index, null, 2), "utf8");
-}
-
-export async function createSelectionToken(scope: TenantScope, email: string, ttlHours = 72) {
-  const index = await readIndex(scope);
+export async function createSelectionToken(scope: TenantScope, email: string, ttlHours = 72): Promise<SelectionToken> {
+  const collection = selectionsCollection(scope);
   const now = Date.now();
   const expiresAt = new Date(now + ttlHours * 60 * 60 * 1000).toISOString();
   const token: SelectionToken = {
@@ -63,24 +38,29 @@ export async function createSelectionToken(scope: TenantScope, email: string, tt
     ownerUid: scope.ownerUid,
     eventId: scope.eventId,
   };
-  index.tokens.push(token);
-  await writeIndex(index, scope);
+
+  await collection.doc(token.token).set(token);
   return token;
 }
 
-export async function findSelectionToken(scope: TenantScope, token: string) {
-  const index = await readIndex(scope);
-  const found = index.tokens.find((t) => t.token === token);
-  if (!found) return null;
-  if (found.expiresAt && new Date(found.expiresAt).getTime() < Date.now()) return null;
+export async function findSelectionToken(scope: TenantScope, token: string): Promise<SelectionToken | null> {
+  const doc = await selectionsCollection(scope).doc(token).get();
+  if (!doc.exists) return null;
+
+  const found = doc.data() as SelectionToken;
+  if (found.expiresAt && new Date(found.expiresAt).getTime() < Date.now()) {
+    return null;
+  }
+
   return found;
 }
 
-export async function markSelectionUsed(scope: TenantScope, token: string) {
-  const index = await readIndex(scope);
-  const entry = index.tokens.find((t) => t.token === token);
-  if (entry) {
-    entry.usedAt = new Date().toISOString();
-    await writeIndex(index, scope);
+export async function markSelectionUsed(scope: TenantScope, token: string): Promise<void> {
+  const docRef = selectionsCollection(scope).doc(token);
+  const doc = await docRef.get();
+  if (doc.exists) {
+    await docRef.update({
+      usedAt: new Date().toISOString(),
+    });
   }
 }

@@ -172,6 +172,7 @@ export default function SelectionPage() {
                   selected ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-elevated)]"
                 }`}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={preview} alt={photo.originalName} className="h-52 w-full object-cover" />
                 <div className="flex items-center justify-between px-3 py-2">
                   <button
