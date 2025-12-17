@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { BackgroundOption } from "@/lib/backgrounds";
 import EventAccessGate from "../event-access";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 type BackgroundState = BackgroundOption & { isCustom?: boolean };
 
-export default function BackgroundsPage() {
+function BackgroundsPageContent() {
   const searchParams = useSearchParams();
   const eventSlug = searchParams.get("event") || "";
 
@@ -438,5 +439,13 @@ export default function BackgroundsPage() {
         </main>
       </div>
     </EventAccessGate>
+  );
+}
+
+export default function BackgroundsPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><LoadingSpinner /></div>}>
+      <BackgroundsPageContent />
+    </Suspense>
   );
 }
