@@ -58,8 +58,8 @@ function photosCollection(scope: TenantScope) {
 }
 
 function toPublicPhoto(record: PhotoRecord): PublicPhoto {
-  // Use composite URL as the primary URL for all variants
-  const url = record.compositeUrl || record.cutoutUrl || `/api/media/${record.id}/cutout`;
+  // Use cutout URL - the final composite is only created when user selects background and sends
+  const url = record.cutoutUrl || `/api/media/${record.id}/cutout`;
 
   return {
     id: record.id,
@@ -97,7 +97,8 @@ export async function savePhoto({
   const id = randomUUID();
   const originalContentType = (file as Blob).type || "application/octet-stream";
 
-  // Fetch the cutout from MODNet's temporary URL
+  // Fetch the cutout from MODNet's temporary URL (expires after ~1 day)
+  // We save it to our R2 immediately to ensure it's available when user selects background
   console.log(`[storage] Fetching cutout from MODNet: ${cutoutUrl}`);
   const cutoutResponse = await fetch(cutoutUrl);
   if (!cutoutResponse.ok) {
@@ -105,23 +106,19 @@ export async function savePhoto({
   }
   const cutoutBuffer = Buffer.from(await cutoutResponse.arrayBuffer());
 
-  // TODO: If backgroundId is provided, composite the cutout with the background
-  // For now, just upload the cutout as the final image
-  // Future: const finalImage = await compositeImages(cutoutBuffer, backgroundId);
-  const finalImage = cutoutBuffer;
+  // Save cutout to temporary R2 path (NOT production - composite is created later in /api/email)
+  // This cutout is deleted after the composite is created and sent
+  const r2Key = `${R2_PREFIX}/cutouts/${scope.ownerUid}/${scope.eventId}/${id}.png`;
+  console.log(`[storage] Uploading cutout to R2: ${r2Key}`);
 
-  // Upload to R2 at boothos/production/{ownerUid}/{eventId}/{photoId}.png
-  const r2Key = `${R2_PREFIX}/production/${scope.ownerUid}/${scope.eventId}/${id}.png`;
-  console.log(`[storage] Uploading composite to R2: ${r2Key}`);
-
-  const { url: compositeUrl } = await uploadToR2({
+  const { url: cutoutPublicUrl } = await uploadToR2({
     key: r2Key,
-    body: finalImage,
+    body: cutoutBuffer,
     contentType: "image/png",
-    cacheControl: "public, max-age=604800", // 7 days
+    cacheControl: "public, max-age=86400", // 1 day (temporary until composite is created)
   });
 
-  const publicUrl = compositeUrl || (R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${r2Key}` : undefined);
+  const publicUrl = cutoutPublicUrl || (R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${r2Key}` : undefined);
 
   const record: PhotoRecord = {
     id,
@@ -131,9 +128,8 @@ export async function savePhoto({
     cutoutContentType,
     createdAt: new Date().toISOString(),
     r2Key,
-    compositeUrl: publicUrl,
-    // Keep cutoutUrl for backwards compat (it will expire after 1 day from MODNet)
-    cutoutUrl,
+    // This is the cutout URL, not the final composite (composite is created in /api/email)
+    cutoutUrl: publicUrl,
     ownerUid: scope.ownerUid,
     eventId: scope.eventId,
     overlayPack,
