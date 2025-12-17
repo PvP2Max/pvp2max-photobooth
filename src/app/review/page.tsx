@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Mail, ChevronRight, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
 import EventAccessGate from "../event-access";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import PhotoGrid from "../components/review/PhotoGrid";
 import SlotManager from "../components/review/SlotManager";
 import BackgroundSelector from "../components/review/BackgroundSelector";
@@ -136,7 +138,10 @@ async function composePreview(
   return { dataUrl: canvas.toDataURL("image/png"), transform: usedTransform };
 }
 
-export default function ReviewPage() {
+function ReviewPageContent() {
+  const searchParams = useSearchParams();
+  const eventSlug = searchParams.get("event") || "";
+
   const [searchEmail, setSearchEmail] = useState("");
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [sending, setSending] = useState(false);
@@ -174,9 +179,12 @@ export default function ReviewPage() {
   }, [selectedPhotos, selectionMap]);
 
   useEffect(() => {
+    if (!eventSlug) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("/api/notifications");
+        const res = await fetch(`/api/notifications?event=${encodeURIComponent(eventSlug)}`, {
+          headers: { "x-boothos-event": eventSlug },
+        });
         const data = (await res.json()) as {
           notifications?: { email: string; count: number }[];
         };
@@ -193,7 +201,7 @@ export default function ReviewPage() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [eventSlug]);
 
   useEffect(() => {
     setCurrentBgIndex(0);
@@ -213,8 +221,11 @@ export default function ReviewPage() {
   }, [step, currentPhotoId, selectionMap, currentSlotId]);
 
   async function loadBackgrounds() {
+    if (!eventSlug) return;
     try {
-      const response = await fetch("/api/backgrounds");
+      const response = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
+        headers: { "x-boothos-event": eventSlug },
+      });
       const payload = (await response.json()) as {
         backgrounds?: BackgroundState[];
         error?: string;
@@ -246,7 +257,9 @@ export default function ReviewPage() {
     }
     setLoadingPhotos(true);
     try {
-      const response = await fetch(`/api/photos?email=${encodeURIComponent(searchEmail)}`);
+      const response = await fetch(`/api/photos?email=${encodeURIComponent(searchEmail)}&event=${encodeURIComponent(eventSlug)}`, {
+        headers: { "x-boothos-event": eventSlug },
+      });
       const payload = (await response.json()) as {
         photos?: Photo[];
         error?: string;
@@ -435,9 +448,9 @@ export default function ReviewPage() {
         return;
       }
 
-      const response = await fetch("/api/email", {
+      const response = await fetch(`/api/email?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({ clientEmail: latestEmail, selections }),
       });
 
@@ -702,5 +715,13 @@ export default function ReviewPage() {
         </main>
       </div>
     </EventAccessGate>
+  );
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><LoadingSpinner /></div>}>
+      <ReviewPageContent />
+    </Suspense>
   );
 }

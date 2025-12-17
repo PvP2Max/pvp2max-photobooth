@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Mail, Image as ImageIcon, Sparkles, Send, RefreshCw, Plus, Copy, Trash2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { BackgroundOption } from "@/lib/backgrounds";
@@ -159,7 +160,10 @@ async function composePreview(
   return { dataUrl: canvas.toDataURL("image/png"), transform: usedTransform };
 }
 
-export default function FrontdeskPage() {
+function FrontdeskPageContent() {
+  const searchParams = useSearchParams();
+  const eventSlug = searchParams.get("event") || "";
+
   const [searchEmail, setSearchEmail] = useState("");
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [sending, setSending] = useState(false);
@@ -202,9 +206,12 @@ export default function FrontdeskPage() {
   }, [selectedPhotos, selectionMap]);
 
   useEffect(() => {
+    if (!eventSlug) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch("/api/notifications");
+        const res = await fetch(`/api/notifications?event=${encodeURIComponent(eventSlug)}`, {
+          headers: { "x-boothos-event": eventSlug },
+        });
         const data = (await res.json()) as {
           notifications?: { email: string; count: number }[];
         };
@@ -221,7 +228,7 @@ export default function FrontdeskPage() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [eventSlug]);
 
   useEffect(() => {
     setCurrentBgIndex(0);
@@ -241,8 +248,11 @@ export default function FrontdeskPage() {
   }, [step, currentPhotoId, selectionMap, currentSlotId]);
 
   async function loadBackgrounds() {
+    if (!eventSlug) return;
     try {
-      const response = await fetch("/api/backgrounds");
+      const response = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
+        headers: { "x-boothos-event": eventSlug },
+      });
       const payload = (await response.json()) as {
         backgrounds?: BackgroundState[];
         error?: string;
@@ -520,9 +530,9 @@ export default function FrontdeskPage() {
         return;
       }
 
-      const response = await fetch("/api/email", {
+      const response = await fetch(`/api/email?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({
           clientEmail: latestEmail,
           selections,
@@ -1084,5 +1094,13 @@ export default function FrontdeskPage() {
         </main>
       </div>
     </EventAccessGate>
+  );
+}
+
+export default function FrontdeskPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><LoadingSpinner /></div>}>
+      <FrontdeskPageContent />
+    </Suspense>
   );
 }

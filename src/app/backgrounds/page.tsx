@@ -10,6 +10,7 @@ type BackgroundState = BackgroundOption & { isCustom?: boolean };
 
 function BackgroundsPageContent() {
   const searchParams = useSearchParams();
+  const businessSlug = searchParams.get("business") || "";
   const eventSlug = searchParams.get("event") || "";
 
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
@@ -46,17 +47,23 @@ function BackgroundsPageContent() {
   }
 
   useEffect(() => {
-    if (!eventSlug) return;
+    if (!eventSlug || !businessSlug) return;
     // Load backgrounds
     fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
       headers: { "x-boothos-event": eventSlug },
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) {
+          setError("Please log in to manage backgrounds. Go to /dashboard to sign in.");
+          return { backgrounds: [] };
+        }
+        return res.json();
+      })
       .then((payload: { backgrounds?: BackgroundState[]; error?: string }) => {
         if (payload.backgrounds) {
           setBackgrounds(payload.backgrounds);
-        } else {
-          setError(payload.error || "Could not load backgrounds.");
+        } else if (payload.error) {
+          setError(payload.error);
         }
       })
       .catch((err) => {
@@ -64,7 +71,7 @@ function BackgroundsPageContent() {
       });
 
     // Load event info
-    fetch(`/api/auth/event?event=${encodeURIComponent(eventSlug)}`, {
+    fetch(`/api/auth/event?business=${encodeURIComponent(businessSlug)}&event=${encodeURIComponent(eventSlug)}`, {
       credentials: "include",
       headers: { "x-boothos-event": eventSlug },
     })
@@ -75,7 +82,7 @@ function BackgroundsPageContent() {
         if (data?.event?.id) setEventId(data.event.id);
       })
       .catch(() => {});
-  }, [eventSlug]);
+  }, [eventSlug, businessSlug]);
 
   async function generateAiBackground(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
