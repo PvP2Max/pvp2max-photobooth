@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import { Camera, Check, RefreshCw, Send, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import type { BackgroundOption } from "@/lib/backgrounds";
@@ -143,6 +144,9 @@ function getStepIndex(stage: Stage): number {
 }
 
 export default function BoothPage() {
+  const params = useParams();
+  const eventSlug = typeof params.eventSlug === "string" ? params.eventSlug : "";
+
   const [stage, setStage] = useState<Stage>("setup");
   const [email, setEmail] = useState("");
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
@@ -163,9 +167,12 @@ export default function BoothPage() {
 
   // Load backgrounds on mount
   useEffect(() => {
+    if (!eventSlug) return;
     async function loadBackgrounds() {
       try {
-        const response = await fetch("/api/backgrounds");
+        const response = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
+          headers: { "x-boothos-event": eventSlug },
+        });
         const payload = (await response.json()) as {
           backgrounds?: BackgroundOption[];
           error?: string;
@@ -188,7 +195,7 @@ export default function BoothPage() {
       }
     }
     loadBackgrounds();
-  }, []);
+  }, [eventSlug]);
 
   // Setup camera
   async function setupCamera() {
@@ -282,8 +289,9 @@ export default function BoothPage() {
       formData.append("file", file);
       formData.append("email", email || "guest@booth.local");
 
-      const uploadResponse = await fetch("/api/photos", {
+      const uploadResponse = await fetch(`/api/photos?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
+        headers: { "x-boothos-event": eventSlug },
         body: formData,
       });
 
@@ -387,9 +395,9 @@ export default function BoothPage() {
     setError(null);
 
     try {
-      const response = await fetch("/api/email", {
+      const response = await fetch(`/api/email?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({
           clientEmail: email,
           selections: [

@@ -51,12 +51,12 @@ function backgroundsCollection(scope: TenantScope) {
 
 async function loadBuiltInAssets(): Promise<BackgroundOption[]> {
   const assetsRoot = path.join(process.cwd(), "public", "assets");
-  const groups: { dir: string; category: "background" | "frame" }[] = [
-    { dir: path.join(assetsRoot, "default-backgrounds"), category: "background" },
-    { dir: path.join(assetsRoot, "default-frames"), category: "frame" },
+  const groups: { dir: string; urlPath: string; category: "background" | "frame" }[] = [
+    { dir: path.join(assetsRoot, "default-backgrounds"), urlPath: "default-backgrounds", category: "background" },
+    { dir: path.join(assetsRoot, "default-frames"), urlPath: "default-frames", category: "frame" },
     // Fallback for user-provided defaults folder
-    { dir: path.join(assetsRoot, "defaults", "backgrounds"), category: "background" },
-    { dir: path.join(assetsRoot, "defaults", "frames"), category: "frame" },
+    { dir: path.join(assetsRoot, "defaults", "backgrounds"), urlPath: "defaults/backgrounds", category: "background" },
+    { dir: path.join(assetsRoot, "defaults", "frames"), urlPath: "defaults/frames", category: "frame" },
   ];
   const options: BackgroundOption[] = [];
   for (const group of groups) {
@@ -69,8 +69,8 @@ async function loadBuiltInAssets(): Promise<BackgroundOption[]> {
           id,
           name: file.replace(/\.[^.]+$/, ""),
           description: `Default ${group.category}`,
-          asset: `/assets/${path.basename(group.dir)}/${file}`,
-          previewAsset: `/assets/${path.basename(group.dir)}/${file}`,
+          asset: `/assets/${group.urlPath}/${file}`,
+          previewAsset: `/assets/${group.urlPath}/${file}`,
           isCustom: false,
           category: group.category,
         });
