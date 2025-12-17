@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { BackgroundOption } from "@/lib/backgrounds";
 import EventAccessGate from "../event-access";
 
 type BackgroundState = BackgroundOption & { isCustom?: boolean };
 
 export default function BackgroundsPage() {
+  const searchParams = useSearchParams();
+  const eventSlug = searchParams.get("event") || "";
+
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [eventPlan, setEventPlan] = useState<string | undefined>(undefined);
   const [allowAiBackgrounds, setAllowAiBackgrounds] = useState(false);
@@ -20,8 +24,11 @@ export default function BackgroundsPage() {
   const [aiLoading, setAiLoading] = useState(false);
 
   async function loadBackgrounds() {
+    if (!eventSlug) return;
     try {
-      const response = await fetch("/api/backgrounds");
+      const response = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
+        headers: { "x-boothos-event": eventSlug },
+      });
       const payload = (await response.json()) as {
         backgrounds?: BackgroundState[];
         error?: string;
@@ -38,8 +45,28 @@ export default function BackgroundsPage() {
   }
 
   useEffect(() => {
-    loadBackgrounds();
-    fetch("/api/auth/event", { credentials: "include" })
+    if (!eventSlug) return;
+    // Load backgrounds
+    fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
+      headers: { "x-boothos-event": eventSlug },
+    })
+      .then((res) => res.json())
+      .then((payload: { backgrounds?: BackgroundState[]; error?: string }) => {
+        if (payload.backgrounds) {
+          setBackgrounds(payload.backgrounds);
+        } else {
+          setError(payload.error || "Could not load backgrounds.");
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Failed to load backgrounds.");
+      });
+
+    // Load event info
+    fetch(`/api/auth/event?event=${encodeURIComponent(eventSlug)}`, {
+      credentials: "include",
+      headers: { "x-boothos-event": eventSlug },
+    })
       .then((res) => res.json())
       .then((data: { business?: { slug?: string }; event?: { id?: string; slug?: string; plan?: string; allowAiBackgrounds?: boolean } }) => {
         if (data?.event?.plan) setEventPlan(data.event.plan);
@@ -47,7 +74,7 @@ export default function BackgroundsPage() {
         if (data?.event?.id) setEventId(data.event.id);
       })
       .catch(() => {});
-  }, []);
+  }, [eventSlug]);
 
   async function generateAiBackground(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,9 +87,9 @@ export default function BackgroundsPage() {
     }
     setAiLoading(true);
     try {
-      const res = await fetch("/api/ai/background", {
+      const res = await fetch(`/api/ai/background?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({ prompt, kind: "background" }),
       });
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
@@ -84,13 +111,13 @@ export default function BackgroundsPage() {
     setError(null);
     setMessage(null);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const res = await fetch(`/api/billing/checkout?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({
           plan: "event-ai",
           eventId,
-          successUrl: window.location.origin + "/backgrounds",
+          successUrl: window.location.origin + `/backgrounds?event=${encodeURIComponent(eventSlug)}`,
           cancelUrl: window.location.href,
         }),
       });
@@ -135,8 +162,9 @@ export default function BackgroundsPage() {
       formData.append("file", file);
       formData.append("category", category);
 
-      const response = await fetch("/api/backgrounds", {
+      const response = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
         method: "POST",
+        headers: { "x-boothos-event": eventSlug },
         body: formData,
       });
       const payload = (await response.json()) as {
@@ -168,9 +196,9 @@ export default function BackgroundsPage() {
       return;
     }
     try {
-      const response = await fetch("/api/backgrounds", {
+      const response = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({ id }),
       });
       const payload = (await response.json()) as { error?: string };
@@ -192,9 +220,9 @@ export default function BackgroundsPage() {
     setMessage(null);
     try {
       const allowedIds = backgrounds.filter((b) => b.allowed !== false).map((b) => b.id);
-      const res = await fetch("/api/backgrounds", {
+      const res = await fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-boothos-event": eventSlug },
         body: JSON.stringify({ allowedIds }),
       });
       const payload = (await res.json().catch(() => ({}))) as { error?: string };
