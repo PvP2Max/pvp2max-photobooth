@@ -7,6 +7,7 @@ import { Mail, Image as ImageIcon, Sparkles, Send, RefreshCw, Plus, Copy, Trash2
 import { toast } from "sonner";
 import type { BackgroundOption } from "@/lib/backgrounds";
 import EventAccessGate from "../event-access";
+import { useAuth } from "../auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,6 +164,7 @@ async function composePreview(
 function FrontdeskPageContent() {
   const searchParams = useSearchParams();
   const eventSlug = searchParams.get("event") || "";
+  const { ready: authReady } = useAuth();
 
   const [searchEmail, setSearchEmail] = useState("");
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -206,7 +208,8 @@ function FrontdeskPageContent() {
   }, [selectedPhotos, selectionMap]);
 
   useEffect(() => {
-    if (!eventSlug) return;
+    // Wait for auth to be ready before making API calls
+    if (!authReady || !eventSlug) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/notifications?event=${encodeURIComponent(eventSlug)}`, {
@@ -228,7 +231,7 @@ function FrontdeskPageContent() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [eventSlug]);
+  }, [authReady, eventSlug]);
 
   useEffect(() => {
     setCurrentBgIndex(0);
@@ -274,8 +277,10 @@ function FrontdeskPageContent() {
   }
 
   useEffect(() => {
+    // Wait for auth to be ready before loading backgrounds
+    if (!authReady) return;
     loadBackgrounds();
-  }, []);
+  }, [authReady]);
 
   async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

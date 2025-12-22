@@ -23,10 +23,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <AuthProvider />
-        <AppShellHeader />
-        {children}
-        <Toaster richColors position="bottom-right" />
+        <AuthProvider>
+          <AppShellHeader />
+          {children}
+          <Toaster richColors position="bottom-right" />
+        </AuthProvider>
       </body>
     </html>
   );

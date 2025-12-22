@@ -1,11 +1,33 @@
 "use client";
 
-import { onAuthStateChanged } from "firebase/auth";
-import { useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { getFirebaseClient } from "@/lib/firebase-client";
 
+type AuthState = {
+  user: User | null;
+  loading: boolean;
+  ready: boolean;
+};
+
+const AuthContext = createContext<AuthState>({
+  user: null,
+  loading: true,
+  ready: false,
+});
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+
 // Patches window.fetch to inject the current Firebase ID token in Authorization headers.
-export default function AuthProvider() {
+export default function AuthProvider({ children }: { children?: React.ReactNode }) {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    ready: false,
+  });
+
   useEffect(() => {
     const { auth } = getFirebaseClient();
     let currentToken: string | null = null;
@@ -35,6 +57,7 @@ export default function AuthProvider() {
         return originalFetch(input, { ...init, headers });
       }
 
+      // Try to get token - first from cache, then from current user
       const token = currentToken || (await auth.currentUser?.getIdToken?.());
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
@@ -45,8 +68,10 @@ export default function AuthProvider() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         currentToken = await user.getIdToken();
+        setAuthState({ user, loading: false, ready: true });
       } else {
         currentToken = null;
+        setAuthState({ user: null, loading: false, ready: true });
       }
     });
 
@@ -55,5 +80,9 @@ export default function AuthProvider() {
     };
   }, []);
 
-  return null;
+  return (
+    <AuthContext.Provider value={authState}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

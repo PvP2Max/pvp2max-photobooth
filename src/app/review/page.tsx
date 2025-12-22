@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Mail, ChevronRight, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
 import EventAccessGate from "../event-access";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useAuth } from "../auth-provider";
 import PhotoGrid from "../components/review/PhotoGrid";
 import SlotManager from "../components/review/SlotManager";
 import BackgroundSelector from "../components/review/BackgroundSelector";
@@ -141,6 +141,7 @@ async function composePreview(
 function ReviewPageContent() {
   const searchParams = useSearchParams();
   const eventSlug = searchParams.get("event") || "";
+  const { ready: authReady } = useAuth();
 
   const [searchEmail, setSearchEmail] = useState("");
   const [loadingPhotos, setLoadingPhotos] = useState(false);
@@ -179,7 +180,8 @@ function ReviewPageContent() {
   }, [selectedPhotos, selectionMap]);
 
   useEffect(() => {
-    if (!eventSlug) return;
+    // Wait for auth to be ready before making API calls
+    if (!authReady || !eventSlug) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/notifications?event=${encodeURIComponent(eventSlug)}`, {
@@ -201,7 +203,7 @@ function ReviewPageContent() {
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [eventSlug]);
+  }, [authReady, eventSlug]);
 
   useEffect(() => {
     setCurrentBgIndex(0);
@@ -246,8 +248,10 @@ function ReviewPageContent() {
   }
 
   useEffect(() => {
+    // Wait for auth to be ready before loading backgrounds
+    if (!authReady) return;
     loadBackgrounds();
-  }, []);
+  }, [authReady]);
 
   async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

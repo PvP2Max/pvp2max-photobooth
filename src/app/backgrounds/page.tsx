@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import type { BackgroundOption } from "@/lib/backgrounds";
 import EventAccessGate from "../event-access";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useAuth } from "../auth-provider";
 
 type BackgroundState = BackgroundOption & { isCustom?: boolean };
 
@@ -12,6 +13,7 @@ function BackgroundsPageContent() {
   const searchParams = useSearchParams();
   const businessSlug = searchParams.get("business") || "";
   const eventSlug = searchParams.get("event") || "";
+  const { ready: authReady } = useAuth();
 
   const [backgrounds, setBackgrounds] = useState<BackgroundState[]>([]);
   const [eventPlan, setEventPlan] = useState<string | undefined>(undefined);
@@ -47,7 +49,9 @@ function BackgroundsPageContent() {
   }
 
   useEffect(() => {
-    if (!eventSlug || !businessSlug) return;
+    // Wait for auth to be ready before making API calls
+    if (!authReady || !eventSlug || !businessSlug) return;
+
     // Load backgrounds
     fetch(`/api/backgrounds?event=${encodeURIComponent(eventSlug)}`, {
       headers: { "x-boothos-event": eventSlug },
@@ -82,7 +86,7 @@ function BackgroundsPageContent() {
         if (data?.event?.id) setEventId(data.event.id);
       })
       .catch(() => {});
-  }, [eventSlug, businessSlug]);
+  }, [authReady, eventSlug, businessSlug]);
 
   async function generateAiBackground(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
