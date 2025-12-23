@@ -9,7 +9,8 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://boothos:boothos@postgres:5432/boothos
-      - LOGTO_ENDPOINT=http://logto:3002
+      # Use public URL for browser redirects, internal for server-to-server
+      - LOGTO_ENDPOINT=https://auth.boothos.app
     env_file:
       - ../.env
     depends_on:
@@ -41,12 +42,14 @@ services:
     environment:
       - TRUST_PROXY_HEADER=1
       - DB_URL=postgresql://boothos:boothos@postgres:5432/logto
-      - ENDPOINT=http://localhost:3002
-      - ADMIN_ENDPOINT=http://localhost:3001
+      # Production URLs - update these to match your Cloudflare Tunnel config
+      - ENDPOINT=https://auth.boothos.app
+      - ADMIN_ENDPOINT=https://auth-admin.boothos.app
     depends_on:
       - postgres
     networks:
       - boothos-net
+      - apps-net
     restart: unless-stopped
 
   redis:
