@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ USERS & AUTH ============
+
+model User {
+  id        String   @id @default(uuid())
+  logtoId   String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businesses Business[]
+  eventRoles EventRole[]
+}
+
+model Business {
+  id               String   @id @default(uuid())
+  name             String
+  slug             String   @unique
+  ownerId          String
+  owner            User     @relation(fields: [ownerId], references: [id])
+  stripeCustomerId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  events Event[]
+}
+
+// ============ EVENTS ============
+
+enum EventPlan {
+  FREE
+  PRO
+  CORPORATE
+}
+
+enum EventMode {
+  SELF_SERVICE
+  PHOTOGRAPHER
+}
+
+enum EventStatus {
+  DRAFT
+  LIVE
+  CLOSED
+}
+
+model Event {
+  id                       String      @id @default(uuid())
+  name                     String
+  slug                     String
+  businessId               String
+  business                 Business    @relation(fields: [businessId], references: [id])
+  plan                     EventPlan   @default(FREE)
+  mode                     EventMode   @default(SELF_SERVICE)
+  status                   EventStatus @default(DRAFT)
+  photoCap                 Int
+  photoUsed                Int         @default(0)
+  aiCredits                Int         @default(0)
+  aiUsed                   Int         @default(0)
+  backgroundRemovalEnabled Boolean     @default(false)
+  stripePaymentId          String?
+  paidAt                   DateTime?
+  eventDate                DateTime?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+
+  roles       EventRole[]
+  sessions    GuestSession[]
+  photos      Photo[]
+  backgrounds Background[]
+  productions Production[]
+
+  @@unique([businessId, slug])
+}
+
+model EventRole {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String   @default("collaborator")
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+}
+
+// ============ GUEST SESSIONS ============
+
+model GuestSession {
+  id        String   @id @default(uuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  email     String
+  name      String?
+  createdAt DateTime @default(now())
+
+  photos Photo[]
+
+  @@index([eventId, email])
+}
+
+// ============ PHOTOS ============
+
+model Photo {
+  id           String       @id @default(uuid())
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      GuestSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  originalName String
+  originalKey  String
+  cutoutKey    String?
+  uploadedBy   String?
+  createdAt    DateTime     @default(now())
+
+  composites PhotoComposite[]
+
+  @@index([eventId])
+  @@index([sessionId])
+}
+
+model PhotoComposite {
+  id           String     @id @default(uuid())
+  photoId      String
+  photo        Photo      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  backgroundId String
+  background   Background @relation(fields: [backgroundId], references: [id])
+  scale        Float      @default(1.0)
+  offsetX      Float      @default(0)
+  offsetY      Float      @default(0)
+  compositeKey String?
+  createdAt    DateTime   @default(now())
+}
+
+// ============ BACKGROUNDS ============
+
+enum BackgroundCategory {
+  BACKGROUND
+  FRAME
+}
+
+model Background {
+  id            String             @id @default(uuid())
+  eventId       String?
+  event         Event?             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  category      BackgroundCategory @default(BACKGROUND)
+  r2Key         String
+  previewKey    String?
+  isAiGenerated Boolean            @default(false)
+  isDefault     Boolean            @default(false)
+  isEnabled     Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+
+  composites PhotoComposite[]
+
+  @@index([eventId])
+}
+
+// ============ PRODUCTIONS ============
+
+model Production {
+  id             String   @id @default(uuid())
+  eventId        String
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  email          String
+  sessionId      String?
+  downloadToken  String   @unique @default(uuid())
+  tokenExpiresAt DateTime
+  downloadCount  Int      @default(0)
+  bundleKey      String?
+  createdAt      DateTime @default(now())
+
+  attachments ProductionAttachment[]
+
+  @@index([eventId])
+  @@index([downloadToken])
+}
+
+model ProductionAttachment {
+  id           String     @id @default(uuid())
+  productionId String
+  production   Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  filename     String
+  r2Key        String
+  contentType  String
+  size         Int
+}

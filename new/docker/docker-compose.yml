@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  boothos:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://boothos:boothos@postgres:5432/boothos
+      - LOGTO_ENDPOINT=http://logto:3002
+    env_file:
+      - ../.env
+    depends_on:
+      - postgres
+      - logto
+    networks:
+      - boothos-net
+      - apps-net
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=boothos
+      - POSTGRES_PASSWORD=boothos
+      - POSTGRES_DB=boothos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - boothos-net
+    restart: unless-stopped
+
+  logto:
+    image: svhd/logto:latest
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+    environment:
+      - TRUST_PROXY_HEADER=1
+      - DB_URL=postgresql://boothos:boothos@postgres:5432/logto
+      - ENDPOINT=http://localhost:3002
+      - ADMIN_ENDPOINT=http://localhost:3001
+    depends_on:
+      - postgres
+    networks:
+      - boothos-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - boothos-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  boothos-net:
+    driver: bridge
+  apps-net:
+    external: true
