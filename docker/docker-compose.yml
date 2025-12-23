@@ -28,6 +28,7 @@ services:
       - POSTGRES_DB=boothos
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-logto-db.sql:/docker-entrypoint-initdb.d/init-logto-db.sql
     networks:
       - boothos-net
     restart: unless-stopped
