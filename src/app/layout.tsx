@@ -1,33 +1,20 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import AppShellHeader from "./app-shell-header";
-import AuthProvider from "./auth-provider";
-import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "BoothOS | Arctic Aura Designs",
-  description:
-    "Upload, style, and deliver background-free photobooth shots with live previews.",
-  icons: [
-    { rel: "icon", url: "/assets/icon-transparent.png" },
-    { rel: "shortcut icon", url: "/assets/icon-transparent.png" },
-    { rel: "apple-touch-icon", url: "/assets/icon-transparent.png" },
-  ],
+  title: "BoothOS - Event Photobooth Platform",
+  description: "Professional event photobooth with AI backgrounds and instant delivery",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        <AuthProvider>
-          <AppShellHeader />
-          {children}
-          <Toaster richColors position="bottom-right" />
-        </AuthProvider>
+      <body className="min-h-screen bg-background antialiased">
+        {children}
       </body>
     </html>
   );

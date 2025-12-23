@@ -1,45 +1,125 @@
-import { NextRequest } from "next/server";
-import { getFirebaseAdmin } from "./firebase";
-import { BoothEvent, TenantScope } from "./tenants";
+import { cookies } from "next/headers";
+import db from "./db";
 
-export type AuthenticatedUser = {
-  uid: string;
-  email?: string;
+const LOGTO_ENDPOINT = process.env.LOGTO_ENDPOINT;
+const LOGTO_APP_ID = process.env.LOGTO_APP_ID;
+const LOGTO_APP_SECRET = process.env.LOGTO_APP_SECRET;
+
+export type SessionUser = {
+  id: string;
+  logtoId: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  createdAt: Date;
 };
 
-export type EventAccess = {
-  event: BoothEvent;
-  scope: TenantScope;
-  roles: {
-    owner: boolean;
-    collaborator: boolean;  // Can upload photos AND send deliveries
-  };
-};
-
-export async function verifyBearer(request: NextRequest): Promise<AuthenticatedUser | null> {
-  const header = request.headers.get("authorization") || "";
-  const match = header.match(/^Bearer (.+)$/i);
-  if (!match) return null;
-  const token = match[1];
-  const { auth } = getFirebaseAdmin();
+export async function getCurrentUser(): Promise<SessionUser | null> {
   try {
-    const decoded = await auth.verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email };
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("boothos_session");
+
+    if (!sessionCookie?.value) {
+      return null;
+    }
+
+    const session = JSON.parse(sessionCookie.value);
+    if (!session.userId) {
+      return null;
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: session.userId },
+    });
+
+    return user;
   } catch {
     return null;
   }
 }
 
-export function roleForEvent(event: BoothEvent, uid: string) {
-  const owner = event.ownerUid === uid;
-  // Check new collaborator role
-  const collaborator = event.roles?.collaborator?.includes(uid) ?? false;
-  // Also check legacy roles for backwards compatibility
-  const legacyPhotographer = (event.roles as { photographer?: string[] })?.photographer?.includes(uid) ?? false;
-  const legacyReview = (event.roles as { review?: string[] })?.review?.includes(uid) ?? false;
+export async function getLogtoAuthUrl(redirectUri: string): Promise<string> {
+  const params = new URLSearchParams({
+    client_id: LOGTO_APP_ID!,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid profile email",
+  });
 
-  return {
-    owner,
-    collaborator: owner || collaborator || legacyPhotographer || legacyReview,
-  };
+  return `${LOGTO_ENDPOINT}/oidc/auth?${params.toString()}`;
+}
+
+export async function exchangeCodeForToken(code: string, redirectUri: string) {
+  const response = await fetch(`${LOGTO_ENDPOINT}/oidc/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${Buffer.from(`${LOGTO_APP_ID}:${LOGTO_APP_SECRET}`).toString("base64")}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Token exchange failed");
+  }
+
+  return response.json();
+}
+
+export async function getLogtoUserInfo(accessToken: string) {
+  const response = await fetch(`${LOGTO_ENDPOINT}/oidc/me`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to get user info");
+  }
+
+  return response.json();
+}
+
+export async function findOrCreateUser(logtoUser: {
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+}): Promise<SessionUser> {
+  let user = await db.user.findUnique({
+    where: { logtoId: logtoUser.sub },
+  });
+
+  if (!user) {
+    user = await db.user.create({
+      data: {
+        logtoId: logtoUser.sub,
+        email: logtoUser.email,
+        name: logtoUser.name || null,
+        avatarUrl: logtoUser.picture || null,
+      },
+    });
+  }
+
+  return user;
+}
+
+export async function setSessionCookie(userId: string) {
+  const cookieStore = await cookies();
+  cookieStore.set("boothos_session", JSON.stringify({ userId }), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    path: "/",
+  });
+}
+
+export async function clearSessionCookie() {
+  const cookieStore = await cookies();
+  cookieStore.delete("boothos_session");
 }

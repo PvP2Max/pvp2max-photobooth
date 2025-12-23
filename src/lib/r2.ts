@@ -1,95 +1,101 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Readable } from "node:stream";
 
-const R2_ENDPOINT = process.env.R2_ENDPOINT;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
-const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL?.replace(/\/$/, "");
-const R2_REGION = process.env.R2_REGION || "auto";
+const R2_ENDPOINT = process.env.R2_ENDPOINT!;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY!;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!;
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL;
 
-function getClient() {
-  if (!R2_ENDPOINT || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-    throw new Error("R2 configuration is incomplete. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME.");
-  }
-  return new S3Client({
-    region: R2_REGION,
-    endpoint: R2_ENDPOINT,
-    credentials: {
-      accessKeyId: R2_ACCESS_KEY_ID,
-      secretAccessKey: R2_SECRET_ACCESS_KEY,
-    },
-    forcePathStyle: true,
-  });
-}
+const s3Client = new S3Client({
+  region: "auto",
+  endpoint: R2_ENDPOINT,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+});
 
-function streamToBuffer(stream: Readable): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    stream.on("error", reject);
-    stream.on("end", () => resolve(Buffer.concat(chunks)));
-  });
-}
-
-export async function uploadToR2({
-  key,
-  body,
-  contentType,
-  cacheControl,
-}: {
+export async function uploadToR2(options: {
   key: string;
-  body: Buffer;
+  body: Buffer | Uint8Array | string;
   contentType: string;
   cacheControl?: string;
-}) {
-  const client = getClient();
-  await client.send(
+}): Promise<{ key: string; url: string | null }> {
+  const { key, body, contentType, cacheControl } = options;
+
+  await s3Client.send(
     new PutObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
       Body: body,
       ContentType: contentType,
-      CacheControl: cacheControl,
-    }),
+      CacheControl: cacheControl || "public, max-age=31536000",
+    })
   );
+
   const url = R2_PUBLIC_BASE_URL ? `${R2_PUBLIC_BASE_URL}/${key}` : null;
   return { key, url };
 }
 
-export async function fetchFromR2(key: string) {
-  const client = getClient();
-  const res = await client.send(
+export async function fetchFromR2(key: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const response = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+    })
+  );
+
+  if (!response.Body) {
+    throw new Error(`File not found: ${key}`);
+  }
+
+  const bytes = await response.Body.transformToByteArray();
+  return {
+    buffer: Buffer.from(bytes),
+    contentType: response.ContentType || "application/octet-stream",
+  };
+}
+
+export async function deleteFromR2(key: string): Promise<void> {
+  await s3Client.send(
+    new DeleteObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+    })
+  );
+}
+
+export async function getDownloadPresignedUrl(key: string, expiresIn: number = 3600): Promise<string> {
+  return getSignedUrl(
+    s3Client,
     new GetObjectCommand({
       Bucket: R2_BUCKET_NAME,
       Key: key,
     }),
+    { expiresIn }
   );
-  const buffer = await streamToBuffer(res.Body as Readable);
-  const contentType = res.ContentType || "application/octet-stream";
-  return { buffer, contentType };
 }
 
-export async function deleteFromR2(keys: string[]) {
-  if (keys.length === 0) return;
-  const client = getClient();
-  for (const key of keys) {
-    try {
-      await client.send(
-        new DeleteObjectCommand({
-          Bucket: R2_BUCKET_NAME,
-          Key: key,
-        }),
-      );
-    } catch (error) {
-      console.error("Failed to delete R2 object", { key, error });
-    }
-  }
+export function getPublicUrl(key: string): string | null {
+  if (!R2_PUBLIC_BASE_URL) return null;
+  return `${R2_PUBLIC_BASE_URL}/${key}`;
 }
 
-export async function presignR2(key: string, expiresInSeconds = 3600) {
-  const client = getClient();
-  const command = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key });
-  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
-}
+export const r2Keys = {
+  photo: (eventId: string, sessionId: string, filename: string) =>
+    `photos/${eventId}/${sessionId}/${filename}`,
+  composite: (eventId: string, compositeId: string) =>
+    `composites/${eventId}/${compositeId}.png`,
+  background: (eventId: string, backgroundId: string) =>
+    `backgrounds/${eventId}/${backgroundId}`,
+  aiBackground: (eventId: string, backgroundId: string) =>
+    `ai-backgrounds/${eventId}/${backgroundId}.png`,
+  production: (productionId: string, filename: string) =>
+    `productions/${productionId}/${filename}`,
+};
