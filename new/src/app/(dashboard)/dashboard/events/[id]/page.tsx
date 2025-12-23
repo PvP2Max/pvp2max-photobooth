@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { AIBackgroundGenerator } from "@/components/dashboard/AIBackgroundGenerator";
 
 interface Event {
   id: string;
@@ -48,6 +49,7 @@ export default function EventDetailPage() {
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "photos" | "backgrounds">("overview");
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -278,7 +280,10 @@ export default function EventDetailPage() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold">Backgrounds</h3>
             {event.aiCredits > event.aiUsed && (
-              <button className="text-sm text-blue-600 hover:text-blue-800">
+              <button
+                onClick={() => setShowAIGenerator(true)}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
                 + Generate AI Background ({event.aiCredits - event.aiUsed} left)
               </button>
             )}
@@ -301,6 +306,22 @@ export default function EventDetailPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {showAIGenerator && event && (
+        <AIBackgroundGenerator
+          eventId={event.id}
+          creditsRemaining={event.aiCredits - event.aiUsed}
+          onGenerated={async () => {
+            const bgRes = await fetch(`/api/v1/events/${eventId}/backgrounds?all=true`);
+            if (bgRes.ok) {
+              const bgData = await bgRes.json();
+              setBackgrounds(bgData.data?.items || []);
+            }
+            setEvent((prev) => prev ? { ...prev, aiUsed: prev.aiUsed + 1 } : null);
+          }}
+          onClose={() => setShowAIGenerator(false)}
+        />
       )}
     </div>
   );
