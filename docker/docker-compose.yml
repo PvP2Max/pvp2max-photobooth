@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   boothos:
     build:
@@ -37,8 +35,8 @@ services:
   logto:
     image: svhd/logto:latest
     ports:
-      - "3001:3001"
-      - "3002:3002"
+      - "4001:3001"  # Admin console on host port 4001
+      - "4002:3002"  # Auth endpoint on host port 4002
     environment:
       - TRUST_PROXY_HEADER=1
       - DB_URL=postgresql://boothos:boothos@postgres:5432/logto
